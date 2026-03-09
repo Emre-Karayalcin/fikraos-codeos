@@ -1,0 +1,372 @@
+@import 'tailwindcss';
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Aeonik Font Family */
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-RegularItalic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-LightItalic.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/fonts/aeonik/Aeonik-BoldItalic.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Dark table styles for Ant Design */
+.dark-table .ant-table {
+  background-color: #475569 !important;
+}
+
+.dark-table .ant-table-thead > tr > th {
+  background-color: #475569 !important;
+  color: #fff !important;
+  border-bottom: 1px solid #64748b !important;
+}
+
+.dark-table .ant-table-tbody > tr > td {
+  background-color: #475569 !important;
+  color: #fff !important;
+  border-bottom: 1px solid #64748b !important;
+}
+
+.dark-table .ant-table-tbody > tr:hover > td {
+  background-color: #64748b !important;
+}
+
+.dark-pagination .ant-pagination-item {
+  background-color: #475569 !important;
+  border-color: #64748b !important;
+}
+
+.dark-pagination .ant-pagination-item a {
+  color: #fff !important;
+}
+
+.dark-pagination .ant-pagination-item-active {
+  background-color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+.dark-pagination .ant-pagination-prev,
+.dark-pagination .ant-pagination-next {
+  color: #fff !important;
+}
+
+.dark-pagination .ant-pagination-prev:hover,
+.dark-pagination .ant-pagination-next:hover {
+  color: #3b82f6 !important;
+}
+
+/* Form inputs dark theme */
+.ant-select-selector {
+  background-color: #64748b !important;
+  border-color: #64748b !important;
+  color: #fff !important;
+}
+
+.ant-select-selection-placeholder {
+  color: #cbd5e1 !important;
+}
+
+.ant-select-arrow {
+  color: #cbd5e1 !important;
+}
+
+.ant-input {
+  background-color: #ffffff1a !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+.ant-input-password {
+  background-color: #ffffff1a !important;
+  position: relative !important;
+}
+
+.ant-input-password .ant-input {
+  background: none !important;
+  background-color: unset !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  border-radius: 25px !important;
+  padding-left: 20px !important;
+  padding-right: 50px !important;
+}
+
+.ant-input-password .ant-input-suffix {
+  margin-left: auto !important;
+  mix-blend-mode: difference !important;
+}
+
+.ant-input-suffix .anticon {
+  color: #fff !important;
+}
+
+.ant-input::placeholder {
+  color: #cbd5e1 !important;
+}
+
+.ant-form-item-label > label {
+  color: #fff !important;
+}
+
+.ant-btn-color-primary {
+  box-shadow: none !important;
+}
+
+.ant-card {
+  color: #fff;
+  background-color: #253542;
+  border: none;
+  border-radius: 8px;
+}
+
+.ant-card-body {
+  padding: 19px !important;
+}
+
+.ant-picker-outlined {
+  background-color: #fefefe33 !important;
+  height: 30px;
+  width: 149px;
+  border: none;
+}
+
+.ant-picker-input {
+  color: white;
+}
+
+.ant-picker-input input,
+.ant-picker-suffix,
+.ant-picker-clear {
+  color: white !important;
+}
+
+.ant-picker-input input::placeholder {
+  color: white !important;
+}
+
+.ant-table,
+.ant-table-thead > tr > th {
+  color: white !important;
+}
+
+.ant-table-cell {
+  padding: 16px 24px !important;
+  border-bottom: 0.6px solid #256b6f !important;
+  background-color: transparent !important;
+}
+
+.ant-table-cell::before {
+  display: none !important;
+}
+
+.ant-checkbox-inner {
+  background-color: #fefefe33 !important;
+  border: 1px solid #fefefe !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 2px !important;
+}
+
+.ant-checkbox-wrapper-checked .ant-checkbox-inner {
+  background-color: #b8d8c0 !important;
+  border: 1px solid #b8d8c0 !important;
+}
+
+.ant-pagination-total-text,
+.ant-pagination-item-link,
+.ant-pagination-item-ellipsis {
+  color: #fff !important;
+}
+
+.ant-form-item-required::before {
+  display: none !important;
+}
+
+.ant-select-selection-item,
+.ant-select-item-option-content {
+  color: #fff !important;
+}
+
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: #b8d8c0 !important;
+}
+
+.ant-select-dropdown {
+  background-color: #475569 !important;
+}
+
+.ant-radio-label {
+  color: #fff !important;
+}
+
+.ant-radio-inner {
+  background-color: transparent !important;
+}
+
+.ant-modal-content,
+.ant-modal-header {
+  background-color: #3d545c !important;
+}
+
+.ant-modal-title {
+  color: #fff !important;
+  font-size: 24px !important;
+}
+
+.ant-modal-close-x {
+  color: #fff !important;
+}
+
+.ant-upload {
+  color: #fff !important;
+}
+
+.ant-form-item-label label {
+  font-weight: 500 !important;
+}
+
+.ant-input-outlined,
+.ant-select-selector,
+.ant-input-number {
+  background-color: #ffffff1a !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+  border: none !important;
+}
+
+.ant-select-arrow {
+  margin-top: 0 !important;
+}
+
+.ant-input-number input {
+  color: #fff !important;
+  min-height: 40px !important;
+}
+
+.ant-phone-input-wrapper input {
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.ant-input-group-addon {
+  border: none !important;
+  background-color: #ffffff1a !important;
+  border-radius: 8px 0 0 8px !important;
+}
+
+.ant-modal-footer .ant-btn-color-primary {
+  background-color: #b8d8c0 !important;
+  color: #0d1f2d !important;
+}
+
+.ant-modal-footer .ant-btn-color-default {
+  background-color: white !important;
+  color: #0d1f2d !important;
+}
+
+.ant-popconfirm-buttons .ant-btn-color-default {
+  background-color: transparent !important;
+}
+
+.ant-popconfirm-buttons .ant-btn-color-primary {
+  background-color: #b8d8c0 !important;
+  color: #0d1f2d !important;
+}
+
+.ant-empty-description {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.ant-empty-image svg,
+.ant-empty-image g {
+  fill: rgba(255, 255, 255, 0.45) !important;
+  stroke: rgba(255, 255, 255, 0.45) !important;
+}
+
+.ant-input-password .ant-input {
+  border-radius: 8px !important;
+}

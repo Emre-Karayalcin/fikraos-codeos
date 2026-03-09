@@ -1,0 +1,1860 @@
+{
+  "newChat": {
+    "title": "إنشاء محادثة",
+    "choose": "اختر طريقة بناء المحادثة",
+    "buildWithAI": "البناء بالذكاء الاصطناعي",
+    "buildManual": "البناء يدويًا",
+    "note": "البناء بالذكاء الاصطناعي ينشئ مشروعًا ومحادثة تلقائيًا."
+  },
+  "manual": {
+    "step1": {
+      "title": "ما هي فكرتك؟ اشرحها بشكل شامل.",
+      "placeholder": "صف الفكرة بالتفصيل..."
+    },
+    "step2": {
+      "title": "أين ستطلق فكرتك؟"
+    },
+    "step3": {
+      "title": "ما الذي يميز فكرتك؟",
+      "placeholder": "اذكر ما يميز فكرتك..."
+    },
+    "step4": {
+      "title": "ما الذي يميز فكرتك؟",
+      "placeholder": "لخص نقاط التميز..."
+    },
+    "step5": {
+      "title": "ما اسم فكرتك؟"
+    },
+    "generateIdeas": "توليد أفكار"
+  },
+  "comments": {
+    "thread": "الرسائل",
+    "loading": "جارٍ تحميل الرسائل...",
+    "noMessages": "لا توجد رسائل بعد",
+    "placeholder": "أضف تعليقاً...",
+    "posted": "تم نشر التعليق",
+    "postError": "فشل في نشر التعليق",
+    "sending": "جارٍ الإرسال...",
+    "send": "إرسال"
+  },
+  "adminAssets": {
+    "leanCanvas": {
+      "noData": "لا توجد بيانات لوحة العمل الرشيقة",
+      "problem": "المشكلة",
+      "solution": "الحل",
+      "uniqueValueProposition": "عرض القيمة الفريد",
+      "customerSegments": "شرائح العملاء",
+      "channels": "القنوات",
+      "keyMetrics": "المقاييس الرئيسية",
+      "costStructure": "هيكل التكلفة",
+      "revenueStreams": "مصادر الإيرادات",
+      "unfairAdvantage": "الميزة غير العادلة"
+    },
+    "businessModel": {
+      "noData": "لا توجد بيانات نموذج العمل",
+      "customerSegments": "شرائح العملاء",
+      "revenueStreams": "مصادر الإيرادات",
+      "keyActivities": "الأنشطة الرئيسية",
+      "keyPartners": "الشركاء الرئيسيون",
+      "costStructure": "هيكل التكلفة",
+      "keyAssumptions": "الافتراضات الرئيسية",
+      "confidence": "الثقة"
+    },
+    "tamSamSom": {
+      "noData": "لا توجد بيانات TAM/SAM/SOM",
+      "marketSizeAnalysis": "تحليل حجم السوق",
+      "marketSize": "حجم السوق",
+      "tam": "السوق الإجمالي المتاح",
+      "sam": "السوق القابل للخدمة المتاح",
+      "som": "السوق القابل للخدمة والحصول عليه",
+      "marketTrends": "اتجاهات السوق",
+      "growthDrivers": "محركات النمو",
+      "marketPenetration": "توقعات اختراق السوق",
+      "year1": "السنة 1",
+      "year3": "السنة 3",
+      "year5": "السنة 5",
+      "customers": "عملاء",
+      "revenue": "إيرادات",
+      "keyAssumptions": "الافتراضات الرئيسية",
+      "impact": "التأثير",
+      "analysisNotes": "ملاحظات التحليل",
+      "method": "الطريقة"
+    }
+  },
+  "aiOutputs": {
+    "title": "جميع مخرجات الذكاء الاصطناعي",
+    "all": "الكل",
+    "collapse": "طي",
+    "expand": "توسيع",
+    "noOutputs": "لا توجد مخرجات ذكاء اصطناعي بعد لهذه الفكرة.",
+    "outputsWillAppear": "ستظهر مخرجات الذكاء الاصطناعي هنا عند إنشائها.",
+    "pitchSlides": "شرائح العرض",
+    "fundingAsk": "طلب التمويل",
+    "responsibilities": "المسؤوليات",
+    "motivators": "المحفزات الرئيسية",
+    "attributes": "الصفات الشخصية",
+    "overview": "نظرة عامة",
+    "competitors": "المنافسون",
+    "strengths": "نقاط القوة",
+    "weaknesses": "نقاط الضعف",
+    "recommendations": "التوصيات",
+    "useOfFunds": "استخدام الأموال",
+    "marketingBudget": "ميزانية التسويق",
+    "targetAudience": "الجمهور المستهدف",
+    "demographics": "التركيبة السكانية",
+    "marketingChannels": "قنوات التسويق",
+    "digitalChannels": "القنوات الرقمية",
+    "traditionalChannels": "القنوات التقليدية",
+    "marketingFunnel": "قمع التسويق",
+    "awareness": "الوعي",
+    "consideration": "الاعتبار",
+    "conversion": "التحويل",
+    "retention": "الاحتفاظ",
+    "timeline": "الجدول الزمني",
+    "messaging": "الرسائل",
+    "brandVoice": "صوت العلامة التجارية",
+    "persona": "الشخصية",
+    "actions": "الإجراءات",
+    "emotions": "المشاعر",
+    "painPoints": "نقاط الألم",
+    "opportunities": "الفرص",
+    "inDepthQuestions": "أسئلة متعمقة",
+    "demographicQuestions": "أسئلة ديموغرافية",
+    "wrapUpQuestions": "أسئلة الختام",
+    "acceptanceCriteria": "معايير القبول",
+    "visualIdentity": "الهوية البصرية",
+    "logoIdea": "مفهوم الشعار",
+    "typography": "الطباعة",
+    "colorPalette": "لوحة الألوان",
+    "brandValues": "قيم العلامة التجارية",
+    "brandPersonality": "شخصية العلامة التجارية",
+    "customerPromise": "وعد العملاء",
+    "imageryPhotography": "الصور والتصوير"
+  },
+  "adminIdea": {
+    "updateSuccess": "تم تحديث الفكرة بنجاح",
+    "updateFailed": "فشل تحديث الفكرة",
+    "deleteSuccess": "تم حذف الفكرة بنجاح",
+    "deleteFailed": "فشل حذف الفكرة",
+    "commentSuccess": "تمت إضافة التعليق بنجاح",
+    "commentFailed": "فشلت إضافة التعليق",
+    "commentEmpty": "لا يمكن أن يكون التعليق فارغاً",
+    "statusUpdateSuccess": "تم تحديث الحالة بنجاح",
+    "statusUpdateFailed": "فشل تحديث الحالة",
+    "evaluationSuccess": "تم إنشاء التقييم بنجاح",
+    "evaluationFailed": "فشل إنشاء التقييم",
+    "notFound": "الفكرة غير موجودة",
+    "backToIdeas": "العودة إلى الأفكار",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "deleteTitle": "حذف الفكرة",
+    "deleteConfirm": "هل أنت متأكد من حذف هذه الفكرة؟ لا يمكن التراجع عن هذا الإجراء.",
+    "cancel": "إلغاء",
+    "deleting": "جارٍ الحذف...",
+    "tabs": {
+      "overview": "نظرة عامة",
+      "aiOutputs": "مخرجات الذكاء الاصطناعي",
+      "lifecycle": "دورة الحياة"
+    },
+    "summary": "الملخص",
+    "details": "التفاصيل",
+    "status": "الحالة",
+    "created": "تاريخ الإنشاء",
+    "lastUpdated": "آخر تحديث",
+    "owner": "المالك",
+    "comments": "التعليقات",
+    "editTitle": "تعديل الفكرة",
+    "editDescription": "تحديث تفاصيل الفكرة",
+    "titleLabel": "العنوان",
+    "descriptionLabel": "الوصف",
+    "tagsLabel": "الوسوم (مفصولة بفواصل)",
+    "updating": "جارٍ التحديث...",
+    "updateButton": "تحديث الفكرة"
+  },
+  "brandIdentity": {
+    "title": "الهوية البصرية للعلامة التجارية",
+    "noData": "لا توجد بيانات للهوية البصرية",
+    "colorPalette": "لوحة الألوان",
+    "typography": "الطباعة",
+    "headline": "العنوان الرئيسي",
+    "subheadline": "العنوان الفرعي",
+    "bodyText": "النص الأساسي",
+    "sampleTitle": "عنوان تجريبي",
+    "sampleSubtitle": "نص داعم للعناوين",
+    "sampleText": "هذا نص تجريبي لتوضيح شكل الخط المستخدم. يظهر كيف يبدو الخط في شكل فقرة مع المسافات المناسبة وسهولة القراءة.",
+    "logoIdea": "مفهوم الشعار",
+    "imageryPhotography": "أسلوب الصور والتصوير",
+    "personalityTraits": "شخصية العلامة التجارية",
+    "brandVoice": "صوت العلامة التجارية",
+    "brandValues": "قيم العلامة التجارية",
+    "customerPromise": "الوعد للعملاء"
+  },
+  "competitorMap": {
+    "title": "تحليل المنافسين",
+    "subtitle": "نظرة عامة استراتيجية على المشهد التنافسي",
+    "marketShare": "الحصة السوقية",
+    "strengths": "نقاط القوة",
+    "weaknesses": "نقاط الضعف",
+    "keyProducts": "المنتجات الرئيسية",
+    "pricing": "التسعير",
+    "target": "الجمهور المستهدف",
+    "marketGaps": "الفجوات والفرص السوقية",
+    "ourAdvantages": "مزايانا التنافسية",
+    "competitiveThreats": "التهديدات التنافسية",
+    "strategicRecommendations": "التوصيات الاستراتيجية"
+  },
+  "brandWheel": {
+    "title": "عجلة العلامة التجارية",
+    "subtitle": "الهوية الأساسية والقيم لعلامتك التجارية",
+    "mission": "المهمة",
+    "vision": "الرؤية",
+    "brandPositioning": "موضع العلامة التجارية",
+    "brandValues": "قيم العلامة التجارية",
+    "personality": "الشخصية",
+    "brandSummary": "ملخص العلامة التجارية",
+    "coreValues": "القيم الأساسية",
+    "personalityTraits": "سمات الشخصية",
+    "positioning": "الموضع",
+    "noData": "لا توجد بيانات عجلة العلامة التجارية"
+  },
+  "centerPanel": {
+    "error": "خطأ",
+    "deleteError": "فشل حذف المحادثة. يرجى المحاولة مرة أخرى.",
+    "copy": "نسخ",
+    "duplicateError": "فشل تكرار المحادثة. يرجى المحاولة مرة أخرى.",
+    "unauthorized": "غير مصرح",
+    "unauthorizedDesc": "تم تسجيل خروجك. جاري تسجيل الدخول مرة أخرى...",
+    "sendError": "فشل إرسال الرسالة. يرجى المحاولة مرة أخرى.",
+    "analyzingQuery": "جاري تحليل استفسارك...",
+    "researchFailed": "فشل البحث",
+    "researchError": "حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.",
+    "noChatSelected": "لم يتم تحديد محادثة",
+    "selectChat": "اختر محادثة للبدء في الدردشة",
+    "launchpad": "منصة الانطلاق",
+    "duplicating": "جاري التكرار...",
+    "duplicate": "تكرار",
+    "confirmDelete": "هل أنت متأكد أنك تريد حذف هذه المحادثة؟",
+    "deleting": "جاري الحذف...",
+    "delete": "حذف",
+    "challengeSubmission": "تقديم التحدي",
+    "submittingTo": "التقديم إلى",
+    "submittingToDesc": "سيتم تقديم فكرتك لهذا التحدي عندما تكون جاهزًا",
+    "challengeCleared": "تم مسح سياق التحدي",
+    "challengeClearedDesc": "لم تعد تقدم لتحدي محدد",
+    "creatingFramework": "جاري إنشاء إطار عملك...",
+    "thinking": "الذكاء الاصطناعي يفكر...",
+    "generatingAssets": "جاري إنشاء أصول الأعمال خطوة بخطوة...",
+    "assetFlow": "لوحة لين → SWOT → الشخصيات → الرحلة → التسويق → المنافسون → TAM/SAM/SOM → العرض",
+    "aiThinking": "الذكاء الاصطناعي يفكر...",
+    "inputPlaceholder": "اطرح سؤالاً أو اوصف فكرة عملك..."
+  },
+  "interviewQuestionsPreview": {
+    "title": "أسئلة المقابلة",
+    "inDepth": "معمقة",
+    "demographic": "ديموغرافية",
+    "wrapUp": "ختامية",
+    "questionsCount": "{{count}} أسئلة",
+    "noQuestions": "لا توجد أسئلة في هذه الفئة",
+    "moreQuestions": "+{{count}} المزيد...",
+    "totalQuestions": "إجمالي الأسئلة"
+  },
+  "brandWheelPreview": {
+    "title": "عجلة العلامة التجارية",
+    "mission": "المهمة",
+    "vision": "الرؤية",
+    "positioning": "الموضع",
+    "values": "القيم",
+    "personality": "الشخصية",
+    "itemsCount": "{{count}} عناصر"
+  },
+  "brandIdentityPreview": {
+    "title": "هوية العلامة التجارية",
+    "colorPalette": "لوحة الألوان",
+    "typographyLogo": "الطباعة والشعار",
+    "brandPersonality": "شخصية العلامة التجارية",
+    "typography": "الطباعة",
+    "logo": "الشعار",
+    "traits": "السمات",
+    "voice": "الصوت"
+  },
+  "competitorMapPreview": {
+    "title": "تحليل المنافسين",
+    "competitors": "المنافسون",
+    "marketInsights": "رؤى السوق",
+    "strategy": "الاستراتيجية",
+    "marketShare": "حصة السوق",
+    "strengthsCount": "{{count}} نقاط قوة",
+    "weaknessesCount": "{{count}} نقاط ضعف",
+    "noData": "لا توجد بيانات المنافسين",
+    "marketGaps": "فجوات السوق",
+    "opportunitiesIdentified": "تم تحديد {{count}} فرص",
+    "noGapsIdentified": "لم يتم تحديد فجوات",
+    "competitiveThreats": "التهديدات التنافسية",
+    "threatsToMonitor": "{{count}} تهديدات لمراقبتها",
+    "noThreatsIdentified": "لم يتم تحديد تهديدات",
+    "advantages": "المزايا",
+    "yourAdvantages": "مزاياك",
+    "noAdvantagesListed": "لا توجد مزايا مدرجة",
+    "topRecommendation": "التوصية الرئيسية",
+    "noRecommendationsAvailable": "لا توجد توصيات متاحة",
+    "moreStrategies": "+{{count}} استراتيجيات إضافية"
+  },
+  "marketingPreview": {
+    "title": "خطة التسويق",
+    "awareness": "الوعي",
+    "consider": "التفكير",
+    "convert": "التحويل",
+    "retain": "الاحتفاظ",
+    "totalBudget": "إجمالي الميزانية",
+    "targeting": "الاستهداف",
+    "messaging": "الرسائل"
+  },
+  "journeyMapPreview": {
+    "title": "رحلة العميل",
+    "defaultPersona": "العميل المستهدف",
+    "loading": "جاري رسم الرحلة...",
+    "personaJourney": "رحلة {{persona}}"
+  },
+  "leanCanvasPreview": {
+    "title": "لوحة لين",
+    "problem": "المشكلة",
+    "solution": "الحل",
+    "valueProp": "عرض القيمة",
+    "customers": "العملاء",
+    "revenue": "الإيرادات",
+    "metrics": "المقاييس"
+  },
+  "pitchOutlinePreview": {
+    "title": "مخطط العرض التقديمي",
+    "slidePresentation": "عرض تقديمي من {{count}} شريحة",
+    "fundingAsk": "طلب التمويل"
+  },
+  "pitchOutline": {
+    "title": "مخطط العرض التقديمي",
+    "subtitle": "تدفق عرض منظم لعرض المستثمرين",
+    "keyPoints": "النقاط الرئيسية",
+    "keyMessages": "الرسائل الرئيسية",
+    "callToAction": "الدعوة للعمل",
+    "generateTitle": "إنشاء ملفات العرض التقديمي",
+    "generatedDecks": "العروض التقديمية المُنشأة",
+    "deckNumber": "العرض التقديمي #{{number}}",
+    "template": "القالب",
+    "theme": "الثيم",
+    "color": "اللون",
+    "generating": "جاري الإنشاء...",
+    "generationFailed": "فشل الإنشاء",
+    "tryAgain": "يرجى المحاولة مرة أخرى",
+    "confirmDelete": "هل أنت متأكد من حذف هذا الإنشاء؟",
+    "deleteFailed": "فشل حذف الإنشاء",
+    "deleteError": "خطأ في حذف الإنشاء",
+    "generateDeck": "إنشاء عرض تقديمي",
+    "generateDescription": "إنشاء عروض PPTX احترافية من مخطط العرض مع قوالب قابلة للتخصيص",
+    "createNew": "إنشاء عرض تقديمي جديد",
+    "customize": "تخصيص وإنشاء",
+    "customizationOptions": "خيارات التخصيص",
+    "templateStyle": "نمط القالب",
+    "modernBusiness": "أعمال حديثة",
+    "minimalClean": "بسيط نظيف",
+    "creativeBold": "إبداعي جريء",
+    "corporateProfessional": "شركات احترافي",
+    "colorScheme": "نظام الألوان",
+    "oceanBlue": "أزرق المحيط",
+    "forestGreen": "أخضر الغابة",
+    "royalPurple": "بنفسجي ملكي",
+    "vibrantOrange": "برتقالي نابض",
+    "darkMode": "الوضع الداكن",
+    "themeFocus": "تركيز الثيم",
+    "professional": "احترافي",
+    "startupPitch": "عرض شركة ناشئة",
+    "techInnovation": "ابتكار تقني",
+    "consulting": "استشارات",
+    "typography": "الطباعة",
+    "interModern": "Inter (حديث)",
+    "robotoClean": "Roboto (نظيف)",
+    "arialClassic": "Arial (كلاسيكي)",
+    "helveticaElegant": "Helvetica (أنيق)",
+    "appendix": "الملحق"
+  },
+  "genericAsset": {
+    "title": "أصل الأعمال",
+    "subtitle": "تحليل ورؤى الأعمال المُنشأة"
+  },
+  "interviewQuestions": {
+    "title": "مقابلات التحقق من العملاء",
+    "noQuestions": "لم يتم إنشاء أسئلة مقابلة بعد",
+    "questionsCount": "{{count}} سؤال عبر {{categories}} فئات",
+    "questionCount": "{{count}} أسئلة",
+    "questionCount_one": "{{count}} سؤال",
+    "disclaimers": "إخلاء المسؤولية",
+    "demographic": "ديموغرافي",
+    "inDepth": "متعمق",
+    "wrapUp": "الختام",
+    "disclaimersContent": "الهدف:\nالهدف من المقابلة هو مساعدتنا في الحصول على فهم أفضل لـ...\n\nالتوقعات:\n• إذا كان هناك أي شيء لا تشعر بالراحة في الرد عليه، فلا تتردد في إعلامي.\n• لا توجد إجابات صحيحة أو خاطئة. الهدف من هذه المقابلة هو سماع وجهة نظرك الفريدة حول تجاربك.\n• سأقوم بتدوين الملاحظات طوال المقابلة، لذا إذا كنت أنظر بعيدًا عن الكاميرا، فهذا يعني أنني مشغول بالكتابة.\n\nإخلاء المسؤولية:\nتذكير سريع، يتم تسجيل هذه الجلسة للرجوع إليها لاحقًا. هل يمكنك تأكيد أنك سعيد بالمضي قدمًا."
+  },
+  "swot": {
+    "title": "تحليل SWOT",
+    "subtitle": "تحليل استراتيجي للعوامل الداخلية والخارجية",
+    "strengths": "نقاط القوة",
+    "weaknesses": "نقاط الضعف",
+    "opportunities": "الفرص",
+    "threats": "التهديدات",
+    "impact": "التأثير",
+    "score": "النقاط",
+    "growth": "النمو",
+    "timeline": "الجدول الزمني",
+    "probability": "الاحتمالية",
+    "mitigation": "التخفيف",
+    "noItems": "لم يتم تحديد عناصر",
+    "items": "عناصر",
+    "opportunitiesLabel": "فرص",
+    "threatsLabel": "تهديدات",
+    "avgScore": "متوسط: {{score}}/10",
+    "market": "السوق",
+    "highRisk": "{{count}} عالي المخاطر",
+    "strategicProfile": "الملف الاستراتيجي",
+    "risk": "المخاطر",
+    "opportunity": "الفرصة"
+  },
+  "journeyMap": {
+    "title": "خريطة رحلة العميل",
+    "subtitle": "فهم تجربة العميل عبر جميع نقاط الاتصال",
+    "targetPersona": "الشخصية المستهدفة",
+    "goal": "الهدف",
+    "touchpoints": "نقاط الاتصال",
+    "painPoints": "نقاط الألم",
+    "opportunities": "الفرص",
+    "emotions": "المشاعر",
+    "keyInsights": "الرؤى الرئيسية",
+    "overview": "نظرة عامة على الرحلة"
+  },
+  "leanCanvas": {
+    "title": "نموذج الأعمال المبسط",
+    "subtitle": "نظرة عامة على نموذج الأعمال في صفحة واحدة",
+    "problem": "المشكلة",
+    "solution": "الحل",
+    "keyMetrics": "المقاييس الرئيسية",
+    "uniqueValueProposition": "عرض القيمة الفريد",
+    "unfairAdvantage": "الميزة التنافسية",
+    "channels": "القنوات",
+    "customerSegments": "شرائح العملاء",
+    "costStructure": "هيكل التكاليف",
+    "revenueStreams": "مصادر الإيرادات"
+  },
+  "marketingPlan": {
+    "title": "خطة التسويق",
+    "subtitle": "استراتيجية تسويق شاملة وخطة تنفيذ",
+    "targeting": "الاستهداف",
+    "primaryAudience": "الجمهور الأساسي",
+    "demographics": "التركيبة السكانية",
+    "messaging": "الرسائل",
+    "valueProposition": "عرض القيمة",
+    "keyMessages": "الرسائل الرئيسية",
+    "marketingFunnel": "قمع التسويق",
+    "awareness": "الوعي",
+    "consideration": "الاعتبار",
+    "conversion": "التحويل",
+    "retention": "الاحتفاظ",
+    "budgetOverview": "نظرة عامة على الميزانية",
+    "totalBudget": "إجمالي ميزانية التسويق",
+    "launchTimeline": "جدول الإطلاق الزمني",
+    "targetAudience": "الجمهور المستهدف",
+    "notDefined": "غير محدد",
+    "psychographics": "السيكوغرافيا",
+    "traitsCount": "{{count}} سمات",
+    "brandVoice": "صوت العلامة التجارية",
+    "channels": "القنوات",
+    "marketingChannels": "قنوات التسويق",
+    "budget": "الميزانية",
+    "notSpecified": "غير محدد",
+    "digital": "رقمي",
+    "traditional": "تقليدي",
+    "funnel": "القمع",
+    "customerJourney": "رحلة العميل",
+    "tactics": "{{count}} تكتيكات",
+    "budgetTimeline": "الميزانية والجدول الزمني",
+    "budgetItems": "بنود الميزانية",
+    "timelinePhases": "مراحل الجدول الزمني",
+    "timelineNotDefined": "الجدول الزمني غير محدد"
+  },
+  "userStories": {
+    "title": "قصص المستخدمين",
+    "noStories": "لم يتم إنشاء قصص مستخدمين بعد",
+    "storiesCount": "تم إنشاء {{count}} قصص",
+    "storiesCount_one": "تم إنشاء {{count}} قصة",
+    "storyLabel": "قصة المستخدم",
+    "acceptanceCriteria": "معايير القبول",
+    "defaultRole": "مستخدم",
+    "criteriaCount": "{{count}} معايير قبول",
+    "criteriaCount_one": "{{count}} معيار قبول",
+    "storyCount": "القصة {{current}}/{{total}}",
+    "loading": "جاري تحميل قصص المستخدم..."
+  },
+  "tamSamSom": {
+    "title": "تحليل حجم السوق",
+    "subtitle": "تفصيل TAM و SAM و SOM وتوقعات الإيرادات",
+    "methodology": "المنهجية",
+    "tam": "TAM",
+    "sam": "SAM",
+    "som": "SOM",
+    "tamFull": "إجمالي السوق القابل للخدمة",
+    "samFull": "السوق القابل للخدمة المتاح",
+    "somFull": "السوق القابل للحصول عليه",
+    "marketPenetration": "اختراق السوق",
+    "revenueProjection": "توقعات الإيرادات",
+    "year1": "السنة الأولى",
+    "year3": "السنة الثالثة",
+    "year5": "السنة الخامسة",
+    "globalMarket": "السوق العالمي",
+    "addressable": "القابل للوصول",
+    "obtainable": "القابل للتحقيق",
+    "defaultTimeframe": "٥-٧ سنوات",
+    "fiveYear": "٥ سنوات",
+    "conservative": "متحفظ",
+    "realistic": "واقعي",
+    "optimistic": "متفائل"
+  },
+  "teamRoles": {
+    "title": "أدوار الفريق",
+    "noData": "لا توجد بيانات أدوار الفريق",
+    "responsibilities": "المسؤوليات",
+    "personalAttributes": "الصفات الشخصية",
+    "drivingMotivators": "المحفزات الرئيسية",
+    "summary": "ملخص الفريق",
+    "summaryDesc": "الأدوار الرئيسية المحددة لمشروعك",
+    "noRoles": "لا توجد أدوار فريق متاحة",
+    "roleCount": "{{current}}/{{total}}",
+    "attributes": "السمات",
+    "motivators": "الدوافع",
+    "viewRole": "عرض {{name}}"
+  },
+  "personas": {
+    "title": "شخصيات المستخدمين",
+    "subtitle": "ملفات تعريف مفصلة لعملائك المستهدفين",
+    "noData": "لا توجد بيانات شخصيات متاحة",
+    "yearsOld": "سنة",
+    "goals": "الأهداف",
+    "painPoints": "نقاط الألم",
+    "behaviors": "السلوكيات",
+    "techUsage": "استخدام التكنولوجيا",
+    "proficiency": "الكفاءة",
+    "dailyTools": "الأدوات اليومية",
+    "platforms": "المنصات",
+    "adoptionStyle": "أسلوب التبني",
+    "decisionInfluence": "تأثير القرار",
+    "defaultName": "شخصية",
+    "defaultOccupation": "محترف",
+    "age": "العمر {{age}}",
+    "loading": "جاري تحميل الشخصيات..."
+  },
+  "experts": {
+    "title": "تحدث مع الخبراء",
+    "subtitle": "احصل على مشورة شخصية من متخصصي الصناعة",
+    "connecting": "جاري الاتصال...",
+    "listening": "يستمع...",
+    "talking": "يتحدث...",
+    "callExpert": "اتصل بالخبير",
+    "endCall": "إنهاء المكالمة",
+    "typeMessage": "اكتب رسالتك...",
+    "modes": {
+      "audio": "صوتي",
+      "text": "نصي"
+    }
+  },
+  "common": {
+    "locale": "ar-SA",
+    "saving": "جارٍ الحفظ...",
+    "submit": "إرسال",
+    "copy": "نسخ",
+    "duplicate": "تكرار",
+    "notSpecified": "غير محدد",
+    "na": "غير متاح",
+    "view": "عرض",
+    "download": "تحميل",
+    "notAvailable": "غير متوفر",
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجح",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "save": "حفظ",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "next": "التالي",
+    "previous": "السابق",
+    "search": "بحث",
+    "filter": "تصفية",
+    "sort": "ترتيب",
+    "export": "تصدير",
+    "import": "استيراد",
+    "settings": "الإعدادات",
+    "help": "المساعدة",
+    "logout": "تسجيل خروج",
+    "login": "تسجيل دخول",
+    "templates": "القوالب",
+    "waiting": "في الانتظار...",
+    "show": "عرض",
+    "entries": "إدخالات",
+    "type": "النوع",
+    "description": "الوصف",
+    "created": "تاريخ الإنشاء",
+    "lastActivity": "آخر نشاط",
+    "actions": "الإجراءات",
+    "noIdeasYet": "لا توجد أفكار بعد",
+    "startCreating": "ابدأ بإنشاء فكرتك التجارية الأولى من لوحة القيادة",
+    "welcomeBack": "أهلاً بعودتك!",
+    "send": "إرسال"
+  },
+  "navigation": {
+    "dashboard": "لوحة القيادة",
+    "myIdeas": "أفكاري",
+    "challenges": "التحديات",
+    "radar": "الرادار",
+    "experts": "الخبراء",
+    "chat": "المحادثة",
+    "projects": "المشاريع",
+    "assets": "الأصول",
+    "profile": "الملف الشخصي",
+    "allConversations": "جميع المحادثات"
+  },
+  "dashboard": {
+    "title": "لوحة القيادة",
+    "subtitle": "مركز قيادة بناء مشاريعك",
+    "overview": "نظرة عامة",
+    "recentProjects": "المشاريع الحديثة",
+    "quickActions": "إجراءات سريعة",
+    "newProject": "مشروع جديد",
+    "viewAll": "عرض الكل",
+    "whatsYourIdea": "ما فكرتك اليوم؟",
+    "explainBriefly": "اشرح فكرتك بإيجاز...",
+    "shareIdea": "شاركني فكرة مشروعك وسأساعدك في بناء إطار عمل متكامل",
+    "currentMode": "الوضع الحالي:",
+    "starting": "جاري البدء...",
+    "enter": "إدخال",
+    "greetings": {
+      "backAtIt": "مرحباً بعودتك، {{name}}",
+      "salam": "سلام {{name}}، ما فكرتك اليوم؟",
+      "welcome": "أهلاً، {{name}}",
+      "feelingCreative": "تشعر بالإبداع؟ لنبدأ.",
+      "readyTo": "مستعد لتحويل الصفر إلى واحد؟"
+    },
+    "modes": {
+      "develop": {
+        "title": "وضع التطوير",
+        "description": "ابنِ وحسّن فكرتك التجارية",
+        "placeholder": "اشرح فكرتك بإيجاز...",
+        "greeting": "{{greeting}}"
+      },
+      "research": {
+        "title": "وضع البحث",
+        "description": "اكتشف وحلل الفرص",
+        "placeholder": "ماذا تريد أن تبحث؟",
+        "greeting": "لنجد فكرتك الكبيرة التالية"
+      },
+      "launch": {
+        "title": "وضع الإطلاق",
+        "description": "ابنِ وأطلق منتجك",
+        "placeholder": "صف ما تريد بناءه...",
+        "greeting": "لنبني شيئاً رائعاً",
+        "comingSoon": "قريباً",
+        "disabled": "وضع الإطلاق معطل حالياً"
+      }
+    },
+    "generationModes": {
+      "speed": "السرعة:",
+      "lite": {
+        "label": "خفيف",
+        "description": "⚡ خفيف: سريع، صفحتان"
+      },
+      "pro": {
+        "label": "محترف",
+        "description": "🚀 محترف: متوازن، 4 صفحات"
+      },
+      "max": {
+        "label": "أقصى",
+        "description": "💎 أقصى: متميز، 6 صفحات"
+      }
+    },
+    "helpText": {
+      "pressEnter": "اضغط",
+      "toSubmit": "للإرسال"
+    },
+    "admin": {
+      "betaMode": "الوضع التجريبي"
+    },
+    "stats": {
+      "totalProjects": "إجمالي المشاريع",
+      "activeChats": "المحادثات النشطة",
+      "assetsGenerated": "الأصول المُنتجة",
+      "completionRate": "معدل الإنجاز"
+    }
+  },
+  "projects": {
+    "title": "أفكاري",
+    "subtitle": "حوّل الأفكار إلى مشاريع منظمة",
+    "createNew": "إنشاء فكرة جديدة",
+    "noProjects": "لا توجد أفكار بعد",
+    "noProjectsDesc": "ابدأ ببناء مشروعك الأول",
+    "projectCreated": "تم إنشاء المشروع!",
+    "projectCreatedDesc": "لنبدأ ببناء مشروعك معاً.",
+    "projectUpdated": "تم تحديث المشروع بنجاح",
+    "projectDeleted": "تم حذف المشروع بنجاح",
+    "newConversation": "محادثة جديدة",
+    "newConversationDescription": "محادثة جديدة لاستكشاف أفكارك",
+    "ideaTitle": "عنوان الفكرة",
+    "myVentures": "مشاريعي",
+    "initialConversation": "محادثة أولية",
+    "loginToView": "يرجى تسجيل الدخول لعرض أفكارك.",
+    "loadingIdeas": "جاري تحميل أفكارك...",
+    "totalIdeas": "{{count}} أفكار",
+    "totalIdeas_one": "{{count}} فكرة",
+    "showingIdeas": "عرض {{start}} إلى {{end}} من {{total}} أفكار",
+    "manageIdeas": "إدارة وتتبع جميع أفكار مشاريعك",
+    "confirmDelete": "هل أنت متأكد من حذف هذه الفكرة؟",
+    "deleteSuccess": "تم حذف الفكرة بنجاح",
+    "deleteError": "فشل حذف الفكرة",
+    "duplicateSuccess": "تم نسخ الفكرة بنجاح",
+    "duplicateError": "فشل نسخ الفكرة"
+  },
+  "chat": {
+    "researchPlaceholder": "ماذا تريد أن تبحث؟",
+    "attach": "إرفاق ملف",
+    "voice": "إدخال صوتي",
+    "modeDevelop": "تطوير",
+    "modeResearch": "بحث",
+    "sendHint": "اضغط Enter للإرسال • Shift + Enter لسطر جديد",
+    "title": "محادثة الشريك الذكي",
+    "subtitle": "بناء مشروعك بأفكار مدعومة بالذكاء الاصطناعي",
+    "cofounderName": "فكرة الذكي",
+    "thinking": "فكرة الذكي يفكر...",
+    "allAssetsGenerated": "تم إنشاء جميع الأصول بنجاح ✅",
+    "generatingAssets": "جارٍ إنشاء أصول الأعمال خطوة بخطوة...",
+    "creatingFramework": "🔄 جاري إنشاء إطار العمل التجاري...",
+    "frameworkComplete": "تم إنجاز إطار العمل التجاري!",
+    "helpTurnIdea": "سأساعدك في تحويل فكرتك إلى إطار عمل تجاري متكامل! لنبدأ بسؤالين بسيطين.",
+    "businessIdeaQuestion": "1. ما هي فكرتك التجارية أو اسم المنتج? 💡",
+    "launchLocationQuestion": "2. أين ستطلق هذا العمل? 🌍",
+    "ideaPlaceholder": "مثال: تطبيق لياقة ذكي، شركة تغليف صديق للبيئة...",
+    "locationPlaceholder": "مثال: الولايات المتحدة، أوروبا، السعودية، عالمي...",
+    "letsGo": "هيا بنا!",
+    "launchFirstQuestion": "2. أين ستطلق أولاً? 🌍",
+    "launchFirstPlaceholder": "مثال: الولايات المتحدة، أوروبا، الشرق الأوسط، جنوب شرق آسيا...",
+    "generatingFramework": "جاري إنشاء إطار عملك التجاري...",
+    "generateMyFramework": "إنشاء إطار عملي التجاري",
+    "willGenerate": "سأقوم بإنشاء: نموذج الأعمال المبسط • SWOT • شخصيات المستخدمين • رحلة العميل • خطة تسويقية • تحليل المنافسين • TAM/SAM/SOM • ملخص العرض",
+    "newChat": "محادثة جديدة",
+    "noChatSelected": "لم يتم تحديد محادثة",
+    "selectConversation": "حدد محادثة لبدء الدردشة",
+    "typeMessage": "اكتب رسالتك...",
+    "send": "إرسال",
+    "welcomeBack": "مرحباً بعودتك، {{name}}!",
+    "thinking": "الذكاء الاصطناعي يفكر...",
+    "generating": "جاري إنتاج الرد...",
+    "error": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى.",
+    "unauthorized": "تم تسجيل خروجك. جاري تسجيل الدخول مرة أخرى...",
+    "noMessages": "لا توجد رسائل بعد",
+    "startConversation": "ابدأ محادثة مع شريكك الذكي",
+    "loading": "جاري تحميل محادثتك...",
+    "notFound": "المحادثة غير موجودة",
+    "notFoundDesc": "هذه المحادثة غير موجودة أو ليس لديك صلاحية للوصول إليها.",
+    "modes": {
+      "fast": "سريع",
+      "balanced": "متوازن",
+      "advanced": "متقدم",
+      "fastDesc": "ردود سريعة مع Claude Haiku",
+      "balancedDesc": "أفضل جودة مع Claude Sonnet",
+      "advancedDesc": "ردود مفصلة مع Claude Sonnet",
+      "ideation": "توليد الأفكار",
+      "strategy": "الاستراتيجية",
+      "execution": "التنفيذ", 
+      "analysis": "التحليل"
+    }
+  },
+  "assets": {
+    "title": "أصول العمل",
+    "subtitle": "نظرة عامة على إطار العمل المُنتج بالذكاء الاصطناعي",
+    "generated": "مُنتج",
+    "noAssets": "لا توجد أصول بعد",
+    "noAssetsDesc": "ستظهر الأصول هنا عند محادثتك مع الذكاء الاصطناعي",
+    "clickToView": "انقر لعرض التفاصيل",
+    "backToOverview": "رجوع للنظرة العامة",
+    "viewDetails": "عرض التفاصيل",
+    "export": "تصدير",
+    "loading": "جاري تحميل الأصول...",
+    "noChatSelected": "لم يتم تحديد محادثة",
+    "noChatDesc": "ابدأ محادثة لإنشاء أصول تجارية",
+    "businessAsset": "تم إنشاء الأصل التجاري",
+    "assets": {
+      "leanCanvas": "نموذج العمل",
+      "swot": "التحليل الرباعي",
+      "personas": "الشخصيات",
+      "userStories": "قصص المستخدمين",
+      "interviewQuestions": "أسئلة المقابلة",
+      "journey": "رحلة العميل",
+      "marketing": "التسويق",
+      "brandWheel": "عجلة العلامة",
+      "brandIdentity": "الهوية",
+      "competitors": "المنافسون",
+      "tamSamSom": "حجم السوق",
+      "teamRoles": "أدوار الفريق",
+      "pitch": "العرض التقديمي"
+    },
+    
+    "status": {
+      "complete": "مكتمل",
+      "inProgress": "قيد التنفيذ",
+      "queued": "في الانتظار",
+      "unknown": "غير معروف"
+    },
+    
+    "categories": {
+      "all": "الكل",
+      "strategy": "الاستراتيجية",
+      "market": "السوق",
+      "customer": "العميل",
+      "marketing": "التسويق",
+      "pitch": "العرض"
+    },
+    
+    "categoryDesc": {
+      "strategy": "استراتيجية العمل الأساسية والتحليل",
+      "market": "بحوث السوق والمنافسة",
+      "customer": "بحوث المستخدمين والتجربة",
+      "marketing": "خطط التسويق والحملات",
+      "pitch": "عروض المستثمرين"
+    },
+    
+    "types": {
+      "SWOT": "تحليل SWOT",
+      "LEAN_CANVAS": "نموذج الأعمال المبسط",
+      "PERSONA": "شخصيات المستخدمين",
+      "USER_STORIES": "قصص المستخدمين",
+      "INTERVIEW_QUESTIONS": "أسئلة المقابلات",
+      "TAM_SAM_SOM": "حجم السوق",
+      "COMPETITOR_MAP": "خريطة المنافسين",
+      "JOURNEY_MAP": "رحلة العميل",
+      "MARKETING_PLAN": "خطة التسويق",
+      "BRAND_WHEEL": "عجلة العلامة التجارية",
+      "BRAND_IDENTITY": "هوية العلامة التجارية",
+      "TEAM_ROLES": "أدوار الفريق",
+      "PITCH_OUTLINE": "مخطط العرض"
+    },
+    
+    "typeDesc": {
+      "SWOT": "نقاط القوة والضعف والفرص والتهديدات",
+      "LEAN_CANVAS": "نظرة عامة على نموذج الأعمال في 9 أقسام",
+      "PERSONA": "ملفات العملاء المستهدفين",
+      "USER_STORIES": "قصص المستخدمين ومعايير القبول",
+      "INTERVIEW_QUESTIONS": "أسئلة مقابلات المستخدمين",
+      "TAM_SAM_SOM": "تحليل TAM/SAM/SOM",
+      "COMPETITOR_MAP": "تحليل المشهد التنافسي",
+      "JOURNEY_MAP": "تحليل رحلة العميل",
+      "MARKETING_PLAN": "استراتيجية تسويق شاملة",
+      "BRAND_WHEEL": "هوية العلامة التجارية والقيم",
+      "BRAND_IDENTITY": "عناصر العلامة التجارية المرئية واللفظية",
+      "TEAM_ROLES": "الأدوار والمسؤوليات داخل الفريق",
+      "PITCH_OUTLINE": "هيكل عرض المستثمرين"
+    },
+    
+    "empty": {
+      "noCategory": "لا توجد أصول {{category}}",
+      "noCategoryDesc": "{{description}} ستظهر هنا عند محادثتك مع الذكاء الاصطناعي",
+      "strategy": "لا توجد أصول استراتيجية",
+      "strategyDesc": "ستظهر الاستراتيجية الأساسية والتحليل هنا عند محادثتك مع الذكاء الاصطناعي",
+      "market": "لا توجد أصول سوق",
+      "marketDesc": "ستظهر بحوث السوق والمنافسة هنا عند محادثتك مع الذكاء الاصطناعي",
+      "customer": "لا توجد أصول عملاء",
+      "customerDesc": "ستظهر بحوث المستخدمين والتجربة هنا عند محادثتك مع الذكاء الاصطناعي",
+      "marketing": "لا توجد أصول تسويق",
+      "marketingDesc": "ستظهر خطط التسويق والحملات هنا عند محادثتك مع الذكاء الاصطناعي",
+      "pitch": "لا توجد أصول عروض",
+      "pitchDesc": "ستظهر عروض المستثمرين هنا عند محادثتك مع الذكاء الاصطناعي"
+    },
+    
+    "swot": {
+      "strengths": "نقاط القوة",
+      "weaknesses": "نقاط الضعف",
+      "opportunities": "الفرص",
+      "threats": "التهديدات"
+    },
+    
+    "leanCanvas": {
+      "problem": "المشكلة",
+      "solution": "الحل",
+      "channels": "القنوات",
+      "keyMetrics": "المقاييس الرئيسية",
+      "uniqueValueProposition": "اقتراح القيمة الفريدة",
+      "unfairAdvantage": "الميزة التنافسية",
+      "customerSegments": "شرائح العملاء",
+      "costStructure": "هيكل التكاليف",
+      "revenueStreams": "مصادر الإيرادات"
+    },
+    
+    "defaults": {
+      "noItemsIdentified": "لا توجد عناصر محددة",
+      "notSpecified": "غير محدد"
+    }
+  },
+  "auth": {
+    "welcome": "أهلاً بك في فكرة هاب",
+    "subtitle": "منصتك المدعومة بالذكاء الاصطناعي لبناء المشاريع",
+    "loginWithReplit": "متابعة مع Replit",
+    "loggingIn": "جاري تسجيل الدخول...",
+    "notAuthenticated": "غير مصرح",
+    "signIn": "تسجيل الدخول إلى حسابك",
+    "signInDesc": "أدخل بياناتك للوصول إلى فكرة هاب",
+    "createAccount": "إنشاء حسابك",
+    "createAccountDesc": "انضم إلى فكرة هاب وابدأ ببناء مشاريعك",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "firstName": "الاسم الأول",
+    "lastName": "اسم العائلة",
+    "email": "عنوان البريد الإلكتروني",
+    "chooseUsername": "اختر اسم مستخدم",
+    "enterPassword": "أدخل كلمة المرور",
+    "enterFirstName": "أدخل اسمك الأول",
+    "enterLastName": "أدخل اسم عائلتك",
+    "enterEmail": "أدخل عنوان بريدك الإلكتروني",
+    "freePlan": "خطة مجانية"
+  },
+  "landing": {
+    "hero": {
+      "title": "حوّل الأفكار إلى مشاريع بالذكاء الاصطناعي",
+      "subtitle": "فكرة هاب هو شريكك الذكي الذي يساعدك في بناء أطر عمل شاملة من خلال المحادثات الطبيعية",
+      "cta": "ابدأ البناء الآن",
+      "learnMore": "اعرف المزيد"
+    },
+    "features": {
+      "title": "كل ما تحتاجه للبناء",
+      "aiCofounder": {
+        "title": "الشريك الذكي",
+        "desc": "تحدث مع الذكاء الاصطناعي لتطوير استراتيجية عملك خطوة بخطوة"
+      },
+      "assets": {
+        "title": "أصول الأعمال",
+        "desc": "أنتج نموذج الأعمال المبسط وشخصيات المستخدمين وتحليل SWOT والمزيد"
+      },
+      "realtime": {
+        "title": "أفكار فورية",
+        "desc": "احصل على تغذية راجعة واقتراحات فورية أثناء البناء"
+      }
+    }
+  },
+  "sidebar": {
+    "collapsed": "توسيع الشريط الجانبي",
+    "expanded": "طي الشريط الجانبي",
+    "quickStats": "إحصائيات سريعة",
+    "recentActivity": "النشاط الحديث",
+    "newIdea": "فكرة جديدة",
+    "startWithIdea": "ابدأ بـ \"ما فكرتك اليوم؟\""
+  },
+  "theme": {
+    "light": "فاتح",
+    "dark": "داكن",
+    "system": "النظام",
+    "switchToLight": "التبديل إلى الوضع الفاتح",
+    "switchToDark": "التبديل إلى الوضع الداكن"
+  },
+  "user": {
+    "freePlan": "الخطة المجانية",
+    "credits": "الرصيد",
+    "creditsRemaining": "{{used}}/{{total}}"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما",
+    "network": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
+    "unauthorized": "تحتاج إلى تسجيل الدخول للوصول إلى هذه الميزة",
+    "forbidden": "ليس لديك صلاحية للوصول إلى هذا المصدر",
+    "notFound": "المصدر المطلوب غير موجود",
+    "validation": "يرجى مراجعة المدخلات والمحاولة مرة أخرى",
+    "pageNotFound": "الصفحة غير موجودة",
+    "pageNotFoundDesc": "الصفحة التي تبحث عنها غير موجودة أو تم نقلها.",
+    "goHome": "العودة للرئيسية",
+    "failedToCreate": "فشل في إنشاء المشروع. يرجى المحاولة مرة أخرى.",
+    "noDescription": "لا يوجد وصف",
+    "failedToFetch": "فشل في جلب البيانات",
+    "failedToCreateChat": "فشل في إنشاء المحادثة"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "quickSettings": "إعدادات سريعة",
+    "essentialOptions": "الخيارات الأساسية لتجربتك",
+    "light": "فاتح",
+    "dark": "داكن",
+    "description": "أدر إعدادات حسابك وتفضيلاتك.",
+    "profile": "الملف الشخصي",
+    "theme": "المظهر",
+    "language": "اللغة",
+    "alerts": "التنبيهات",
+    "privacy": "الخصوصية",
+    "data": "البيانات",
+    "profileImage": "رابط صورة الملف الشخصي",
+    "profileImagePlaceholder": "https://example.com/avatar.jpg",
+    "emailNotifications": "إشعارات البريد الإلكتروني",
+    "emailNotificationsDesc": "تلقي التحديثات عبر البريد الإلكتروني",
+    "pushNotifications": "الإشعارات الفورية",
+    "pushNotificationsDesc": "تلقي إشعارات المتصفح",
+    "soundEffects": "المؤثرات الصوتية",
+    "soundEffectsDesc": "تشغيل الأصوات للإشعارات",
+    "autoSave": "الحفظ التلقائي",
+    "autoSaveDesc": "حفظ عملك تلقائياً",
+    "profileVisibility": "مرئية الملف الشخصي",
+    "dataRetention": "الاحتفاظ بالبيانات",
+    "public": "عام",
+    "private": "خاص",
+    "exportData": "تصدير البيانات",
+    "exportDataDesc": "تحميل جميع بياناتك بصيغة JSON",
+    "dangerZone": "منطقة الخطر",
+    "deleteAccount": "حذف الحساب",
+    "deleteAccountDesc": "حذف حسابك وجميع البيانات المرتبطة به نهائياً",
+    "deleteConfirmation": "هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ لا يمكن التراجع عن هذا الإجراء.",
+    "saving": "جاري الحفظ...",
+    "saveProfile": "حفظ الملف الشخصي",
+    "exporting": "جاري التصدير...",
+    "deleting": "جاري الحذف...",
+    "30days": "30 يوماً",
+    "90days": "90 يوماً",
+    "1year": "سنة واحدة",
+    "forever": "إلى الأبد",
+    "profileUpdated": "تم تحديث الملف الشخصي",
+    "profileUpdatedDesc": "تم تحديث ملفك الشخصي بنجاح.",
+    "settingsUpdated": "تم تحديث الإعدادات",
+    "settingsUpdatedDesc": "تم حفظ تفضيلاتك.",
+    "dataExported": "تم تصدير البيانات",
+    "dataExportedDesc": "تم تصدير بياناتك بنجاح.",
+    "accountDeleted": "تم حذف الحساب",
+    "accountDeletedDesc": "تم حذف حسابك نهائياً.",
+    "updateFailed": "فشل التحديث",
+    "updateFailedDesc": "فشل في تحديث الملف الشخصي.",
+    "exportFailed": "فشل التصدير",
+    "exportFailedDesc": "فشل في تصدير البيانات.",
+    "deletionFailed": "فشل الحذف",
+    "deletionFailedDesc": "فشل في حذف الحساب."
+  },
+  "challenges": {
+    "title": "التحديات",
+    "subtitle": "انضم إلى تحديات مبتكرة وتنافس مع رواد الأعمال في منطقة الشرق الأوسط وشمال أفريقيا",
+    "activeChallenges": "{{count}} تحدٍ نشط",
+    "upcomingChallenges": "{{count}} قادم",
+    "submissions": "{{count}} مشاركة",
+    "submissionsLabel": "المشاركات",
+    "errorFetch": "فشل في جلب التحديات",
+    "status": {
+      "active": "نشط",
+      "upcoming": "قادم",
+      "ended": "منتهٍ",
+      "draft": "مسودة"
+    },
+    "delete": {
+      "button": "حذف التحدي",
+      "confirm": "هل أنت متأكد من حذف هذا التحدي؟ لا يمكن التراجع عن هذا الإجراء.",
+      "successTitle": "تم حذف التحدي",
+      "successDesc": "تم حذف التحدي بنجاح.",
+      "errorGeneric": "فشل حذف التحدي"
+    },
+    "timeLeft": {
+      "ended": "منتهٍ",
+      "startsIn": "يبدأ خلال {{days}} يوم",
+      "endsToday": "ينتهي اليوم",
+      "oneDay": "يوم واحد متبقٍ",
+      "daysLeft": "{{days}} يوم متبقٍ"
+    },
+    "filters": {
+      "all": "جميع التحديات",
+      "active": "نشط",
+      "upcoming": "قادم",
+      "ended": "منتهٍ"
+    },
+    "empty": {
+      "title": "لم يتم العثور على تحديات",
+      "noCreated": "لم يتم إنشاء أي تحديات بعد",
+      "tryFilters": "جرب تعديل الفلاتر لرؤية المزيد من التحديات"
+    },
+    "create": {
+      "button": "إنشاء تحدٍ",
+      "title": "إنشاء تحدٍ جديد",
+      "description": "إنشاء تحدٍ ابتكاري جديد لمساحة العمل الخاصة بك",
+      "successTitle": "تم إنشاء التحدي",
+      "successDesc": "تم إنشاء التحدي الخاص بك بنجاح",
+      "errorGeneric": "فشل في إنشاء التحدي",
+      "missingFieldsTitle": "حقول مفقودة",
+      "missingFieldsDesc": "يرجى ملء جميع الحقول المطلوبة"
+    },
+    "form": {
+      "title": "العنوان",
+      "titlePlaceholder": "حلول نيوم للمدن الذكية",
+      "slug": "رابط URL",
+      "slugPlaceholder": "neom-smart-city",
+      "shortDescription": "وصف مختصر",
+      "shortDescriptionPlaceholder": "جملة مختصرة عن التحدي",
+      "description": "الوصف",
+      "descriptionPlaceholder": "وصف تفصيلي للتحدي...",
+      "deadline": "الموعد النهائي",
+      "date": "التاريخ",
+      "time": "الوقت",
+      "selectDate": "اختر التاريخ",
+      "status": "الحالة",
+      "emoji": "الإيموجي",
+      "maxSubmissions": "الحد الأقصى للمشاركات",
+      "prize": "الجائزة (اختياري)",
+      "prizePlaceholder": "37,500 ريال",
+      "tags": "الوسوم (مفصولة بفواصل)",
+      "tagsPlaceholder": "الذكاء الاصطناعي، نيوم، المدن الذكية، رؤية 2030"
+    }
+  },
+  "radar": {
+    "title": "الرادار",
+    "subtitle": "ابق على اطلاع بأحدث التطورات في التكنولوجيا والابتكار والأعمال في منطقة الشرق الأوسط وشمال أفريقيا",
+    "loadMore": "تحميل المزيد من القصص",
+    "noNews": "لا توجد أخبار متاحة لهذا الموضوع",
+    "unknownSource": "مصدر غير معروف",
+    "sources": "{{count}} مصادر",
+    "topics": {
+      "forYou": "لك",
+      "innovation": "الابتكار",
+      "ai": "الذكاء الاصطناعي",
+      "investments": "استثمارات منطقة الشرق الأوسط",
+      "ycStartups": "شركات YC الناشئة (الشرق الأوسط)"
+    },
+    "timeAgo": {
+      "justNow": "الآن",
+      "oneHour": "منذ ساعة واحدة",
+      "hours": "منذ {{count}} ساعات",
+      "oneDay": "منذ يوم واحد",
+      "days": "منذ {{count}} أيام"
+    },
+    "widgets": {
+      "aiTools": {
+        "title": "أحدث أدوات الذكاء الاصطناعي",
+        "viewAll": "عرض جميع الأدوات",
+        "tags": {
+          "new": "جديد",
+          "updated": "محدث",
+          "hot": "رائج",
+          "featured": "مميز"
+        },
+        "categories": {
+          "languageModel": "نموذج اللغة",
+          "imageGeneration": "توليد الصور",
+          "codeEditor": "محرر الأكواد",
+          "searchAI": "بحث بالذكاء الاصطناعي",
+          "videoAI": "فيديو بالذكاء الاصطناعي"
+        }
+      },
+      "companies": {
+        "title": "الشركات الرائجة"
+      },
+      "interests": {
+        "title": "حفظ الاهتمامات",
+        "description": "اختر المواضيع والاهتمامات لتخصيص تجربتك في الرادار",
+        "save": "حفظ الاهتمامات",
+        "categories": {
+          "tech": "التكنولوجيا والعلوم",
+          "finance": "المالية",
+          "arts": "الفنون والثقافة",
+          "sports": "الرياضة",
+          "entertainment": "الترفيه"
+        }
+      }
+    },
+    "errors": {
+      "fetchFailed": "فشل في جلب الأخبار",
+      "unableToLoad": "تعذر تحميل الأخبار في الوقت الحالي",
+      "checkConnection": "يرجى التحقق من اتصالك والمحاولة مرة أخرى"
+    },
+    "reader": {
+      "backToRadar": "العودة إلى الرادار",
+      "viewOriginal": "عرض المقال الأصلي",
+      "by": "بواسطة",
+      "keyPoints": "النقاط الرئيسية",
+      "relatedTo": "متعلق بـ",
+      "sampleContent1": "هذا هو محتوى المقال الكامل الذي سيتم استخراجه من المصدر الأصلي باستخدام واجهة برمجة تطبيقات لاستخراج المحتوى مثل Mercury Reader أو Diffbot. يتضمن المحتوى النص الكامل والصور والتنسيق من المقال الأصلي.",
+      "sampleContent2": "في التطبيق الحقيقي، سيتم جلب هذا المحتوى من عنوان URL للمقال ومعالجته لإزالة الإعلانات والتنقل والعناصر الأخرى غير المحتوى، مما يوفر تجربة قراءة نظيفة داخل المنصة.",
+      "sampleContent3": "سيحافظ استخراج المقال على التنسيق المهم مثل العناوين والفقرات والقوائم والوسائط المضمنة مع ضمان التحميل السريع والتصميم المتسق مع تصميم المنصة."
+    }
+  },
+  "challenge": {
+    "notFound": "التحدي غير موجود",
+    "backToChallenges": "العودة إلى التحديات",
+    "deadline": "الموعد النهائي",
+    "daysLeft": "{{count}} أيام متبقية",
+    "daysLeft_one": "{{count}} يوم متبقي",
+    "ended": "انتهى",
+    "submissions": "{{count}} مشاركات",
+    "submissions_one": "{{count}} مشاركة",
+    "description": "وصف التحدي",
+    "myIdeas": "أفكاري للتحدي ({{count}})",
+    "creating": "جاري الإنشاء...",
+    "createIdea": "إنشاء فكرة",
+    "noIdeasYet": "لا توجد أفكار بعد. أنشئ أول فكرة!",
+    "delete": {
+      "button": "حذف التحدي",
+      "confirm": "هل أنت متأكد من حذف هذا التحدي؟ سيتم أيضاً حذف جميع المشاريع والمشاركات المرتبطة به. لا يمكن التراجع عن هذا الإجراء.",
+      "successTitle": "تم حذف التحدي",
+      "successDesc": "تم حذف التحدي وجميع المشاريع المرتبطة به بنجاح.",
+      "errorGeneric": "فشل حذف التحدي"
+    },
+    "table": {
+      "title": "العنوان",
+      "type": "النوع",
+      "created": "تاريخ الإنشاء",
+      "actions": "الإجراءات"
+    },
+    "openInNewTab": "فتح في علامة تبويب جديدة",
+    "confirmDelete": "حذف هذه الفكرة؟",
+    "submissionsTitle": "المشاركات ({{count}})",
+    "noSubmissionsYet": "لا توجد مشاركات بعد. كن أول من يشارك!",
+    "submissionProgress": "تقدم المشاركات",
+    "capacity": "السعة",
+    "challengeStatus": "حالة التحدي",
+    "statusLabel": "الحالة",
+    "timeLeft": "الوقت المتبقي",
+    "days": "ي",
+    "status": {
+      "active": "نشط",
+      "upcoming": "قادم",
+      "ended": "انتهى",
+      "draft": "مسودة"
+    },
+    "submitSolution": "تقديم حلك",
+    "submitYourSolution": "تقديم حلك",
+    "submitDescription": "شارك حلك المبتكر لهذا التحدي",
+    "form": {
+      "title": "عنوان الحل *",
+      "titlePlaceholder": "حلي للمدينة الذكية",
+      "description": "الوصف *",
+      "descriptionPlaceholder": "صف حلك وكيف يعالج التحدي...",
+      "demoUrl": "رابط التجربة (اختياري)"
+    },
+    "submitSolutionButton": "تقديم الحل",
+    "fillRequired": "يرجى ملء جميع الحقول المطلوبة",
+    "submitSuccess": "تم إرسال المشاركة بنجاح!",
+    "submitFailed": "فشل التقديم",
+    "by": "بواسطة",
+    "viewDemo": "عرض التجربة",
+    "score": "النقاط",
+    "projectDeleted": "تم حذف المشروع بنجاح",
+    "projectDuplicated": "تم نسخ المشروع بنجاح",
+    "deleteFailed": "فشل حذف المشروع",
+    "duplicateFailed": "فشل نسخ المشروع",
+    "navigationFailed": "فشل الانتقال إلى المشروع",
+    "noOrganization": "لم يتم العثور على منظمة",
+    "createProjectFailed": "فشل إنشاء المشروع",
+    "createChatFailed": "فشل إنشاء المحادثة",
+    "createIdeaFailed": "فشل إنشاء الفكرة"
+  },
+  "project": {
+    "type": {
+      "research": "بحث",
+      "develop": "منتج أولي",
+      "launch": "فكرة"
+    }
+  },
+  "admin": {
+    "settings-page": {
+      "title": "إعدادات مساحة العمل",
+      "description": "تخصيص مظهر مساحة العمل وعنوان URL",
+      "success": {
+        "title": "تم تحديث الإعدادات",
+        "description": "تم تحديث إعدادات مساحة العمل بنجاح"
+      },
+      "error": {
+        "title": "خطأ في تحديث الإعدادات"
+      },
+      "logoUrl": {
+        "label": "رابط الشعار",
+        "placeholder": "https://example.com/logo.png",
+        "description": "رابط صورة شعار مساحة العمل الخاصة بك"
+      },
+      "primaryColor": {
+        "label": "اللون الأساسي",
+        "description": "اختر اللون الأساسي للعلامة التجارية لمساحة العمل"
+      },
+      "slug": {
+        "label": "عنوان URL لمساحة العمل",
+        "description": "عنوان URL مخصص لمساحة العمل (أحرف صغيرة وأرقام وشرطات فقط)"
+      },
+      "preview": {
+        "title": "معاينة",
+        "description": "كيف ستظهر مساحة العمل للمستخدمين"
+      }
+    },
+    "criteria": {
+      "text": {
+        "save": "حفظ المعايير",
+        "unsavedChanges": "لديك تغييرات غير محفوظة",
+        "success": {
+          "title": "تم حفظ المعايير",
+          "description": "تم حفظ معايير التقييم بنجاح"
+        },
+        "error": {
+          "title": "فشل في حفظ المعايير"
+        }
+      },
+      "title": "معايير التقييم بالذكاء الاصطناعي",
+      "description": "قم بتحميل ملفات JSON التي تحدد المقاييس والمعايير للتقييم المدعوم بالذكاء الاصطناعي",
+      "uploading": "جارٍ الرفع...",
+      "upload": {
+        "button": "رفع ملف JSON",
+        "hint": "الحد الأقصى 2 ميجابايت • صيغة JSON فقط",
+        "success": {
+          "title": "تم رفع الملف"
+        },
+        "error": {
+          "title": "فشل الرفع"
+        }
+      },
+      "delete": {
+        "confirm": "هل أنت متأكد أنك تريد حذف",
+        "success": {
+          "title": "تم حذف الملف",
+          "description": "تم إزالة ملف معايير التقييم"
+        },
+        "error": {
+          "title": "فشل الحذف"
+        }
+      },
+      "view": {
+        "title": "ملف معايير التقييم",
+        "description": "محتوى الملف",
+        "uploaded": "تم الرفع",
+        "by": "بواسطة",
+        "error": {
+          "title": "فشل تحميل الملف"
+        }
+      },
+      "validation": {
+        "invalidJson": {
+          "title": "صيغة JSON غير صالحة",
+          "description": "يرجى إدخال صيغة JSON صالحة"
+        },
+        "invalidType": {
+          "title": "نوع ملف غير صالح",
+          "description": "يرجى اختيار ملف JSON (.json)"
+        },
+        "tooLarge": {
+          "title": "الملف كبير جدًا",
+          "description": "يجب أن يكون حجم الملف أقل من 2 ميجابايت"
+        },
+        "empty": {
+          "title": "خطأ",
+          "description": "يرجى إدخال معايير التقييم"
+        }
+      },
+      "files": {
+        "label": "الملفات المرفوعة",
+        "view": "عرض المحتوى",
+        "delete": "حذف الملف",
+        "hint": "💡 انقر على أيقونة العين لعرض محتوى الملف، أو أيقونة سلة المهملات للحذف",
+        "empty": "لم يتم رفع ملفات معايير التقييم بعد. قم برفع ملف JSON للبدء."
+      },
+      "legacy": {
+        "divider": "أو استخدم إدخال النص القديم",
+        "current": "المعايير الحالية (قديم)",
+        "label": "معايير التقييم (نص)",
+        "placeholder": "أدخل معايير التقييم بصيغة JSON...",
+        "hint": "حدد المقاييس التي سيستخدمها الذكاء الاصطناعي لتقييم الأفكار. يجب أن يكون لكل مقياس وزن (إجمالي 1.0) ووصف.",
+        "button": "تحديث المعايير (قديم)",
+        "success": {
+          "title": "نجح",
+          "description": "تم تحديث معايير التقييم بنجاح"
+        },
+        "error": {
+          "title": "خطأ"
+        }
+      }
+    },
+    "mode": "لوحة الإدارة",
+    "sidebar": {
+      "header": {
+        "title": "لوحة الإدارة",
+        "subtitle": "إدارة مساحة العمل"
+      },
+      "dashboard": {
+        "title": "لوحة القيادة",
+        "description": "لوحة إدارة"
+      },
+      "ideas": {
+        "title": "الأفكار",
+        "description": "إدارة الأفكار والمشاريع"
+      },
+      "workspace": {
+        "title": "مساحة العمل",
+        "description": "تكوين مساحة العمل"
+      },
+      "branding": {
+        "title": "العلامة التجارية",
+        "description": "تخصيص المظهر"
+      },
+      "members": {
+        "title": "الأعضاء",
+        "description": "إدارة أعضاء الفريق"
+      },
+      "settings": {
+        "title": "الإعدادات",
+        "description": "الإعدادات العامة"
+      },
+      "exit": "الخروج من الإدارة"
+    },
+
+    "guard": {
+      "verifying": "جاري التحقق من صلاحية المسؤول...",
+      "workspaceNotFound": {
+        "title": "مساحة العمل غير موجودة",
+        "invalidSlug": "معرف مساحة العمل غير صالح",
+        "notAccessible": "مساحة العمل \"{{slug}}\" غير موجودة أو غير قابلة للوصول"
+      },
+      "accessDenied": {
+        "title": "تم رفض الوصول",
+        "notMember": "أنت لست عضوًا في مساحة العمل \"{{workspace}}\".",
+        "contactAdmin": "يرجى الاتصال بمسؤول مساحة العمل للحصول على الوصول."
+      },
+      "adminRequired": {
+        "title": "مطلوب صلاحية المسؤول",
+        "needsPrivileges": "تحتاج إلى امتيازات المسؤول للوصول إلى هذه الصفحة.",
+        "currentRole": "الدور الحالي: {{role}}"
+      },
+      "goToHome": "الذهاب إلى الصفحة الرئيسية",
+      "goToMyWorkspaces": "الذهاب إلى مساحات العمل الخاصة بي",
+      "goToWorkspace": "الذهاب إلى مساحة العمل"
+    },
+    "analytics": {
+      "overview": {
+        "title": "نظرة عامة على مساحة العمل",
+        "description": "المقاييس والتحليلات الرئيسية لمساحة عملك"
+      },
+      "stats": {
+        "totalIdeas": {
+          "title": "إجمالي الأفكار",
+          "description": "الأفكار المقدمة إلى مساحة العمل"
+        },
+        "activeConversations": {
+          "title": "المحادثات النشطة",
+          "description": "جلسات الدردشة الجارية"
+        },
+        "businessAssets": {
+          "title": "أصول الأعمال",
+          "description": "مستندات الأعمال المولدة"
+        },
+        "teamMembers": {
+          "title": "أعضاء الفريق",
+          "description": "أعضاء مساحة العمل النشطون"
+        }
+      },
+      "recentActivity": {
+        "title": "النشاط الأخير",
+        "description": "أحدث تفاعلات مساحة العمل",
+        "ideasSubmitted": "الأفكار المقدمة",
+        "conversationsStarted": "المحادثات المبدوءة",
+        "assetsGenerated": "الأصول المولدة",
+        "thisMonth": "هذا الشهر"
+      },
+      "workspaceHealth": {
+        "title": "صحة مساحة العمل",
+        "description": "مؤشرات الأداء الإجمالية لمساحة العمل",
+        "memberEngagement": "تفاعل الأعضاء",
+        "ideaActivity": "نشاط الأفكار",
+        "assetCreation": "إنشاء الأصول"
+      },
+      "engagement": {
+        "active": "نشط",
+        "low": "منخفض"
+      },
+      "activity": {
+        "high": "عالي",
+        "medium": "متوسط",
+        "low": "منخفض"
+      }
+    },
+
+    "workspace": {
+      "defaultPage": {
+        "title": "الصفحة الافتراضية بعد تسجيل الدخول",
+        "description": "اختر الصفحة التي يتم توجيه المستخدمين إليها بعد تسجيل الدخول.",
+        "label": "الصفحة الافتراضية"
+      },
+      "routes": {
+        "title": "أسماء المسارات",
+        "description": "خصص أسماء وصفحات الوصف (EN / AR). عند التغيير سيظهر زر حفظ لكل بطاقة.",
+        "path": "المسار",
+        "save": "حفظ",
+        "nameEn": "الاسم (EN)",
+        "nameAr": "الاسم (AR)",
+        "descEn": "الوصف (EN)",
+        "descAr": "الوصف (AR)",
+        "titleEn": "العنوان (EN)",
+        "titleAr": "العنوان (AR)"
+      },
+      "routeSavedTitle": "تم الحفظ",
+      "routeSavedDesc": "تم تحديث تسمية المسار",
+      "routeSaveErrorTitle": "خطأ",
+      "routeSaveErrorDesc": "فشل في حفظ تسمية المسار",
+      "header": {
+        "title": "تكوين مساحة العمل",
+        "subtitle": "إدارة إعدادات وميزات مساحة العمل"
+      },
+      "basic": {
+        "title": "المعلومات الأساسية",
+        "description": "تحديث اسم مساحة العمل والتفاصيل الأساسية",
+        "name": "اسم مساحة العمل",
+        "namePlaceholder": "مساحة العمل الخاصة بي"
+      },
+      "features": {
+        "title": "الميزات",
+        "description": "تمكين أو تعطيل ميزات مساحة العمل",
+        "challenges": {
+          "label": "التحديات",
+          "description": "تمكين إنشاء وإدارة التحديات"
+        },
+        "experts": {
+          "label": "استشارات الخبراء",
+          "description": "السماح للمستخدمين بالاستشارة مع خبراء الذكاء الاصطناعي"
+        },
+        "radar": {
+          "label": "الرادار (موجز الأخبار)",
+          "description": "عرض الأخبار وتحديثات الصناعة"
+        }
+      },
+      "save": "حفظ التغييرات",
+      "saving": "جاري الحفظ...",
+      "success": {
+        "title": "تم تحديث مساحة العمل",
+        "description": "تم حفظ إعدادات مساحة العمل بنجاح."
+      },
+      "error": {
+        "title": "خطأ",
+        "description": "فشل تحديث إعدادات مساحة العمل."
+      }
+    },
+    "ideas": {
+      "move": {
+        "title": "نقل حالة الفكرة",
+        "confirm": "هل أنت متأكد أنك تريد نقل الفكرة إلى \"{{status}}\"؟",
+        "instruction": "أضف تعليقًا يشرح سبب نقل هذه الفكرة إلى هذه الحالة.",
+        "commentLabel": "تعليق",
+        "commentPlaceholder": "اشرح سبب تغيير حالة الفكرة...",
+        "validation": {
+          "title": "مطلوب تعليق",
+          "description": "يرجى إضافة تعليق يشرح تغيير الحالة."
+        },
+        "saving": "جاري الحفظ...",
+        "confirmButton": "تأكيد وإضافة تعليق",
+        "success": {
+          "title": "تم تحديث الحالة",
+          "description": "تم حفظ حالة الفكرة والتعليق."
+        },
+        "error": {
+          "title": "فشل التحديث",
+          "description": "فشل تغيير الحالة"
+        }
+      },
+      "header": {
+        "title": "إدارة الأفكار",
+        "subtitle": "إدارة وتتبع جميع الأفكار والمشاريع"
+      },
+      "newIdea": "فكرة جديدة",
+      "statuses": {
+        "backlog": "قائمة الانتظار",
+        "underReview": "قيد المراجعة",
+        "shortlisted": "القائمة المختصرة",
+        "inIncubation": "قيد الاحتضان",
+        "archived": "مؤرشف"
+      },
+      "dropHere": "أسقط الأفكار هنا",
+      "opening": "جاري فتح الدردشة...",
+      "create": {
+        "title": "إنشاء فكرة جديدة",
+        "description": "أضف فكرة جديدة إلى مساحة العمل. ستبدأ في قائمة الانتظار.",
+        "fields": {
+          "title": "العنوان",
+          "titlePlaceholder": "أدخل عنوان الفكرة",
+          "summary": "الملخص",
+          "summaryPlaceholder": "اوصف فكرتك",
+          "tags": "العلامات (مفصولة بفواصل)",
+          "tagsPlaceholder": "الذكاء الاصطناعي، السوق، SaaS"
+        },
+        "cancel": "إلغاء",
+        "submit": "إنشاء الفكرة",
+        "creating": "جاري الإنشاء...",
+        "success": {
+          "title": "نجاح",
+          "description": "تم إنشاء الفكرة بنجاح"
+        },
+        "error": {
+          "title": "خطأ",
+          "description": "فشل إنشاء الفكرة"
+        },
+        "validation": {
+          "title": "خطأ في التحقق",
+          "description": "العنوان والملخص مطلوبان"
+        }
+      },
+      "update": {
+        "error": {
+          "title": "خطأ",
+          "description": "فشل تحديث الحالة"
+        }
+      },
+      "navigate": {
+        "error": {
+          "title": "خطأ",
+          "description": "فشل فتح دردشة الفكرة"
+        }
+      }
+    },
+
+    "userManagement": {
+      "title": "إدارة المستخدمين",
+      "description": "إدارة أعضاء مساحة العمل وأدوارهم",
+      "inviteUser": "دعوة مستخدم",
+      "unknownUser": "مستخدم غير معروف",
+      "status": {
+        "pending": "دعوة معلقة"
+      },
+      "invite": {
+        "title": "دعوة مستخدم جديد",
+        "fields": {
+          "existing": "اختر مستخدمًا موجودًا (اختياري)",
+          "selectPlaceholder": "اختر مستخدمًا...",
+          "email": "عنوان البريد الإلكتروني",
+          "emailPlaceholder": "user@example.com",
+          "role": "الدور",
+          "rolePlaceholder": "اختر دورًا"
+        },
+        "sendInvite": "إرسال الدعوة",
+        "inviting": "جاري الدعوة...",
+        "cancel": "إلغاء",
+        "success": {
+          "title": "تمت دعوة المستخدم",
+          "description": "تمت إضافة المستخدم بنجاح إلى مساحة العمل."
+        },
+        "error": {
+          "title": "خطأ في دعوة المستخدم",
+          "description": "فشلت دعوة المستخدم. يرجى المحاولة مرة أخرى."
+        }
+      },
+      "roles": {
+        "owner": "المالك",
+        "admin": "المسؤول",
+        "mentor": "المرشد",
+        "member": "عضو"
+      },
+      "members": {
+        "title": "الأعضاء الحاليون ({{count}})"
+      },
+      "table": {
+        "user": "المستخدم",
+        "email": "البريد الإلكتروني",
+        "role": "الدور",
+        "joined": "تاريخ الانضمام",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "makeMember": "جعله عضوًا",
+        "makeMentor": "جعله مرشدًا",
+        "makeAdmin": "جعله مسؤولًا",
+        "removeFromWorkspace": "إزالة من مساحة العمل",
+        "ownerCannotModify": "المالك (لا يمكن تعديله)"
+      },
+      "role": {
+        "success": {
+          "title": "تم تحديث الدور",
+          "description": "تم تحديث دور العضو بنجاح."
+        },
+        "error": {
+          "title": "خطأ في تحديث الدور",
+          "description": "فشل تحديث الدور. يرجى المحاولة مرة أخرى."
+        }
+      },
+      "remove": {
+        "success": {
+          "title": "تمت إزالة العضو",
+          "description": "تمت إزالة العضو بنجاح من مساحة العمل."
+        },
+        "error": {
+          "title": "خطأ في إزالة العضو",
+          "description": "فشلت إزالة العضو. يرجى المحاولة مرة أخرى."
+        },
+        "dialog": {
+          "title": "إزالة العضو",
+          "description": "هل أنت متأكد أنك تريد إزالة {{username}} من مساحة العمل؟ لا يمكن التراجع عن هذا الإجراء.",
+          "cancel": "إلغاء",
+          "confirm": "إزالة العضو"
+        }
+      }
+    },
+    "settings": {
+      "header": {
+        "title": "الإعدادات",
+        "subtitle": "تكوين إعدادات مساحة العمل والتفضيلات والتكاملات."
+      },
+      "accessDenied": {
+        "title": "تم رفض الوصول",
+        "description": "ليس لديك إذن للوصول إلى لوحة الإدارة."
+      }
+    },
+
+    "branding": {
+      "header": {
+        "title": "العلامة التجارية",
+        "subtitle": "تخصيص مظهر مساحة العمل"
+      },
+      "logo": {
+        "title": "شعار الوضع الفاتح",
+        "description": "تحميل شعار مساحة العمل",
+        "urlLabel": "رابط الشعار",
+        "urlPlaceholder": "https://example.com/logo.png",
+        "upload": "تحميل",
+        "uploading": "جاري التحميل...",
+        "preview": "معاينة الشعار الفاتح",
+        "previewAlt": "معاينة الشعار",
+        "darkLabel": "شعار الوضع الداكن",
+        "darkPreview": "معاينة شعار الوضع الداكن"
+      },
+      "colors": {
+        "title": "الألوان",
+        "description": "اختر ألوان علامتك التجارية",
+        "primaryLabel": "اللون الأساسي",
+        "preview": "معاينة",
+        "variants": {
+          "primary": "أساسي",
+          "hover": "عند التمرير",
+          "outline": "محدد",
+          "button": "زر"
+        }
+      },
+      "save": "حفظ التغييرات",
+      "saving": "جاري الحفظ...",
+      "success": {
+        "title": "تم تحديث العلامة التجارية",
+        "description": "تم حفظ إعدادات علامتك التجارية بنجاح."
+      },
+      "error": {
+        "title": "خطأ",
+        "description": "فشل تحديث إعدادات العلامة التجارية."
+      },
+      "upload": {
+        "success": {
+          "title": "تم تحميل الشعار",
+          "description": "تم تحميل شعارك بنجاح."
+        },
+        "error": {
+          "title": "فشل التحميل",
+          "description": "فشل تحميل الشعار. يرجى المحاولة مرة أخرى."
+        }
+      },
+      "validation": {
+        "fileSize": {
+          "title": "الملف كبير جدًا",
+          "description": "يجب أن يكون حجم الشعار أقل من 5 ميجابايت"
+        },
+        "fileType": {
+          "title": "نوع ملف غير صالح",
+          "description": "يرجى تحميل ملف صورة (JPEG أو PNG أو GIF أو SVG أو WebP)"
+        }
+      }
+    }
+  },
+  "workspace": {
+    "welcomeToFikrahub": "مرحباً بك في فكرة هب",
+    "enterWorkspace": "أدخل مساحة العمل الخاصة بك للمتابعة",
+    "workspaceNameLabel": "اسم مساحة العمل",
+    "yourWorkspacePlaceholder": "مساحة-العمل-الخاصة-بك",
+    "workspaceSlugDesc": "استخدم الأحرف الصغيرة والأرقام والشرطات فقط",
+    "continueToWorkspace": "المتابعة إلى مساحة العمل",
+    "or": "أو",
+    "createNewWorkspaceBtn": "إنشاء مساحة عمل جديدة",
+    "dontKnowWorkspace": "لا تعرف اسم مساحة العمل الخاصة بك؟",
+    "contactWorkspaceAdmin": "اتصل بمسؤول مساحة العمل",
+    "invalidWorkspaceName": "اسم مساحة العمل غير صالح — استخدم الأحرف الصغيرة والأرقام والشرطات فقط",
+    "verifyingAccess": "التحقق من الوصول إلى مساحة العمل...",
+    "notFound": "مساحة العمل غير موجودة",
+    "invalidIdentifier": "معرّف مساحة العمل غير صالح",
+    "doesNotExist": "مساحة العمل \"{{slug}}\" غير موجودة أو غير متاحة",
+    "createNew": "إنشاء مساحة عمل جديدة",
+    "goHome": "الذهاب إلى الصفحة الرئيسية",
+    "accessDenied": "الوصول مرفوض",
+    "notMember": "أنت لست عضواً في مساحة العمل \"{{name}}\".",
+    "contactAdmin": "يرجى الاتصال بمسؤول مساحة العمل للحصول على حق الوصول.",
+    "goToMyWorkspaces": "الذهاب إلى مساحات العمل الخاصة بي",
+    "createNewWorkspace": "إنشاء مساحة عمل جديدة",
+    "createYourWorkspace": "إنشاء مساحة العمل الخاصة بك",
+    "step1": "الخطوة 1: إعداد مساحة العمل",
+    "step2": "الخطوة 2: إنشاء حساب المسؤول",
+    "workspaceName": "اسم مساحة العمل",
+    "workspaceNamePlaceholder": "شركة أكمي",
+    "workspaceNameDesc": "هذا هو اسم مؤسستك أو فريقك",
+    "workspaceUrl": "رابط مساحة العمل",
+    "workspaceSlugPlaceholder": "acme-inc",
+    "continue": "متابعة ←",
+    "checking": "جارٍ التحقق...",
+    "firstName": "الاسم الأول",
+    "firstNamePlaceholder": "أحمد",
+    "lastName": "اسم العائلة",
+    "lastNamePlaceholder": "محمد",
+    "emailAddress": "عنوان البريد الإلكتروني",
+    "emailPlaceholder": "ahmed@example.com",
+    "password": "كلمة المرور",
+    "passwordPlaceholder": "••••••••",
+    "passwordDesc": "يجب أن تكون 8 أحرف على الأقل",
+    "back": "→ رجوع",
+    "createWorkspace": "إنشاء مساحة العمل",
+    "creating": "جارٍ الإنشاء...",
+    "welcomeMessage": "مرحباً بك في {{name}}! 🎉",
+    "provideWorkspaceName": "يرجى تقديم اسم مساحة العمل",
+    "nameNotAvailable": "اسم مساحة العمل غير متاح",
+    "failedToCheck": "فشل التحقق من اسم مساحة العمل",
+    "provideEmailPassword": "يرجى تقديم بريدك الإلكتروني وكلمة المرور",
+    "passwordTooShort": "يجب أن تكون كلمة المرور 8 أحرف على الأقل"
+  },
+  "workspaceLanding": {
+    "resetTitle": "إعادة تعيين كلمة المرور",
+    "resetDescription": "قم بتعيين كلمة مرور جديدة لحسابك.",
+    "newPassword": "كلمة المرور الجديدة",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "passwordPlaceholder": "أدخل كلمة المرور",
+    "confirmPasswordPlaceholder": "تأكيد كلمة المرور",
+    "resetSave": "حفظ كلمة المرور الجديدة",
+    "resetMissingParams": "رمز إعادة التعيين أو مُعرّف المستخدم مفقود.",
+    "resetFailed": "فشل في إعادة تعيين كلمة المرور.",
+    "resetSuccess": "تم تغيير كلمة المرور — جاري تسجيل الدخول...",
+    "saving": "جاري الحفظ...",
+    "passwordsNotMatch": "كلمتا المرور غير متطابقتين",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "forgotSent": "تم إرسال رابط إعادة تعيين كلمة المرور!",
+    "forgotFailed": "فشل في إرسال رابط إعادة التعيين.",
+    "sendReset": "إرسال رابط إعادة التعيين",
+    "sending": "جارٍ الإرسال...",
+    "backToLogin": "العودة لتسجيل الدخول",
+    "emailRequired": "يرجى إدخال عنوان البريد الإلكتروني.",
+    "loadingWorkspace": "جاري تحميل مساحة العمل...",
+    "workspaceNotFound": "مساحة العمل غير موجودة",
+    "workspaceDoesNotExist": "مساحة العمل \"{{slug}}\" غير موجودة",
+    "createNewWorkspace": "إنشاء مساحة عمل جديدة",
+    "signInOrCreate": "سجل الدخول إلى حسابك أو أنشئ حساباً جديداً",
+    "login": "تسجيل الدخول",
+    "signUp": "التسجيل",
+    "email": "البريد الإلكتروني",
+    "emailPlaceholder": "you@example.com",
+    "password": "كلمة المرور",
+    "firstName": "الاسم الأول",
+    "firstNamePlaceholder": "أحمد",
+    "lastName": "اسم العائلة",
+    "lastNamePlaceholder": "محمد",
+    "passwordRequirement": "يجب أن تكون 8 أحرف على الأقل",
+    "signIn": "تسجيل الدخول",
+    "signingIn": "جاري تسجيل الدخول...",
+    "createAccount": "إنشاء حساب",
+    "creatingAccount": "جاري إنشاء الحساب...",
+    "welcomeBack": "مرحباً بعودتك، {{email}}! 👋",
+    "welcomeTo": "مرحباً بك في {{name}}! 🎉",
+    "loginFailed": "فشل تسجيل الدخول",
+    "signupFailed": "فشل التسجيل",
+    "passwordTooShort": "يجب أن تكون كلمة المرور 8 أحرف على الأقل"
+  },
+  "language": {
+    "english": "الإنجليزية",
+    "arabic": "العربية"
+  }
+}

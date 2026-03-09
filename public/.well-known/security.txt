@@ -1,0 +1,38 @@
+Contact: mailto:security@fikrahub.com
+Expires: 2026-12-31T23:59:59.000Z
+Preferred-Languages: en, ar
+Canonical: https://fikrahub.com/.well-known/security.txt
+
+# Security Policy
+
+We take security seriously and appreciate responsible disclosure.
+
+## Reporting a Vulnerability
+
+If you discover a security vulnerability, please:
+1. DO NOT open a public issue
+2. Email: security@fikrahub.com
+3. Include:
+   - Description of the vulnerability
+   - Steps to reproduce
+   - Potential impact
+   - Suggested fix (if any)
+
+## Response Timeline
+
+- Initial Response: Within 48 hours
+- Status Update: Within 7 days
+- Resolution Timeline: Depends on severity
+
+## Recognition
+
+We acknowledge security researchers who responsibly disclose vulnerabilities.
+
+## Out of Scope
+
+- Social engineering attacks
+- Physical attacks
+- Denial of Service attacks
+- Spam or Social Behavior
+
+Thank you for helping keep FikraHub secure!

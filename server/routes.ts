@@ -1,0 +1,4949 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { setupAuth, isAuthenticated, hashPassword } from "./auth";
+import { requireOrgMembership } from "./middleware/authorization";
+import { generateBusinessAsset, generateChatResponse } from "./openai";
+import { getRealtimeConnection, endRealtimeConversation } from "./gpt-realtime";
+import { ResearchAgent } from "./research";
+import OpenAI from 'openai';
+import vercelRoutes from "./vercel-routes";
+import { registerIdeaRoutes } from "./idea-routes";
+import { registerWorkspaceRoutes } from "./workspace-routes";
+import { registerChallengeRoutes } from "./challenge-routes";
+import { registerSuperAdminRoutes } from "./super-admin-routes";
+import multer from 'multer'; // ✅ Add multer import
+import path from 'path'; // ✅ Add path import
+import fs from 'fs'; // ✅ Add fs import
+import { Resend } from 'resend';
+import mustache from 'mustache';
+import { fileURLToPath } from 'url';
+import { parseEvaluationCriteria, parseEvaluationResponse, buildProjectEvaluationPrompt } from './lib/evaluationCriteria';
+import { randomBytes } from 'crypto';
+import { validateUploadedFile, sanitizeFilename } from './lib/fileValidation';
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Initialize Azure OpenAI client only if credentials are available
+const azureOpenAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT_DEV;
+const azureOpenAIKey = process.env.AZURE_OPENAI_API_KEY_DEV;
+const azureAPIVersion = process.env.AZURE_OPENAI_API_VERSION || '2025-01-01-preview';
+const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-fikra-dev';
+
+// Remove trailing slash from endpoint to avoid double slashes
+const cleanEndpoint = azureOpenAIEndpoint?.replace(/\/$/, '');
+
+const openai = (azureOpenAIKey && cleanEndpoint) ? new OpenAI({
+  apiKey: azureOpenAIKey,
+  baseURL: `${cleanEndpoint}/openai/deployments/${azureDeployment}`,
+  defaultQuery: { 'api-version': azureAPIVersion },
+  defaultHeaders: { 'api-key': azureOpenAIKey },
+}) : null;
+
+// Add debug logging
+if (openai) {
+  console.log('✅ Azure OpenAI client initialized:', {
+    endpoint: cleanEndpoint,
+    deployment: azureDeployment,
+    apiVersion: azureAPIVersion,
+    fullBaseURL: `${cleanEndpoint}/openai/deployments/${azureDeployment}`,
+    note: 'Deployment in baseURL, will pass empty string as model'
+  });
+}
+
+if (!openai) {
+  console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
+}
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges } from "@shared/schema";
+import { z } from "zod";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { canAccessProject, canModifyProject, canAccessChat, canAccessAssets } from "./middleware/authorization";
+import { requireApiKey } from "./middleware/api-key-auth";
+import { passwordResetLimiter, authRateLimiter, orgCreationLimiter, fileUploadLimiter, aiRateLimiter, dataExportLimiter } from "./middleware/security";
+import { passwordValidation, handleValidationErrors } from "./middleware/validation";
+import {
+  updateUserProfileSchema,
+  createOrganizationSchema,
+  updateOrgSettingsSchema,
+  addOrgMemberSchema,
+  updateMemberRoleSchema,
+  generatePitchDeckSchema,
+  generateAssetSchema,
+  chatResponseSchema,
+  voiceSynthesizeSchema,
+  researchQuerySchema,
+  validateRequest,
+} from "@shared/validation-schemas";
+
+export function registerRoutes(app: Express): Server {
+  // create transporter once (reuse)
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
+
+  if (!resendClient) {
+    console.warn("⚠️  RESEND_API_KEY not set - Email features will be disabled");
+  }
+
+  // Auth middleware - includes user registration, login, logout endpoints
+  setupAuth(app);
+
+  // Workspace management routes (multi-tenancy)
+  registerWorkspaceRoutes(app);
+
+  // Idea management routes
+  registerIdeaRoutes(app);
+
+  // Challenge management routes
+  registerChallengeRoutes(app);
+
+  // Super admin platform routes
+  registerSuperAdminRoutes(app);
+
+  // ✅ Multer storage configuration for evaluation criteria JSON files
+  const criteriaStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(process.cwd(), 'uploads', 'evaluation-criteria');
+      
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      // Generate unique filename: orgId-timestamp-originalname (cryptographically secure)
+      const uniqueSuffix = `${Date.now()}-${randomBytes(8).toString('hex')}`;
+      const ext = path.extname(file.originalname);
+      const nameWithoutExt = path.basename(file.originalname, ext);
+
+      // SECURITY: Enhanced filename sanitization with length limits
+      const maxFilenameLength = 100;
+      let sanitized = nameWithoutExt
+        .normalize('NFD') // Unicode normalization
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[^a-z0-9_-]/gi, '_') // Remove special chars
+        .toLowerCase()
+        .slice(0, maxFilenameLength); // Limit length
+
+      // Prevent empty filenames
+      if (!sanitized || sanitized.length === 0) {
+        sanitized = 'upload';
+      }
+
+      cb(null, `${sanitized}-${uniqueSuffix}${ext}`);
+    }
+  });
+
+  // ✅ Multer upload middleware for JSON files with enhanced security
+  const uploadCriteria = multer({
+    storage: criteriaStorage,
+    limits: {
+      fileSize: 2 * 1024 * 1024, // 2MB limit for JSON files
+      files: 1 // Only allow 1 file at a time
+    },
+    fileFilter: (req, file, cb) => {
+      // Whitelist approach: Only accept JSON files
+      const allowedMimeTypes = ['application/json', 'text/json'];
+      const allowedExtensions = ['.json'];
+
+      const ext = path.extname(file.originalname).toLowerCase();
+      const mimeType = file.mimetype.toLowerCase();
+
+      if (allowedMimeTypes.includes(mimeType) && allowedExtensions.includes(ext)) {
+        cb(null, true);
+      } else {
+        console.warn(`Rejected file upload: ${file.originalname} (${file.mimetype})`);
+        cb(new Error('Invalid file type. Only JSON files are allowed.'));
+      }
+    }
+  });
+
+  // User info endpoint with organization memberships
+  app.get('/api/user', isAuthenticated, async (req: any, res) => {
+    try {
+      // Fetch user's organization memberships with role info
+      const preferredSlug = typeof req.query?.slug === 'string' ? req.query.slug : undefined;
+      let memberships = await db
+         .select({
+           orgId: organizationMembers.orgId,
+           role: organizationMembers.role,
+           orgName: organizations.name,
+           orgSlug: organizations.slug
+         })
+         .from(organizationMembers)
+         .innerJoin(organizations, eq(organizationMembers.orgId, organizations.id))
+         .where(eq(organizationMembers.userId, req.user.id));
+
+      // If a slug was supplied, move that membership to the front (if present)
+      if (preferredSlug && Array.isArray(memberships) && memberships.length > 1) {
+        const idx = memberships.findIndex((m: any) => m.orgSlug === preferredSlug);
+        if (idx > 0) {
+          const [match] = memberships.splice(idx, 1);
+          memberships.unshift(match);
+        }
+      }
+      // Check if user is admin of any organization
+      const isAdmin = memberships.some(m => m.role === 'OWNER' || m.role === 'ADMIN');
+
+      res.json({
+        ...req.user,
+        memberships,
+        isAdmin,
+        primaryOrgId: memberships[0]?.orgId // First org as primary
+      });
+    } catch (error) {
+      console.error('Error fetching user memberships:', error);
+      // Fallback to basic user info if there's an error
+      res.json(req.user);
+    }
+  });
+
+  // Update user profile endpoint
+  // ✅ SECURITY FIX (P1): Add comprehensive input validation
+  app.patch('/api/user/profile', isAuthenticated, validateRequest(updateUserProfileSchema), async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { firstName, lastName, email, profileImageUrl } = req.body;
+      
+      const updatedUser = await storage.updateUser(userId, {
+        firstName,
+        lastName,
+        email,
+        profileImageUrl
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Export user data endpoint
+  // SECURITY FIX (P2): Added dataExportLimiter to prevent abuse
+  app.post('/api/user/export', isAuthenticated, dataExportLimiter, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // Get user's data
+      const userData = await storage.getUserData(userId);
+      
+      res.json({
+        user: req.user,
+        projects: userData.projects,
+        chats: userData.chats,
+        messages: userData.messages,
+        assets: userData.assets,
+        exportedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error exporting user data:", error);
+      res.status(500).json({ message: "Failed to export data" });
+    }
+  });
+
+  // Delete user account endpoint
+  app.delete('/api/user/delete', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // Delete all user's data
+      await storage.deleteUser(userId);
+      
+      // Logout the user
+      req.logout((err: any) => {
+        if (err) {
+          console.error("Error logging out after account deletion:", err);
+        }
+      });
+      
+      res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
+  // Organization routes
+  app.get('/api/organizations', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const organizations = await storage.getUserOrganizations(userId);
+      res.json(organizations);
+    } catch (error) {
+      console.error("Error fetching organizations:", error);
+      res.status(500).json({ message: "Failed to fetch organizations" });
+    }
+  });
+
+  // ✅ SECURITY FIX (P1): Add comprehensive input validation
+  app.post('/api/organizations', isAuthenticated, validateRequest(createOrganizationSchema), async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { name } = req.body;
+      
+      const organization = await storage.createOrganization({ name }, userId);
+      res.json(organization);
+    } catch (error) {
+      console.error("Error creating organization:", error);
+      res.status(500).json({ message: "Failed to create organization" });
+    }
+  });
+
+  // Admin middleware - checks if user has ADMIN or OWNER role in organization
+  const isOrgAdmin = async (req: any, res: any, next: any) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user.id;
+      
+      const userRole = await storage.getUserRole(userId, orgId);
+      if (!userRole || (userRole !== 'ADMIN' && userRole !== 'OWNER')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      next();
+    } catch (error) {
+      console.error("Error checking admin role:", error);
+      res.status(500).json({ message: "Failed to verify admin access" });
+    }
+  };
+
+  // Check admin role endpoint - returns role info without blocking
+  // ✅ SECURITY FIX (P2): Add authorization check to prevent organization enumeration
+  app.get('/api/organizations/:orgId/admin/check-role', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user.id;
+
+      const userRole = await storage.getUserRole(userId, orgId);
+
+      // ✅ SECURITY FIX (P2): Return 403 if user is not a member
+      // Prevents enumeration of valid organization IDs
+      if (!userRole) {
+        return res.status(403).json({
+          message: 'Access denied',
+          error: 'You are not a member of this organization'
+        });
+      }
+
+      res.json({
+        role: userRole,
+        isAdmin: userRole === 'ADMIN' || userRole === 'OWNER'
+      });
+    } catch (error) {
+      console.error("Error checking admin role:", error);
+      res.status(500).json({ message: "Failed to verify admin access" });
+    }
+  });
+
+  // SECURITY: Public endpoint requires API key authentication
+  app.post('/api/public/projects', requireApiKey, orgCreationLimiter, async (req, res) => {
+    try {
+      const { email, title, description, verscale_chat_id, old_verscale_chat_id } = req.body;
+
+      // Validate required fields
+      if (!email) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Email is required',
+          message: 'Please provide an email address'
+        });
+      }
+
+      if (!title) {
+        return res.status(400).json({
+          success: false,
+          error: 'Title is required',
+          message: 'Please provide a project title'
+        });
+      }
+
+      // ✅ Validate verscale_chat_id is required
+      if (!verscale_chat_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'verscale_chat_id is required',
+          message: 'Please provide a verscale_chat_id'
+        });
+      }
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+          message: `No user found with email: ${email}`
+        });
+      }
+
+      // Get user's primary organization
+      const organizations = await storage.getUserOrganizations(user.id);
+      
+      if (!organizations || organizations.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'No organization found',
+          message: 'User does not belong to any organization'
+        });
+      }
+
+      const primaryOrg = organizations[0];
+
+      // ✅ Check if this is an update operation (old_verscale_chat_id provided)
+      if (old_verscale_chat_id) {
+        console.log(`🔄 Update operation detected: email=${email}, old_chat_id=${old_verscale_chat_id}, new_chat_id=${verscale_chat_id}`);
+        
+        // Find existing project by email + old_verscale_chat_id
+        const existingProjects = await storage.getProjectsByOrg(primaryOrg.id);
+        const existingProject = existingProjects.find((p: any) => 
+          p.createdById === user.id && 
+          p.verscale_chat_id === old_verscale_chat_id
+        );
+
+        if (existingProject) {
+          console.log(`✅ Found existing project to update: ${existingProject.id}`);
+          
+          // Update the existing project with new verscale_chat_id
+          const updatedProject = await storage.updateProject(existingProject.id, {
+            verscale_chat_id: verscale_chat_id,
+            title: title, // Also update title in case it changed
+            description: description || existingProject.description,
+            updatedAt: new Date()
+          });
+
+          console.log(`✅ Updated project ${existingProject.id}: old_chat_id=${old_verscale_chat_id} → new_chat_id=${verscale_chat_id}`);
+
+          return res.status(200).json({
+            success: true,
+            data: {
+              id: updatedProject.id,
+              title: updatedProject.title,
+              description: updatedProject.description,
+              verscale_chat_id: updatedProject.verscale_chat_id,
+              old_verscale_chat_id: old_verscale_chat_id,
+              orgId: updatedProject.orgId,
+              userId: user.id,
+              createdAt: updatedProject.createdAt,
+              updatedAt: updatedProject.updatedAt
+            },
+            message: 'Project updated successfully'
+          });
+        } else {
+          console.log(`⚠️ No existing project found with old_verscale_chat_id=${old_verscale_chat_id}, creating new project instead`);
+          // If no existing project found, continue to create new one
+        }
+      }
+
+      // ✅ Create new project (either no old_verscale_chat_id or update target not found)
+      const projectData = insertProjectSchema.parse({
+        orgId: primaryOrg.id,
+        title,
+        description: description || null,
+        type: 'DEVELOP',
+        status: 'BACKLOG',
+        verscale_chat_id: verscale_chat_id,
+        createdById: user.id,
+        tags: []
+      });
+
+      const project = await storage.createProject(projectData);
+
+      console.log(`✅ Public API: Created project for user ${email} (${user.id}) with verscale_chat_id=${verscale_chat_id}`);
+
+      res.status(201).json({
+        success: true,
+        data: {
+          id: project.id,
+          title: project.title,
+          description: project.description,
+          verscale_chat_id: project.verscale_chat_id,
+          orgId: project.orgId,
+          userId: user.id,
+          createdAt: project.createdAt
+        },
+        message: 'Project created successfully'
+      });
+
+    } catch (error) {
+      console.error('❌ Public API - Create/Update project error:', error);
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation error',
+          details: error.errors
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create or update project',
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  // Admin routes
+  // ✅ SECURITY FIX (P1): Add comprehensive input validation
+  app.patch('/api/organizations/:orgId/admin/settings', isAuthenticated, isOrgAdmin, validateRequest(updateOrgSettingsSchema), async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const { logoUrl, primaryColor, slug, challengesEnabled, expertsEnabled, radarEnabled, dashboardEnabled, aiBuilderEnabled, formSubmissionEnabled, academyEnabled } = req.body;
+
+      const updatedOrg = await storage.updateOrganization(orgId, {
+        logoUrl,
+        primaryColor,
+        slug,
+        challengesEnabled,
+        expertsEnabled,
+        radarEnabled,
+        dashboardEnabled,
+        aiBuilderEnabled,
+        formSubmissionEnabled,
+        academyEnabled
+      });
+
+      res.json(updatedOrg);
+    } catch (error) {
+      console.error("Error updating organization settings:", error);
+      res.status(500).json({ message: "Failed to update organization settings" });
+    }
+  });
+
+  app.get('/api/organizations/:orgId/admin/members', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const members = await storage.getOrganizationMembers(orgId);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching organization members:", error);
+      res.status(500).json({ message: "Failed to fetch organization members" });
+    }
+  });
+
+  // ✅ SECURITY FIX (P1): Add comprehensive input validation
+  app.post('/api/organizations/:orgId/admin/members', isAuthenticated, isOrgAdmin, validateRequest(addOrgMemberSchema), async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const { email, role } = req.body;
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+
+      // make sure no user with this email is already a member of the org
+      const existingMemberUser = await storage.getUserByEmailOrganization(email, orgId);
+      if (existingMemberUser) {
+        return res.status(400).json({ message: 'A user with this email is already a member of the organization' });
+      }
+
+      // create a new user for this invite (temp credentials)
+      const localPart = email.split('@')[0].replace(/[^\w\-\.]/g, '').slice(0, 20) || 'user';
+      const username = `${localPart}`;
+
+      // Generate cryptographically secure temporary password — user will set real password during registration
+      // Password format: alphanumeric + special chars, 16 characters long
+      const rawPassword = randomBytes(16).toString('base64').slice(0, 16);
+      // SECURITY: Hash password using scrypt
+      const hashedPassword = await hashPassword(rawPassword);
+
+      const newUser = await storage.createUser({
+        email,
+        username,
+        firstName: 'New',
+        lastName: 'User',
+        password: hashedPassword,
+        status: 'PENDING'
+      });
+
+      // add user to organization
+      await storage.addOrganizationMember(orgId, newUser.id, role || 'MEMBER');
+
+      // prepare registration link (frontend should prefill email + org slug)
+      const org = await storage.getOrganization(orgId).catch(() => null);
+      const hostUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const orgSlug = org?.slug || orgId;
+      const registerUrl = `${hostUrl}/w/${orgSlug}/register?email=${encodeURIComponent(email)}&userId=${encodeURIComponent(newUser.id)}`;
+
+      // render & send invite email (uses existing invite template; button should point to registerUrl)
+      if (resendClient) {
+        const orgName = org?.name || 'your workspace';
+        const userName = newUser.firstName || newUser.username || newUser.email;
+
+        const templateCandidates = [
+          path.join(__dirname, 'email-templates', 'invite-member.html'),
+          path.join(process.cwd(), 'server', 'email-templates', 'invite-member.html'),
+          path.join(process.cwd(), 'dist', 'email-templates', 'invite-member.html'),
+          path.join(process.cwd(), 'email-templates', 'invite-member.html')
+        ];
+
+        let html = '';
+        const found = templateCandidates.find(p => {
+          try { return fs.existsSync(p); } catch { return false; }
+        });
+
+        if (found) {
+          try {
+            const htmlTemplate = fs.readFileSync(found, 'utf8');
+            html = mustache.render(htmlTemplate, {
+              orgName,
+              userName,
+              role: role || 'MEMBER',
+              acceptUrl: registerUrl,
+              hostUrl,
+              orgSlug
+            });
+          } catch (tplErr) {
+            console.warn('Failed to read/render email template at', found, tplErr);
+          }
+        }
+
+        if (!html) {
+          const inlineTemplate = `<html><body>
+            <p>Hi {{userName}},</p>
+            <p>You have been invited to join <strong>{{orgName}}</strong> on FikraHub.</p>
+            <p>Click the button below to complete your registration (your email will be pre-filled):</p>
+            <p><a href="{{registerUrl}}">Complete registration</a></p>
+            <p>If that doesn't work, open {{hostUrl}} and enter workspace slug: <strong>{{orgSlug}}</strong></p>
+          </body></html>`;
+          html = mustache.render(inlineTemplate, { orgName, userName, registerUrl, hostUrl, orgSlug });
+        }
+
+        try {
+          await resendClient.emails.send({
+            from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+            to: email,
+            subject: `You're invited to ${org?.name || 'FikraHub'}`,
+            html
+          });
+          console.log(`✅ Invite email sent to ${email} for org ${orgId}`);
+        } catch (err) {
+          console.error('❌ Resend failed to send invite email:', err);
+          console.log('Invitation content (fallback log):', { to: email, subject: `You're invited to ${org?.name || 'FikraHub'}`, htmlSnippet: html.substring(0,300) });
+        }
+      } else {
+        console.log(`ℹ️ Resend not configured. Skipping send. Invitation details: to=${email}, orgSlug=${orgSlug}`);
+      }
+
+      res.json({ message: "Member added successfully", user: { id: newUser.id, email: newUser.email, username: newUser.username } });
+    } catch (error) {
+      console.error("Error adding organization member:", error);
+      res.status(500).json({ message: "Failed to add organization member" });
+    }
+  });
+
+  // ✅ SECURITY FIX (P1): Add comprehensive input validation
+  app.patch('/api/organizations/:orgId/admin/members/:userId', isAuthenticated, isOrgAdmin, validateRequest(updateMemberRoleSchema), async (req: any, res) => {
+    try {
+      const { orgId, userId } = req.params;
+      const { role } = req.body;
+      
+      await storage.updateMemberRole(orgId, userId, role);
+      res.json({ message: "Member role updated successfully" });
+    } catch (error) {
+      console.error("Error updating member role:", error);
+      res.status(500).json({ message: "Failed to update member role" });
+    }
+  });
+
+  app.post('/api/workspaces/:slug/complete-invite', authRateLimiter, async (req: any, res) => {
+    try {
+      const { email, password, firstName, lastName, userId } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: 'email and password are required' });
+      }
+
+      // verify userId present
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'userId is required' });
+      }
+
+      // fetch invited user
+      const invited = await storage.getUser(userId);
+      if (!invited) {
+        return res.status(404).json({ error: 'Invited user not found' });
+      }
+
+      // Only allow completing invite if user is PENDING
+      if (!invited.status || invited.status !== 'PENDING') {
+        console.warn(`Invite completion attempted for non-pending user: ${userId}, status: ${invited.status}`);
+        return res.status(400).json({ error: 'Invalid invite or invite already completed' });
+      }
+
+      // Validate password strength
+      if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) ||
+          !/[0-9]/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+        return res.status(400).json({
+          error: 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'
+        });
+      }
+
+      // hash password and update user
+      // SECURITY: Hash password using scrypt
+      const hashed = await hashPassword(password);
+      const updated = await storage.updateUser(invited.id, {
+        email,
+        firstName: firstName || invited.firstName || '',
+        lastName: lastName || invited.lastName || '',
+        password: hashed,
+        status: 'ACTIVE'
+      });
+
+      // Auto-login if possible (Passport style)
+      if (typeof req.logIn === 'function') {
+        req.logIn(updated, (err: any) => {
+          if (err) {
+            console.error('Auto-login failed after signup:', err);
+            // fallback: attach to session manually if available
+            if (req.session) (req.session as any).userId = updated.id;
+            return res.status(500).json({ error: 'Failed to create session after signup' });
+          }
+          // success - return user for frontend redirect to workspace dashboard
+          return res.json({ success: true, user: updated });
+        });
+        return;
+      }
+
+      // Fallback session set (if express-session used)
+      if (req.session) {
+        (req.session as any).userId = updated.id;
+      }
+
+      res.json({ success: true, user: updated });
+    } catch (error) {
+      console.error('Signup completion error:', error);
+      res.status(500).json({ error: 'Signup failed' });
+    }
+  });
+
+  app.delete('/api/organizations/:orgId/admin/members/:userId', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { orgId, userId } = req.params;
+      
+      // Prevent removing the last owner
+      const userRole = await storage.getUserRole(userId, orgId);
+      if (userRole === 'OWNER') {
+        const allMembers = await storage.getOrganizationMembers(orgId);
+        const owners = allMembers.filter(m => m.role === 'OWNER');
+        if (owners.length <= 1) {
+          return res.status(400).json({ message: "Cannot remove the last owner" });
+        }
+      }
+      
+      await storage.removeMemberFromOrganization(orgId, userId);
+      res.json({ message: "Member removed successfully" });
+    } catch (error) {
+      console.error("Error removing organization member:", error);
+      res.status(500).json({ message: "Failed to remove organization member" });
+    }
+  });
+
+  app.get('/api/organizations/:orgId/admin/stats', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const stats = await storage.getOrganizationStats(orgId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching organization stats:", error);
+      res.status(500).json({ message: "Failed to fetch organization stats" });
+    }
+  });
+
+  app.get('/api/organizations/:orgId/admin/ideas', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const projects = await storage.getProjectsByOrg(orgId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching organization ideas:", error);
+      res.status(500).json({ message: "Failed to fetch organization ideas" });
+    }
+  });
+
+  // Project routes
+  app.get('/api/organizations/:orgId/projects', isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const projects = await storage.getProjectsByOrg(orgId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      res.status(500).json({ message: "Failed to fetch projects" });
+    }
+  });
+
+  // Project routes
+  app.get('/api/organizations/:orgId/projects-user', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user.id;
+      const projects = await storage.getProjectsByUser(userId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      res.status(500).json({ message: "Failed to fetch projects" });
+    }
+  });
+
+  app.post('/api/projects', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const projectData = insertProjectSchema.parse({
+        ...req.body,
+        type: req.body.type || 'LAUNCH',
+        createdById: userId,
+      });
+
+      const project = await storage.createProject(projectData);
+      res.json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid project data", errors: error.errors });
+      }
+      console.error("Error creating project:", error);
+      res.status(500).json({ message: "Failed to create project" });
+    }
+  });
+
+  // List projects by organization
+  app.get('/api/projects', isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.query;
+      if (!orgId || typeof orgId !== 'string') {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const projects = await storage.getProjectsByOrg(orgId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      res.status(500).json({ message: "Failed to fetch projects" });
+    }
+  });
+
+  // Update project endpoint (with authorization check)
+  app.patch('/api/projects/:id', isAuthenticated, canModifyProject, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      // Whitelist allowed update fields to prevent mass assignment
+      const allowedFields = ['title', 'description', 'status', 'tags', 'type', 'deploymentUrl', 'verscale_chat_id'];
+      const safeUpdateData: any = {};
+
+      for (const field of allowedFields) {
+        if (field in updateData) {
+          safeUpdateData[field] = updateData[field];
+        }
+      }
+
+      const project = await storage.updateProject(id, safeUpdateData);
+      res.json(project);
+    } catch (error) {
+      console.error("Error updating project:", error);
+      res.status(500).json({ message: "Failed to update project" });
+    }
+  });
+
+  app.get('/api/projects/:id', isAuthenticated, canAccessProject, async (req: any, res) => {
+    try {
+      // Project already attached to req by middleware
+      const project = req.project;
+      res.json(project);
+    } catch (error) {
+      console.error("Error fetching project:", error);
+      res.status(500).json({ message: "Failed to fetch project" });
+    }
+  });
+
+  app.delete('/api/projects/:id', isAuthenticated, canModifyProject, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      // Authorization already checked by canModifyProject middleware
+      await storage.deleteProject(id);
+      res.json({ message: "Project deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      res.status(500).json({ message: "Failed to delete project" });
+    }
+  });
+
+  // Chat routes
+  app.get('/api/projects/:projectId/chats', isAuthenticated, canAccessProject, async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const chats = await storage.getChatsByProject(projectId);
+      res.json(chats);
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+      res.status(500).json({ message: "Failed to fetch chats" });
+    }
+  });
+
+  app.get('/api/chats/:id', isAuthenticated, canAccessChat, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const chat = await storage.getChat(id);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      res.json(chat);
+    } catch (error) {
+      console.error("Error fetching chat:", error);
+      res.status(500).json({ message: "Failed to fetch chat" });
+    }
+  });
+
+  app.post('/api/chats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const chatData = insertChatSchema.parse({
+        ...req.body,
+        createdById: userId,
+      });
+      
+      const chat = await storage.createChat(chatData);
+      res.json(chat);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid chat data", errors: error.errors });
+      }
+      console.error("Error creating chat:", error);
+      res.status(500).json({ message: "Failed to create chat" });
+    }
+  });
+
+  app.get('/api/chats/:id/messages', isAuthenticated, canAccessChat, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const messages = await storage.getMessagesByChat(id);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  // Message routes
+  app.post('/api/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const messageData = insertMessageSchema.parse(req.body);
+      const message = await storage.createMessage(messageData);
+      res.json(message);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid message data", errors: error.errors });
+      }
+      console.error("Error creating message:", error);
+      res.status(500).json({ message: "Failed to create message" });
+    }
+  });
+
+  // Asset routes
+  app.get('/api/projects/:projectId/assets', isAuthenticated, canAccessAssets, async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const assets = await storage.getAssetsByProject(projectId);
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching assets:", error);
+      res.status(500).json({ message: "Failed to fetch assets" });
+    }
+  });
+
+  app.post('/api/assets', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const assetData = insertAssetSchema.parse({
+        ...req.body,
+        createdById: userId,
+      });
+
+      const asset = await storage.createAsset(assetData);
+      res.json(asset);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid asset data", errors: error.errors });
+      }
+      console.error("Error creating asset:", error);
+      res.status(500).json({ message: "Failed to create asset" });
+    }
+  });
+
+  // Update asset data (manual edit)
+  app.patch('/api/assets/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { data } = req.body;
+
+      if (!data) {
+        return res.status(400).json({ message: "Missing asset data" });
+      }
+
+      // Get asset to verify ownership/permission
+      const asset = await storage.getAsset(id);
+      if (!asset) {
+        return res.status(404).json({ message: "Asset not found" });
+      }
+
+      // Update asset
+      const updated = await storage.updateAsset(id, {
+        data,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating asset:", error);
+      res.status(500).json({ message: "Failed to update asset" });
+    }
+  });
+
+  // AI-powered section regeneration
+  app.post('/api/assets/:id/ai-edit', isAuthenticated, aiRateLimiter, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { section, instructions, currentData } = req.body;
+
+      if (!section || !instructions) {
+        return res.status(400).json({ message: "Missing section or instructions" });
+      }
+
+      // Get asset to verify ownership/permission
+      const asset = await storage.getAsset(id);
+      if (!asset) {
+        return res.status(404).json({ message: "Asset not found" });
+      }
+
+      // Determine if we're editing all or a specific section
+      const isEditAll = section === "_ALL_";
+
+      let systemPrompt: string;
+      if (isEditAll) {
+        systemPrompt = `You are an AI assistant helping to edit business assets.
+The user wants to modify the ENTIRE ${asset.kind} asset.
+Current complete data: ${JSON.stringify(currentData, null, 2)}
+
+User instructions: ${instructions}
+
+Respond ONLY with a valid JSON object containing ALL fields of the asset with the requested modifications applied. Maintain the same structure and field names. Do not include any markdown formatting or additional text.`;
+      } else {
+        systemPrompt = `You are an AI assistant helping to edit business assets.
+The user wants to modify the "${section}" section of a ${asset.kind} asset.
+Current data for this section: ${JSON.stringify(currentData[section], null, 2)}
+
+User instructions: ${instructions}
+
+Respond ONLY with a valid JSON object containing the updated "${section}" field. Do not include any markdown formatting or additional text.`;
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Generate the updated data based on the instructions." }
+        ],
+        temperature: 0.7,
+      });
+
+      const response = completion.choices[0].message.content?.trim() || "{}";
+
+      // Parse AI response
+      let newData;
+      try {
+        const parsed = JSON.parse(response);
+
+        if (isEditAll) {
+          // For full edit, use the entire parsed response
+          newData = parsed;
+        } else {
+          // For section edit, extract the section and merge
+          const updatedSection = parsed[section] || parsed;
+          newData = {
+            ...currentData,
+            [section]: updatedSection,
+          };
+        }
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", response);
+        return res.status(500).json({ message: "AI generated invalid response" });
+      }
+
+      // Return proposed changes without saving to database
+      // User will review and approve changes in the frontend
+      // Changes will be saved when user clicks "Save Changes" in the modal
+      res.json({
+        ...asset,
+        data: newData,
+      });
+    } catch (error) {
+      console.error("Error regenerating asset section:", error);
+      res.status(500).json({ message: "Failed to regenerate section with AI" });
+    }
+  });
+
+  // SlideSpeak pitch deck generation route with database persistence
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour) + input validation
+  app.post('/api/generate-pitch-deck', isAuthenticated, aiRateLimiter, validateRequest(generatePitchDeckSchema), async (req: any, res) => {
+    try {
+      const { pitchData, projectId, assetId } = req.body;
+      
+      if (!pitchData || !pitchData.slides || !projectId) {
+        return res.status(400).json({ message: 'Invalid pitch data or missing project ID' });
+      }
+
+      console.log('🎯 Starting pitch deck generation for project:', projectId);
+
+      const { generatePitchDeckFile } = await import('./slidespeak.js');
+      const result = await generatePitchDeckFile(pitchData);
+      
+      if (result.success && result.taskId) {
+        console.log('✅ SlideSpeak task created:', result.taskId);
+        
+        // Save generation to database
+        const generationData = insertPitchDeckGenerationSchema.parse({
+          projectId,
+          assetId: assetId || null,
+          taskId: result.taskId,
+          status: 'GENERATING' as const,
+          template: pitchData.template || 'Modern Business',
+          theme: pitchData.theme || 'Professional', 
+          colorScheme: pitchData.colorScheme || 'Blue',
+          fontFamily: pitchData.fontFamily || 'Inter',
+          createdById: req.user.id,
+        });
+
+        const generation = await storage.createPitchDeckGeneration(generationData);
+
+        res.json({
+          success: true,
+          taskId: result.taskId,
+          generationId: generation.id,
+          message: result.message
+        });
+      } else {
+        console.error('❌ SlideSpeak generation failed:', result.error);
+        res.status(500).json({
+          success: false,
+          error: result.error
+        });
+      }
+    } catch (error) {
+      console.error('Error generating pitch deck:', error);
+      res.status(500).json({ message: 'Failed to generate pitch deck file' });
+    }
+  });
+
+  // Check SlideSpeak task status route with database updates
+  app.get('/api/check-pitch-status/:taskId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      console.log('🔍 Checking status for task:', taskId);
+      
+      // Get generation record from database
+      const generation = await storage.getPitchDeckGenerationByTaskId(taskId);
+      if (!generation) {
+        return res.status(404).json({
+          success: false,
+          error: 'Generation not found'
+        });
+      }
+
+      if (generation.status === 'COMPLETED' && generation.downloadUrl) {
+        return res.json({
+          success: true,
+          status: 'SUCCESS',
+          downloadUrl: generation.downloadUrl,
+          pptxUrl: generation.downloadUrl,
+          message: 'SUCCESS',
+          taskId,
+          generation
+        });
+      }
+
+      // Check SlideSpeak status
+      const { checkSlidesSpeakStatus } = await import('./slidespeak.js');
+      const result = await checkSlidesSpeakStatus(taskId);
+      
+      // Update database based on SlideSpeak response
+      let updatedGeneration = generation;
+      if (result.success && result.downloadUrl) {
+        console.log('✅ Generation completed, updating database with download URL');
+        updatedGeneration = await storage.updatePitchDeckGeneration(generation.id, {
+          status: 'COMPLETED',
+          downloadUrl: result.downloadUrl,
+        });
+      } else if (result.status === 'FAILURE' || result.status === 'REVOKED') {
+        console.log('❌ Generation failed, updating database');
+        updatedGeneration = await storage.updatePitchDeckGeneration(generation.id, {
+          status: 'FAILED',
+          errorMessage: result.message || 'Generation failed',
+        });
+      }
+
+      // Return the result with database status
+      res.json({
+        ...result,
+        generation: updatedGeneration
+      });
+    } catch (error) {
+      console.error('Task status check error:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  // Get pitch deck generations for a project
+  app.get('/api/projects/:projectId/pitch-deck-generations', isAuthenticated, async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      console.log('📋 Fetching pitch deck generations for project:', projectId);
+      
+      const generations = await storage.getPitchDeckGenerationsByProject(projectId);
+      res.json(generations);
+    } catch (error) {
+      console.error('Error fetching pitch deck generations:', error);
+      res.status(500).json({ message: 'Failed to fetch pitch deck generations' });
+    }
+  });
+
+  // Delete pitch deck generation
+  app.delete('/api/pitch-deck-generations/:generationId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { generationId } = req.params;
+      const userId = req.user.id;
+      
+      console.log('🗑️ Deleting pitch deck generation:', generationId);
+      
+      // Get the generation to verify ownership
+      const generation = await storage.getPitchDeckGenerationById(generationId);
+      if (!generation) {
+        return res.status(404).json({ message: 'Generation not found' });
+      }
+      
+      // Check if user owns this generation (through project ownership or being creator)
+      if (generation.createdById !== userId) {
+        return res.status(403).json({ message: 'Not authorized to delete this generation' });
+      }
+      
+      await storage.deletePitchDeckGeneration(generationId);
+      res.json({ success: true, message: 'Generation deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting pitch deck generation:', error);
+      res.status(500).json({ message: 'Failed to delete generation' });
+    }
+  });
+
+  // Get all pitch deck generations for the current authenticated user (user-centric Pitch tab)
+  app.get('/api/my-pitch-decks', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const decks = await storage.getPitchDeckGenerationsByUser(userId);
+      res.json(decks);
+    } catch (error) {
+      console.error('Error fetching user pitch decks:', error);
+      res.status(500).json({ message: 'Failed to fetch pitch decks' });
+    }
+  });
+
+  // Get single pitch deck generation by ID (for the viewer page)
+  app.get('/api/my-pitch-decks/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const generation = await storage.getPitchDeckGenerationById(req.params.id);
+      if (!generation) return res.status(404).json({ message: 'Not found' });
+      if (generation.createdById !== userId) return res.status(403).json({ message: 'Forbidden' });
+      res.json(generation);
+    } catch (error) {
+      console.error('Error fetching pitch deck:', error);
+      res.status(500).json({ message: 'Failed to fetch pitch deck' });
+    }
+  });
+
+  // Serve PPTX file inline (no Content-Disposition: attachment) for in-browser viewing
+  app.get('/api/pitch-preview/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const generation = await storage.getPitchDeckGenerationById(req.params.id);
+      if (!generation) return res.status(404).json({ message: 'Not found' });
+      if (generation.createdById !== userId) return res.status(403).json({ message: 'Forbidden' });
+      if (!generation.downloadUrl) return res.status(404).json({ message: 'File not ready' });
+
+      // downloadUrl is like /uploads/pitch/filename.pptx → resolve to disk path
+      const relPath = generation.downloadUrl.startsWith('/') ? generation.downloadUrl.slice(1) : generation.downloadUrl;
+      const filePath = path.join(process.cwd(), relPath);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File not found on disk' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+      res.setHeader('Content-Disposition', `inline; filename="${path.basename(filePath)}"`);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+    } catch (error) {
+      console.error('Error serving pitch file:', error);
+      res.status(500).json({ message: 'Failed to serve file' });
+    }
+  });
+
+  // Create a pitch deck from plain text topic (simplified user-centric pitch endpoint)
+  app.post('/api/my-pitch-decks', isAuthenticated, aiRateLimiter, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { plain_text, projectId, length, tone, template, custom_user_instructions } = req.body;
+
+      if (!plain_text || !projectId) {
+        return res.status(400).json({ message: 'plain_text and projectId are required' });
+      }
+
+      const apiKey = process.env.SLIDESPEAK_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: 'SlideSpeak API key not configured' });
+      }
+
+      const slideCount = Math.max(3, Math.min(parseInt(length) || 8, 20));
+      const chosenTemplate = template || 'default';
+
+      // SlideSpeak accepts: 'default' | 'casual' | 'professional' | 'funny' | 'educational' | 'sales_pitch'
+      // Map our UI tone labels (possibly capitalised) to the expected lowercase API values
+      const toneMap: Record<string, string> = {
+        professional: 'professional',
+        casual: 'casual',
+        funny: 'funny',
+        educational: 'educational',
+        sales_pitch: 'sales_pitch',
+        salespitch: 'sales_pitch',
+        'sales pitch': 'sales_pitch',
+        default: 'default',
+      };
+      const normalizedTone = tone ? (toneMap[tone.toLowerCase()] ?? 'professional') : undefined;
+
+      // Build SlideSpeak request body (matching PHP PitchController fields)
+      const slideSpeakBody: Record<string, any> = {
+        plain_text,
+        length: slideCount,
+        template: chosenTemplate,
+        language: 'English',
+      };
+      if (normalizedTone) slideSpeakBody.tone = normalizedTone;
+      if (custom_user_instructions) slideSpeakBody.custom_user_instructions = custom_user_instructions;
+
+      // Call SlideSpeak directly with plain_text
+      const response = await fetch('https://api.slidespeak.co/api/v1/presentation/generate', {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify(slideSpeakBody),
+      });
+
+      const data = await response.json() as any;
+      if (!response.ok || !data.task_id) {
+        return res.status(500).json({ success: false, error: data.message || 'Failed to initiate generation' });
+      }
+
+      const generationData = insertPitchDeckGenerationSchema.parse({
+        projectId,
+        assetId: null,
+        taskId: data.task_id,
+        status: 'GENERATING' as const,
+        template: chosenTemplate,
+        theme: tone || 'Professional',
+        colorScheme: 'Blue',
+        fontFamily: 'Inter',
+        createdById: userId,
+      });
+
+      const generation = await storage.createPitchDeckGeneration(generationData);
+      res.json({ success: true, taskId: data.task_id, generationId: generation.id });
+    } catch (error) {
+      console.error('Error creating user pitch deck:', error);
+      res.status(500).json({ message: 'Failed to create pitch deck' });
+    }
+  });
+
+  // Asset generation route
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour) + input validation
+  app.post('/api/generate-asset', isAuthenticated, aiRateLimiter, validateRequest(generateAssetSchema), async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { type, context, businessDescription, projectId, additionalData } = req.body;
+      console.log(`🤖 Generating business asset of type "${type}" for project ${projectId}...`);
+      const generatedAsset = await generateBusinessAsset({
+        type,
+        context,
+        businessDescription,
+        additionalData,
+      });
+
+      // Save to database
+      const assetData = insertAssetSchema.parse({
+        projectId,
+        kind: type,
+        title: generatedAsset.title,
+        data: generatedAsset.data,
+        markdown: generatedAsset.markdown,
+        html: generatedAsset.html,
+        createdById: userId,
+      });
+
+      const asset = await storage.createAsset(assetData);
+      res.json(asset);
+    } catch (error) {
+      console.error("Error generating asset:", error);
+      res.status(500).json({ message: "Failed to generate asset" });
+    }
+  });
+
+  // AI Chat response route
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour) + input validation
+  app.post('/api/chat/response', isAuthenticated, aiRateLimiter, validateRequest(chatResponseSchema), async (req, res) => {
+    try {
+      const { message, context, mode } = req.body;
+      console.log(`🤖 Generating AI response for message (${mode || 'balanced'} mode):`, message.substring(0, 50) + "...");
+      const response = await generateChatResponse(message, context, mode || 'balanced');
+      
+      // Handle structured response with assets
+      if (typeof response === 'object' && response.assets) {
+        console.log(`🎨 Structured response detected! Assets object:`, JSON.stringify(response.assets, null, 2));
+        
+        // Store assets if any were generated
+        if (context.projectId && response.assets.data) {
+          const assetsToStore = [];
+          const { data } = response.assets;
+          
+          // Convert each asset type to our storage format
+          for (const [key, value] of Object.entries(data)) {
+            if (value && Object.keys(value).length > 0) {
+              const assetType = key.toUpperCase().replace(/-/g, '_');
+              assetsToStore.push({
+                projectId: context.projectId,
+                kind: assetType,
+                title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                data: value,
+                createdById: (req.user as any)?.id || '1',
+              });
+            }
+          }
+          
+          // Store all assets
+          for (const asset of assetsToStore) {
+            await storage.createAsset({
+              ...asset,
+              kind: asset.kind as 'LEAN_CANVAS' | 'SWOT' | 'PERSONA' | 'JOURNEY_MAP' | 'MARKETING_PLAN' | 'COMPETITOR_MAP' | 'TAM_SAM_SOM' | 'PITCH_OUTLINE'
+            });
+          }
+          
+          console.log(`📊 Stored ${assetsToStore.length} assets for project ${context.projectId}:`, assetsToStore.map(a => a.kind).join(', '));
+        }
+        
+        res.json({ response: response.response, assets: response.assets });
+      } else {
+        res.json({ response });
+      }
+    } catch (error) {
+      console.error("Error generating chat response:", error);
+      res.status(500).json({ message: "Failed to generate response" });
+    }
+  });
+
+  // Voice synthesis route
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour) + input validation
+  app.post('/api/voice/synthesize', isAuthenticated, aiRateLimiter, validateRequest(voiceSynthesizeSchema), async (req, res) => {
+    try {
+      const { text, voice_id } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ message: "Text is required" });
+      }
+      
+      const audioBuffer = await generateSpeech({ text, voice_id });
+      
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length.toString(),
+        'Cache-Control': 'public, max-age=3600'
+      });
+      
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      res.status(500).json({ message: "Failed to generate speech" });
+    }
+  });
+
+  // Research endpoint using Perplexity API with streaming
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour) + input validation
+  app.post("/api/research/perplexity", isAuthenticated, aiRateLimiter, validateRequest(researchQuerySchema), async (req, res) => {
+    try {
+      const { query } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      // Check if Perplexity API key is available
+      if (!process.env.PERPLEXITY_API_KEY) {
+        // Fallback to simulated response if no API key
+        return res.json({
+          content: `Research completed for: ${query}. Market analysis shows strong potential with favorable competitive positioning and clear growth opportunities.`,
+          keyFindings: [
+            "Market shows significant growth potential with emerging opportunities",
+            "Competitive landscape reveals positioning advantages for new entrants", 
+            "Technology trends indicate favorable timing for market entry",
+            "Customer segment analysis reveals specific unmet needs"
+          ],
+          citations: [
+            "https://example.com/market-analysis",
+            "https://example.com/competitor-research",
+            "https://example.com/tech-trends"
+          ]
+        });
+      }
+
+      // Set up Server-Sent Events for real-time updates
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Cache-Control',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      });
+
+      // Send detailed status updates
+      const sendStatus = (message: string) => {
+        res.write(`data: ${JSON.stringify({ type: 'status', message })}\n\n`);
+      };
+
+      sendStatus('Initializing comprehensive research query...');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      sendStatus('Connecting to Perplexity AI research network...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      sendStatus('Searching academic databases and web sources...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      sendStatus('Gathering real-time market data and industry reports...');
+
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'sonar-pro',
+          search_domain_filter: ["wsj.com", "ft.com", "bloomberg.com", "techcrunch.com", "wamda.com", "menabytes.com", "crunchbase.com", "pitchbook.com", "cbinsights.com", "mckinsey.com", "bcg.com", "deloitte.com", "pwc.com", "statista.com", "grandviewresearch.com", "marketsandmarkets.com"],
+          search_recency_filter: "month",
+          return_citations: true,
+          return_images: false,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a world-class business research analyst with deep expertise in market analysis, strategic consulting, and global business intelligence. Provide exceptionally detailed, current, and diverse research with these mandatory sections: Executive Summary (4-5 key insights with specific metrics), Market Landscape (specific market size from 2024/2025 data, growth rates with CAGR, emerging trends with adoption timelines), Competitive Analysis (top 7-10 players including startups and regional leaders with latest revenue/market share/funding data), Technology & Innovation (current technology stack, disruptive technologies, AI/automation impact, sustainability trends), Regional Analysis (North America, Europe, MENA, Asia-Pacific with local players and cultural factors), Strategic Opportunities (5-7 high-impact opportunities with implementation complexity and timeline), Risk Assessment (market, regulatory, competitive, operational, geopolitical risks with mitigation strategies), Investment Thesis (specific funding requirements, realistic ROI projections 2025-2030, exit scenarios with comparable transactions), and Future Roadmap (detailed 2-5 year outlook with quarterly milestones and KPIs). Use clean formatting without markdown asterisks. Include latest 2024-2025 data, specific numbers, percentages, dollar amounts, and actionable insights. Prioritize diverse data sources, emerging market perspectives, and underrepresented segments. Make this comprehensive, investor-grade intelligence.'
+            },
+            {
+              role: 'user',
+              content: `Conduct comprehensive market research and strategic analysis on: "${query}". Requirements: (1) Latest 2024-2025 market data with specific revenue figures and growth projections, (2) Global competitive landscape including established players, emerging startups, and regional champions across different markets, (3) Technology trends including AI integration, automation impact, and sustainability factors, (4) Regulatory environment and compliance requirements across major markets (US, EU, MENA, APAC), (5) Investment and funding landscape with recent deals, valuations, and funding trends, (6) Diverse go-to-market strategies for different customer segments and geographies, (7) Operational challenges with practical solutions and best practices, (8) Partnership ecosystem and channel opportunities, (9) International expansion strategies with market-specific considerations, (10) Realistic scenario planning for 2025-2030 with quarterly milestones, (11) ESG considerations and sustainability requirements, (12) Demographic diversity analysis including underserved markets and emerging consumer segments. Focus on actionable, data-driven intelligence that provides strategic decision-making insights for entrepreneurs and investors. Include specific company examples, financial metrics, and implementation timelines.`
+            }
+          ]
+        }),
+      });
+
+      console.log('Perplexity API request sent, awaiting response...', response);
+
+      await new Promise(resolve => setTimeout(resolve, 400));
+      sendStatus('Processing AI analysis and extracting key insights...');
+
+      if (!response.ok) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: `Research failed: ${response.status}` })}\n\n`);
+        res.end();
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      sendStatus('Analyzing competitive landscape and market trends...');
+
+      const data = await response.json();
+      console.log('Perplexity API Response:', JSON.stringify(data, null, 2));
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
+      sendStatus('Compiling citations and verifying source reliability...');
+      
+      let content = data.choices?.[0]?.message?.content;
+      const searchResults = data.search_results || [];
+      
+      // Clean up markdown formatting - remove asterisks and improve readability
+      if (content) {
+        content = content
+          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold asterisks
+          .replace(/\*(.*?)\*/g, '$1') // Remove italic asterisks
+          .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up extra line breaks
+          .replace(/^#+\s*/gm, '## ') // Normalize headers
+          .trim();
+      }
+
+      if (!content) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'No content received from research API' })}\n\n`);
+        res.end();
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 400));
+      sendStatus('Formatting comprehensive research report...');
+
+      // Extract key findings from the response
+      const keyFindings = extractKeyFindings(content);
+
+      // Format sources from search_results (Perplexity's actual format)  
+      const sources = searchResults.map((result: any, index: number) => ({
+        title: result.title || `Source ${index + 1}`,
+        url: result.url,
+        snippet: `Last updated: ${result.last_updated || 'Recently'}. ${result.title || 'Research source providing relevant data and insights.'}`
+      }));
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+      sendStatus('Research complete! Delivering comprehensive analysis...');
+
+      // Send final result
+      res.write(`data: ${JSON.stringify({ 
+        type: 'result', 
+        data: {
+          content,
+          keyFindings,
+          sources,
+          searchResults // Also include raw search results for debugging
+        }
+      })}\n\n`);
+      
+      res.end();
+
+    } catch (error) {
+      console.error('Research error:', error);
+      res.write(`data: ${JSON.stringify({ 
+        type: 'error', 
+        message: `Research failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+      })}\n\n`);
+      res.end();
+    }
+  });
+
+  // Follow-up research endpoint
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour)
+  app.post('/api/research/followup', isAuthenticated, aiRateLimiter, async (req, res) => {
+    try {
+      const { question, context, previousQuery } = req.body;
+      
+      if (!question) {
+        return res.status(400).json({ error: 'Question is required' });
+      }
+
+      if (!process.env.PERPLEXITY_API_KEY) {
+        return res.status(500).json({
+          error: 'Perplexity API key not configured'
+        });
+      }
+
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'sonar-pro',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a comprehensive business research analyst. The user is asking a follow-up question about their previous research. Provide detailed, focused analysis that EXTENDS and ENHANCES the existing research. Use markdown formatting with clear headers (##, ###), bullet points, tables, and bold text. Focus on providing NEW insights, data, or perspectives that complement the original research. Be specific, actionable, and comprehensive. Structure your response as a cohesive analysis section that could be appended to the existing research.'
+            },
+            {
+              role: 'user',
+              content: `Previous research query: "${previousQuery}"\n\nPrevious research context:\n${context}\n\nFollow-up question: ${question}\n\nPlease provide detailed analysis that specifically addresses this follow-up question while building upon the previous research.`
+            }
+          ]
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Perplexity API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Follow-up API Response:', JSON.stringify(data, null, 2));
+      
+      const content = data.choices?.[0]?.message?.content;
+
+      if (!content) {
+        throw new Error('No content received from Perplexity API');
+      }
+
+      res.json({
+        content,
+        question
+      });
+
+    } catch (error) {
+      console.error('Follow-up error:', error);
+      res.status(500).json({ 
+        error: 'Follow-up failed',
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
+  function extractKeyFindings(content: string): string[] {
+    const lines = content.split('\n').filter(line => line.trim());
+    const findings: string[] = [];
+    
+    // Enhanced extraction logic for comprehensive research
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Look for various bullet/list formats and key indicators
+      if (trimmed.match(/^[-•*▪▫]\s+/) || 
+          trimmed.match(/^\d+\.\s+/) ||
+          trimmed.match(/^[A-Z][a-z]*:\s/) || // "Market: ..." format
+          trimmed.toLowerCase().includes('market size') ||
+          trimmed.toLowerCase().includes('growth rate') ||
+          trimmed.toLowerCase().includes('key player') ||
+          trimmed.toLowerCase().includes('opportunity') ||
+          trimmed.toLowerCase().includes('trend') ||
+          trimmed.toLowerCase().includes('challenge') ||
+          trimmed.toLowerCase().includes('competitive') ||
+          trimmed.toLowerCase().includes('revenue') ||
+          trimmed.toLowerCase().includes('forecast')) {
+        
+        const cleaned = trimmed.replace(/^[-•*▪▫\d\.\s]*/, '').replace(/^[A-Z][a-z]*:\s*/, '');
+        if (cleaned.length > 15 && cleaned.length < 200) {
+          findings.push(cleaned);
+        }
+      }
+    }
+    
+    // If no structured findings, extract meaningful sentences with business insights
+    if (findings.length === 0) {
+      const sentences = content.split(/[.!?]/).filter(s => s.trim().length > 30);
+      for (const sentence of sentences.slice(0, 6)) {
+        const trimmed = sentence.trim();
+        if (trimmed.match(/\b(market|revenue|growth|competitor|opportunity|trend|customer|business|industry)\b/i)) {
+          findings.push(trimmed + '.');
+        }
+      }
+    }
+    
+    return findings.slice(0, 6); // Return up to 6 key findings
+  }
+
+  // News API endpoint with multi-language support
+  app.get('/api/news', isAuthenticated, async (req, res) => {
+    try {
+      const { 
+        topic = 'technology', 
+        country = 'us', 
+        page = '1',
+        language = 'en' // ✅ Add language parameter with default
+      } = req.query;
+      
+      if (!process.env.NEWSDATA_API_KEY) {
+        // Fallback to mock data if no API key
+        return res.json({
+          status: "success",
+          totalResults: 8,
+          results: [
+            {
+              article_id: "1",
+              title: "Saudi Arabia launches new AI research institute in Riyadh",
+              link: "https://arabnews.com/saudi-ai-institute-riyadh",
+              creator: ["Arab News"],
+              description: "The Kingdom announces a major investment in artificial intelligence research with focus on Arabic language processing and computer vision.",
+              pubDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+              source_id: "arabnews",
+              source_url: "https://arabnews.com",
+              image_url: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=200&fit=crop",
+              category: ["technology"]
+            },
+            {
+              article_id: "2",
+              title: "UAE's ADNOC announces $15B investment in clean energy",
+              link: "https://thenationalnews.com/adnoc-clean-energy-investment",
+              creator: ["The National"],
+              description: "Major investment in renewable energy infrastructure across the Gulf region signals commitment to green transition.",
+              pubDate: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+              source_id: "thenational",
+              source_url: "https://thenationalnews.com",
+              image_url: "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400&h=200&fit=crop",
+              category: ["business"]
+            }
+          ]
+        });
+      }
+
+      // ✅ Build NewsData.io API URL with dynamic language
+      let url = `https://newsdata.io/api/1/latest?apikey=${process.env.NEWSDATA_API_KEY}&language=${language}`;
+      
+      // Add topic-specific keywords (adjust based on language if needed)
+      switch (topic) {
+        case 'for-you':
+          url += '&category=business,technology';
+          url += '&q=' + encodeURIComponent(
+            language === 'ar' 
+              ? 'شركة ناشئة OR تقنية مالية OR دبي OR السعودية OR الإمارات OR منطقة الشرق الأوسط'
+              : 'startup OR fintech OR Dubai OR Saudi OR UAE OR MENA'
+          );
+          break;
+        case 'innovation':
+          url += '&category=technology,science';
+          url += '&q=' + encodeURIComponent(
+            language === 'ar'
+              ? 'ابتكار OR اختراق OR نيوم OR "مدينة ذكية" OR دبي'
+              : 'innovation OR breakthrough OR NEOM OR "smart city" OR Dubai'
+          );
+          break;
+        case 'ai':
+          url += '&category=technology';
+          url += '&q=' + encodeURIComponent(
+            language === 'ar'
+              ? '"الذكاء الاصطناعي" OR AI OR ChatGPT OR دبي OR السعودية'
+              : '"artificial intelligence" OR AI OR ChatGPT OR Dubai OR Saudi'
+          );
+          break;
+        case 'investments':
+          url += '&category=business';
+          url += '&q=' + encodeURIComponent(
+            language === 'ar'
+              ? '"رأس المال الاستثماري" OR استثمار OR تمويل OR دبي OR السعودية OR منطقة الشرق الأوسط'
+              : '"venture capital" OR investment OR funding OR Dubai OR Saudi OR MENA'
+          );
+          break;
+        case 'yc-startups':
+          url += '&category=business,technology';
+          url += '&q=' + encodeURIComponent(
+            language === 'ar'
+              ? 'شركة ناشئة OR رائد أعمال OR دبي OR السعودية OR مصر OR منطقة الشرق الأوسط'
+              : 'startup OR entrepreneur OR Dubai OR Saudi OR Egypt OR MENA'
+          );
+          break;
+        default:
+          url += '&category=business,technology';
+      }
+      
+      // Add MENA country focus for better regional coverage (max 5 countries for free tier)
+      url += '&country=ae,sa,qa,us,gb'; // Saudi, UAE, Qatar + major tech hubs
+      
+      console.log(`📰 Fetching news from NewsData.io for topic: ${topic}, language: ${language}`);
+      console.log(`📰 API URL: ${url.replace(process.env.NEWSDATA_API_KEY || '', '[API_KEY_HIDDEN]')}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'FikraHub-App/1.0'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`📰 NewsData.io API error (${response.status}):`, errorText);
+        console.error(`📰 Full URL that failed:`, url);
+        throw new Error(`NewsData.io API error: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Enhanced strict image validation function
+      const isValidImage = (imageUrl: string): boolean => {
+        if (!imageUrl || imageUrl.trim() === '' || imageUrl === 'null' || imageUrl === 'undefined') return false;
+        
+        // Must be valid HTTP/HTTPS URL
+        if (!imageUrl.startsWith('http')) return false;
+        
+        // Skip common broken/placeholder patterns (expanded list)
+        const invalidPatterns = [
+          'placeholder', 'default', 'no-image', 'missing', 'broken', 'error',
+          'logo.png', 'logo.jpg', 'favicon', 'avatar.png', 'generic', 'sample',
+          '1x1.gif', 'spacer.gif', 'blank.', 'transparent.', 'empty.',
+          'dummy', 'test.', 'null', 'undefined', 'loading.',
+          // Crypto-specific placeholder patterns
+          'coin-placeholder', 'crypto-default', 'bitcoin-logo', 'ethereum-logo',
+          'token-default', 'chart-placeholder', 'price-chart-default'
+        ];
+        
+        const lowerUrl = imageUrl.toLowerCase();
+        if (invalidPatterns.some(pattern => lowerUrl.includes(pattern))) return false;
+        
+        // Skip very short URLs (likely invalid)
+        if (imageUrl.length < 20) return false;
+        
+        // Skip URLs that look like API endpoints or non-image paths
+        const invalidPaths = ['/api/', '/json', '/xml', '/rss', '/feed'];
+        if (invalidPaths.some(path => lowerUrl.includes(path))) return false;
+        
+        // Must have valid image extension or be from reputable domains
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
+        const reputableDomains = [
+          // Image hosting services
+          'unsplash.com', 'pexels.com', 'pixabay.com', 'images.unsplash.com',
+          'cdn.', 'cloudinary.com', 'amazonaws.com', 'cloudfront.net',
+          'wp.com', 'wordpress.com', 'gravatar.com', 'ytimg.com',
+          // News media domains
+          'reuters.com', 'bloomberg.com', 'cnn.com', 'bbc.com', 'guardian.com',
+          'washingtonpost.com', 'nytimes.com', 'wsj.com', 'ft.com',
+          // Tech/crypto news domains
+          'coindesk.com', 'cointelegraph.com', 'cryptonews.com', 'decrypt.co',
+          'techcrunch.com', 'verge.com', 'arstechnica.com', 'wired.com',
+          // Middle East news domains
+          'thenationalnews.com', 'arabnews.com', 'gulfnews.com', 'khaleejtimes.com'
+        ];
+        
+        const hasValidExtension = validExtensions.some(ext => lowerUrl.includes(ext));
+        const fromReputableDomain = reputableDomains.some(domain => lowerUrl.includes(domain));
+        
+        // Additional validation: URL should not end with common non-image file extensions
+        const invalidExtensions = ['.html', '.php', '.asp', '.xml', '.json', '.txt', '.pdf'];
+        const hasInvalidExtension = invalidExtensions.some(ext => lowerUrl.endsWith(ext));
+        
+        if (hasInvalidExtension) return false;
+        
+        // Must either have valid extension OR be from reputable domain
+        return hasValidExtension || fromReputableDomain;
+      };
+      
+      // Transform the data and filter for high-quality articles with valid images
+      const articlesWithImages = data.results
+        ?.filter((article: any) => {
+          // STRICT image filtering - absolutely no articles without valid images
+          if (!isValidImage(article.image_url)) {
+            console.log(`🚫 Filtered out article without valid image: "${article.title}" - Image URL: ${article.image_url}`);
+            return false;
+          }
+          
+          // Must have meaningful title and description
+          if (!article.title || article.title.length < 10) {
+            console.log(`🚫 Filtered out article with short title: "${article.title}"`);
+            return false;
+          }
+          if (!article.description || article.description.length < 20) {
+            console.log(`🚫 Filtered out article with short description: "${article.title}"`);
+            return false;
+          }
+          
+          // Additional quality filters for crypto articles
+          const title = article.title.toLowerCase();
+          
+          // Skip articles with spammy crypto titles (common in low-quality sources)
+          const spammyPatterns = [
+            'bulls eye', 'targets $', 'price prediction', 'to the moon',
+            'moonshot', 'explosive growth', 'massive gains', 'next 100x'
+          ];
+          
+          if (spammyPatterns.some(pattern => title.includes(pattern))) {
+            console.log(`🚫 Filtered out potentially spammy crypto article: "${article.title}"`);
+            return false;
+          }
+          
+          return true;
+        })
+        ?.map((article: any, index: number) => ({
+          id: article.article_id || String(index + 1),
+          topic: topic,
+          title: article.title || 'Untitled',
+          url: article.link || '#',
+          source: article.source_name || article.source_id || (article.creator?.[0] || 'Unknown Source'),
+          image: article.image_url,
+          publishedAt: article.pubDate || new Date().toISOString(),
+          summary: article.description || article.content?.substring(0, 200) + '...' || 'No description available',
+          score: Math.floor(Math.random() * 20) + 80, // Random score 80-99 (UI only, not security-sensitive)
+          tags: article.category || ['News'],
+          sourceCount: Math.floor(Math.random() * 5) + 1, // Random count 1-5 (UI only, not security-sensitive)
+          sourceDomain: article.source_url ? new URL(article.source_url).hostname : 'unknown.com'
+        })) || [];
+
+      // Remove duplicates based on title (case-insensitive)
+      const uniqueArticles = articlesWithImages.reduce((acc: any[], current: any) => {
+        const normalizedTitle = current.title.toLowerCase().trim();
+        
+        // Check if we already have an article with this title
+        const isDuplicate = acc.some(article => 
+          article.title.toLowerCase().trim() === normalizedTitle
+        );
+        
+        if (!isDuplicate) {
+          acc.push(current);
+        } else {
+          console.log(`🚫 Removed duplicate article: "${current.title}"`);
+        }
+        
+        return acc;
+      }, []);
+
+      // Take only first 15 unique articles
+      const finalArticles = uniqueArticles.slice(0, 15);
+      console.log(`📰 Filtered ${finalArticles.length} high-quality articles with valid images from ${data.results?.length || 0} total results`);
+      
+      res.json({
+        status: data.status,
+        totalResults: finalArticles.length,
+        results: finalArticles
+      });
+      
+    } catch (error) {
+      console.error('News API error:', error);
+      console.log('🔄 Falling back to mock data due to API error');
+      
+      // Always fall back to mock data when external API fails
+      return res.json({
+        status: "success",
+        totalResults: 8,
+        results: [
+          {
+            id: "1",
+            topic: "ai",
+            title: "Saudi Arabia launches new AI research institute in Riyadh",
+            url: "https://arabnews.com/saudi-ai-institute-riyadh",
+            source: "Arab News",
+            image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+            summary: "The Kingdom announces a major investment in artificial intelligence research with focus on Arabic language processing and computer vision.",
+            score: 95,
+            tags: ["Saudi", "AI", "Research"],
+            sourceCount: 12,
+            sourceDomain: "arabnews.com"
+          },
+          {
+            id: "2",
+            topic: "investments",
+            title: "UAE's ADNOC announces $15B investment in clean energy",
+            url: "https://thenationalnews.com/adnoc-clean-energy-investment",
+            source: "The National",
+            image: "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+            summary: "Major investment in renewable energy infrastructure across the Gulf region signals commitment to green transition.",
+            score: 88,
+            tags: ["UAE", "Investment", "Clean Energy"],
+            sourceCount: 8,
+            sourceDomain: "thenationalnews.com"
+          },
+          {
+            id: "3",
+            topic: "innovation",
+            title: "NEOM unveils breakthrough in desalination technology",
+            url: "https://reuters.com/neom-desalination-breakthrough",
+            source: "Reuters",
+            image: "https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+            summary: "Revolutionary solar-powered desalination plant achieves 40% efficiency improvement over traditional methods.",
+            score: 82,
+            tags: ["Saudi", "NEOM", "Technology"],
+            sourceCount: 15,
+            sourceDomain: "reuters.com"
+          },
+          {
+            id: "4",
+            topic: "yc-startups",
+            title: "Egyptian fintech startup raises $50M Series B",
+            url: "https://wamda.com/egyptian-fintech-series-b",
+            source: "Wamda",
+            image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+            summary: "Cairo-based payment platform expands across MENA region with backing from international VCs.",
+            score: 78,
+            tags: ["Egypt", "Fintech", "Series B"],
+            sourceCount: 6,
+            sourceDomain: "wamda.com"
+          },
+          {
+            id: "5",
+            topic: "ai",
+            title: "Dubai launches Arabic language AI model for government services",
+            url: "https://khaleejtimes.com/dubai-arabic-ai-model",
+            source: "Khaleej Times",
+            image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+            summary: "Dubai government partners with local tech companies to develop first comprehensive Arabic LLM for public sector automation.",
+            score: 90,
+            tags: ["UAE", "AI", "Government"],
+            sourceCount: 7,
+            sourceDomain: "khaleejtimes.com"
+          },
+          {
+            id: "6",
+            topic: "investments",
+            title: "Qatar Investment Authority backs $2B Middle East tech fund",
+            url: "https://zawya.com/qatar-tech-fund-investment",
+            source: "Zawya",
+            image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+            summary: "New venture capital fund targets early-stage startups across the Middle East with focus on fintech and healthtech.",
+            score: 85,
+            tags: ["Qatar", "VC Fund", "Startups"],
+            sourceCount: 10,
+            sourceDomain: "zawya.com"
+          },
+          {
+            id: "7",
+            topic: "innovation",
+            title: "Moroccan startup develops AI-powered agriculture platform",
+            url: "https://menabytes.com/morocco-agritech-platform",
+            source: "MENAbytes",
+            image: "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 14 * 60 * 60 * 1000).toISOString(),
+            summary: "Casablanca-based AgriTech startup uses machine learning to optimize crop yields and reduce water consumption.",
+            score: 76,
+            tags: ["Morocco", "AgriTech", "Sustainability"],
+            sourceCount: 4,
+            sourceDomain: "menabytes.com"
+          },
+          {
+            id: "8",
+            topic: "yc-startups",
+            title: "Saudi logistics startup expands to 5 GCC countries",
+            url: "https://argaam.com/saudi-logistics-expansion",
+            source: "Argaam",
+            image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=200&fit=crop",
+            publishedAt: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
+            summary: "Riyadh-based logistics platform secures regional expansion funding and partnerships with major e-commerce players.",
+            score: 73,
+            tags: ["Saudi", "Logistics", "E-commerce"],
+            sourceCount: 5,
+            sourceDomain: "argaam.com"
+          }
+        ]
+      });
+    }
+  });
+
+  // Research endpoint (original streaming version)
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour)
+  app.post('/api/research', isAuthenticated, aiRateLimiter, async (req, res) => {
+    try {
+      const { query } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ message: "Query is required" });
+      }
+
+      console.log(`🔍 Starting research for: "${query}"`);
+      
+      // Set up Server-Sent Events
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      const researchAgent = new ResearchAgent();
+      await researchAgent.conductResearch(query, res);
+      
+      res.end();
+    } catch (error) {
+      console.error("Research error:", error);
+      res.status(500).json({ message: "Research failed" });
+    }
+  });
+
+  function parseJSONResponse(responseText: string): any {
+    try {
+      let jsonString = responseText.trim();
+      
+      // Extract JSON from markdown code blocks
+      const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        responseText.match(/```\s*([\s\S]*?)\s*```/);
+      
+      if (jsonMatch) {
+        jsonString = jsonMatch[1] || jsonMatch[0];
+      }
+      
+      // Clean up any leading/trailing non-JSON characters
+      jsonString = jsonString.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+      
+      return JSON.parse(jsonString);
+    } catch (error) {
+      console.error("❌ Failed to parse JSON response:", error);
+      return null;
+    }
+  }
+
+  async function extractBusinessContextFromConversation(
+    messages: any[],
+    language: string
+  ): Promise<{ ideaName: string; launchLocation: string; hasIdea: boolean; hasLocation: boolean }> {
+    try {
+      // Use Azure OpenAI client
+      if (!openai) {
+        // Return default values if AI service not configured
+        console.error('❌ Azure OpenAI client not configured');
+        return { ideaName: '', launchLocation: '', hasIdea: false, hasLocation: false };
+      }
+
+      // Get only user messages for analysis
+      const userMessages = messages
+        .filter((m: any) => m.role === 'user')
+        .map((m: any) => m.text)
+        .join('\n---\n');
+
+      const response = await openai.chat.completions.create({
+        model: azureDeployment,
+        max_tokens: 500,
+        temperature: 0.3,
+        messages: [{
+          role: 'system',
+          content: 'You are an expert business analyst. Respond ONLY with valid JSON, no other text.'
+        }, {
+          role: 'user',
+          content: `You are an expert business analyst. Analyze this conversation and extract the business idea and target location.
+
+  **Conversation History:**
+  ${userMessages}
+
+  **Your Task:**
+  1. Identify the MAIN business idea (the most detailed, comprehensive business description)
+  2. Identify the target market/location (country, region, or city)
+
+  **Rules:**
+  - For business idea: Look for detailed descriptions with business context, features, market size, revenue model
+  - Ignore casual greetings like "hello", "hi", "how are you"
+  - For location: Look for explicit mentions of countries, cities, or regions
+  - If no clear location mentioned, return empty string (don't guess)
+  - If multiple ideas mentioned, pick the most detailed/recent one
+  - Extract exact text, don't summarize or modify
+
+  **Response Format (JSON only):**
+  {
+    "ideaName": "exact business idea text from conversation",
+    "launchLocation": "exact location text or empty string",
+    "hasIdea": true/false,
+    "hasLocation": true/false,
+    "confidence": "high/medium/low"
+  }
+
+  **Examples:**
+
+  Input: "I want to develop Supply Chain Sustainability Intelligence platform..."
+  Output:
+  {
+    "ideaName": "Supply Chain Sustainability Intelligence Enterprise platform that provides end-to-end visibility into supply chain environmental impact with AI-driven recommendations...",
+    "launchLocation": "",
+    "hasIdea": true,
+    "hasLocation": false,
+    "confidence": "high"
+  }
+
+  Input: "Hi there\n---\nFood delivery app for Dubai\n---\nUAE"
+  Output:
+  {
+    "ideaName": "Food delivery app for Dubai",
+    "launchLocation": "UAE",
+    "hasIdea": true,
+    "hasLocation": true,
+    "confidence": "high"
+  }
+
+  Return ONLY the JSON object, no other text.`
+        }]
+      });
+
+      const text = response.choices[0]?.message?.content || '{}';
+
+      // ✅ Use shared JSON parser
+      const result = parseJSONResponse(text);
+
+      if (!result) {
+        console.error('❌ Failed to parse OpenAI response');
+        return {
+          ideaName: '',
+          launchLocation: '',
+          hasIdea: false,
+          hasLocation: false
+        };
+      }
+
+      console.log('✅ OpenAI extracted business context:', {
+        hasIdea: result.hasIdea,
+        hasLocation: result.hasLocation,
+        confidence: result.confidence,
+        ideaLength: result.ideaName?.length || 0,
+        location: result.launchLocation || 'none'
+      });
+
+      return {
+        ideaName: result.ideaName || '',
+        launchLocation: result.launchLocation || '',
+        hasIdea: result.hasIdea || false,
+        hasLocation: result.hasLocation || false
+      };
+
+    } catch (error: any) {
+      console.error('❌ Failed to extract business context:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        status: error?.status,
+        code: error?.code,
+        type: error?.type,
+        response: error?.response?.data
+      });
+      return {
+        ideaName: '',
+        launchLocation: '',
+        hasIdea: false,
+        hasLocation: false
+      };
+    }
+  }
+
+  // AI Cofounder Chat Route - conversational flow  
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour)
+  app.post('/api/agent/chat', isAuthenticated, aiRateLimiter, async (req, res) => {
+    try {
+      const { message, chatId, language = 'en' } = req.body;
+      
+      if (!chatId) {
+        return res.status(400).json({ message: "Chat ID is required" });
+      }
+
+      const chat = await storage.getChat(chatId);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+
+      // Store user message
+      if (message && message.trim() && message !== "__AGENT_START__") {
+        await storage.createMessage({
+          chatId,
+          role: "user",
+          text: message,
+        });
+      }
+
+      const messages = await storage.getMessagesByChat(chatId);
+      
+      // ✅ Check if we have all 13 assets (generation complete)
+      const existingAssets = await storage.getAssetsByProject(chat.projectId);
+      const hasAllAssets = existingAssets.length >= 13;
+      
+      // ✅ CRITICAL: If all assets exist, ONLY handle updates, NEVER generate new ones
+      if (hasAllAssets) {
+        // Only process if user sent an actual message (not __AGENT_START__)
+        if (message && message.trim() && message !== "__AGENT_START__") {
+          console.log('✅ Checking for update intent...');
+          
+          const intent = await detectAssetIntent(message, existingAssets, language);
+          
+          // ✅ CRITICAL: Check if intent exists before processing
+          if (intent) {
+            console.log(`🎯 User wants to ${intent.action} ${intent.isMultiple ? 'multiple assets' : intent.assetTypes.length === 0 ? 'all assets' : 'single asset'}`);
+            console.log(`📝 Assets: ${intent.assetTypes.join(', ') || 'ALL'}`);
+            
+            // Extract idea name and location
+            const userMessages = messages.filter((m: any) => m.role === 'user');
+            let ideaName = '';
+            let launchLocation = '';
+            
+            for (const msg of userMessages) {
+              const text = msg.text?.toLowerCase() || '';
+              if (!ideaName && msg.text && msg.text.trim().length > 10) {
+                const businessKeywords = ['app', 'platform', 'service', 'product', 'business', 'startup'];
+                if (businessKeywords.some(keyword => text.includes(keyword))) {
+                  ideaName = msg.text;
+                  break;
+                }
+              }
+            }
+            
+            if (!ideaName) ideaName = chat.title || 'Business Idea';
+            
+            for (let i = userMessages.length - 1; i >= 0; i--) {
+              const text = userMessages[i].text?.toLowerCase() || '';
+              if (text.length < 30 && (text.includes('uae') || text.includes('dubai') || 
+                  text.includes('usa') || text.includes('saudi') || text.includes('egypt'))) {
+                launchLocation = userMessages[i].text || '';
+                break;
+              }
+            }
+            
+            if (!launchLocation) launchLocation = 'UAE';
+            
+            // ✅ Use bulk handler for ALL modification intents
+            await handleBulkAssetUpdate({
+              chatId,
+              projectId: chat.projectId,
+              assetTypes: intent.assetTypes,
+              action: intent.action,
+              modification: intent.modification,
+              targetFields: intent.targetFields,
+              ideaName,
+              launchLocation,
+              language,
+              userId: (req as any).user?.id
+            });
+            
+            // ✅ CRITICAL: Return immediately after handling
+            return res.json({ message: "Asset update completed" });
+          } else {
+            // ✅ No modification intent - respond conversationally
+            console.log('ℹ️ No modification intent - responding conversationally');
+            
+            let conversationalResponse = '';
+            try {
+              // Use Azure OpenAI client
+              if (!openai) {
+                return res.status(503).json({ error: 'AI service not configured' });
+              }
+
+              const response = await openai.chat.completions.create({
+                model: azureDeployment,
+                max_tokens: 300,
+                temperature: 0.7,
+                messages: [
+                  {
+                    role: 'system',
+                    content: language === 'ar'
+                      ? 'أنت شريك أعمال ذكي ودود. المستخدم لديه بالفعل 13 أصلاً تجارياً كاملاً. رد بطريقة طبيعية ومفيدة. إذا سألوا عن التعديلات، أخبرهم أنه يمكنهم طلب تحديث أي أصل.'
+                      : 'You are a friendly AI business cofounder. The user already has all 13 business assets completed. Respond naturally and helpfully. If they ask about changes, let them know they can request updates to any asset.'
+                  },
+                  {
+                    role: 'user',
+                    content: language === 'ar'
+                      ? `المستخدم لديه جميع الأصول الـ 13 المكتملة. رسالته: "${message}". رد بطريقة طبيعية ومفيدة (2-3 جمل).`
+                      : `User has all 13 assets completed. Their message: "${message}". Respond naturally and helpfully (2-3 sentences).`
+                  }
+                ]
+              });
+
+              conversationalResponse = response.choices[0]?.message?.content ||
+                (language === 'ar'
+                  ? 'شكراً لك! لديك جميع أصولك التجارية جاهزة. هل تريد تحديث أي منها؟'
+                  : 'Thanks! You have all your business assets ready. Would you like to update any of them?');
+            } catch (error) {
+              console.error('❌ Failed to generate conversational response:', error);
+              conversationalResponse = language === 'ar'
+                ? 'شكراً لك! لديك جميع أصولك التجارية الـ 13 جاهزة. يمكنك طلب تحديث أي أصل في أي وقت.'
+                : 'Thanks! You have all 13 business assets ready. You can request updates to any asset anytime.';
+            }
+
+            const agentMessage = await storage.createMessage({
+              chatId,
+              role: "assistant",
+              text: conversationalResponse,
+            });
+
+            // ✅ CRITICAL: Return immediately after conversational response
+            return res.json(agentMessage);
+          }
+        } else {
+          // ✅ __AGENT_START__ or empty message when all assets exist
+          console.log('ℹ️ Agent start message with all assets - responding with completion status');
+          
+          const completionMessage = language === 'ar'
+            ? '✅ تم إنشاء جميع أصولك التجارية الـ 13 بنجاح!\n\nيمكنك الآن:\n• مراجعة الأصول في اللوحة اليمنى\n• طلب تحديثات أو تعديلات على أي أصل\n• تصدير أصولك\n\nكيف يمكنني مساعدتك اليوم؟'
+            : '✅ All 13 business assets have been successfully generated!\n\nYou can now:\n• Review assets in the right panel\n• Request updates or modifications to any asset\n• Export your assets\n\nHow can I help you today?';
+
+          const agentMessage = await storage.createMessage({
+            chatId,
+            role: "assistant",
+            text: completionMessage,
+          });
+
+          // ✅ CRITICAL: Return immediately
+          return res.json(agentMessage);
+        }
+      }
+      
+      // ✅ ONLY REACH HERE IF hasAllAssets === false
+      // This is the ONLY path that can trigger new asset generation
+      console.log('📝 Less than 13 assets - proceeding with normal generation flow');
+      
+      const userMessages = messages.filter((m: any) => m.role === 'user');
+      const hasGenerationStart = messages.some((m: any) => 
+        m.role === 'assistant' && (m.text?.includes('create your complete business framework') || m.text?.includes('Starting to build'))
+      );
+
+      // ✅ USE CLAUDE TO EXTRACT CONTEXT instead of manual parsing
+      const context = await extractBusinessContextFromConversation(messages, language);
+      
+      let ideaName = context.ideaName;
+      let launchLocation = context.launchLocation;
+      let hasIdea = context.hasIdea;
+      let hasLocation = context.hasLocation;
+      
+      console.log(`🤖 Claude extraction: hasIdea=${hasIdea}, hasLocation=${hasLocation}`);
+      console.log(`📝 Extracted - Idea: "${ideaName.substring(0, 100)}..."`);
+      console.log(`📍 Location: "${launchLocation}"`);
+      
+      const needsIdea = !hasIdea;
+      const needsLocation = !hasLocation;
+      
+      console.log(`🤖 Smart extraction: hasIdea=${hasIdea}, hasLocation=${hasLocation}, hasGeneration=${hasGenerationStart}`);
+      console.log(`📝 Extracted - Idea: "${ideaName}", Location: "${launchLocation}"`);
+      console.log(`🎯 Still needs: idea=${needsIdea}, location=${needsLocation}`);
+      
+      const readyForGeneration = hasIdea && hasLocation && !hasGenerationStart;
+      
+      if (readyForGeneration) {
+        console.log('🚀 FORCING GENERATION START - Have both idea and location!');
+      } else {
+        const assistantMessageCount = messages.filter(m => m.role === 'assistant').length;
+        const userMessageCount = userMessages.length;
+
+        // Only skip if we have MORE assistant messages than user messages (strictly greater)
+        if (assistantMessageCount > userMessageCount) {
+          console.log('🚫 Skipping duplicate response - already responded to latest user message');
+          return res.json({ message: "Response already sent" });
+        }
+      }
+      
+      const recentUserMessage = userMessages[userMessages.length - 1]?.text || '';
+
+      let agentState = 'ask_idea';
+      
+      if (hasGenerationStart) {
+        agentState = 'completed';
+        console.log(`🎯 Agent state: COMPLETED`);
+      } else if (hasIdea && hasLocation) {
+        agentState = 'generate_framework';
+        console.log(`🎯 Agent state: GENERATE_FRAMEWORK - READY TO START GENERATION!`);
+      } else if (needsIdea && needsLocation) {
+        agentState = 'ask_idea';
+        console.log(`🎯 Agent state: ASK_IDEA`);
+      } else if (needsLocation) {
+        agentState = 'ask_location';
+        console.log(`🎯 Agent state: ASK_LOCATION`);
+      } else if (needsIdea) {
+        agentState = 'ask_idea_clarify';
+        console.log(`🎯 Agent state: ASK_IDEA_CLARIFY`);
+      }
+
+      let responseText = '';
+
+      try {
+        if (!openai) {
+          throw new Error('Azure OpenAI not configured');
+        }
+
+        console.log(`🤖 Generating response via Azure OpenAI - State: ${language}`);
+        const languageInstructions = language === 'ar'
+          ? 'IMPORTANT: Respond in Arabic only. You are an Arabic-speaking AI Business Cofounder (شريك ذكي في الأعمال). Use proper Arabic grammar and business terminology.'
+          : 'Respond in English only.';
+
+        let systemPrompt = '';
+        let userPrompt = '';
+
+        if (agentState === 'ask_idea') {
+          systemPrompt = language === 'ar'
+            ? 'أنت شريك أعمال ذكي ودود. ابدأ المحادثة بترحيب دافئ واطلب من المستخدم مشاركة فكرته التجارية بطريقة طبيعية ومحادثة.'
+            : 'You are a friendly AI business cofounder. Start the conversation with a warm greeting and naturally ask the user to share their business idea.';
+
+          userPrompt = language === 'ar'
+            ? 'ابدأ محادثة جديدة مع رائد أعمال. رحب به واطلب منه مشاركة فكرته التجارية بطريقة ودية وطبيعية (2-3 جمل).'
+            : 'Start a new conversation with an entrepreneur. Greet them warmly and ask them to share their business idea in a friendly, natural way (2-3 sentences).';
+        } else if (agentState === 'ask_location') {
+          systemPrompt = language === 'ar'
+            ? `أنت شريك أعمال ذكي. المستخدم شارك فكرته: "${ideaName}". أظهر اهتمامك وحماسك، ثم اسأل عن السوق المستهدف بطريقة طبيعية.`
+            : `You are a friendly AI business cofounder. The user shared their idea: "${ideaName}". Show genuine interest and excitement, then naturally ask about their target market.`;
+
+          userPrompt = language === 'ar'
+            ? `الفكرة التجارية: "${ideaName}". أظهر حماسك لهذه الفكرة واسأل بشكل طبيعي عن السوق أو المنطقة المستهدفة (2-3 جمل).`
+            : `Business idea: "${ideaName}". Show excitement about this idea and naturally ask about the target market or region (2-3 sentences).`;
+        } else if (agentState === 'ask_idea_clarify') {
+          systemPrompt = language === 'ar'
+            ? 'أنت شريك أعمال ذكي. المستخدم لم يقدم فكرة واضحة بعد. اطلب منه توضيح فكرته بطريقة ودية.'
+            : 'You are a friendly AI business cofounder. The user hasn\'t provided a clear idea yet. Gently ask them to clarify their business idea.';
+
+          userPrompt = language === 'ar'
+            ? `آخر رسالة من المستخدم: "${recentUserMessage}". اطلب منه توضيح فكرته التجارية بطريقة ودية (2-3 جمل).`
+            : `User's last message: "${recentUserMessage}". Gently ask them to clarify their business idea (2-3 sentences).`;
+        } else {
+          systemPrompt = language === 'ar'
+            ? `أنت شريك أعمال ذكي ومتعاون. ${ideaName ? `الفكرة: "${ideaName}".` : ''} ${launchLocation ? `السوق: "${launchLocation}".` : ''} استمر في المحادثة بشكل طبيعي.`
+            : `You are a friendly, collaborative AI business cofounder. ${ideaName ? `Idea: "${ideaName}".` : ''} ${launchLocation ? `Market: "${launchLocation}".` : ''} Continue the conversation naturally.`;
+
+          userPrompt = language === 'ar'
+            ? `آخر رسالة من المستخدم: "${recentUserMessage}". رد عليه بطريقة طبيعية ومفيدة (2-3 جمل).`
+            : `User's last message: "${recentUserMessage}". Respond naturally and helpfully (2-3 sentences).`;
+        }
+
+        const response = await openai.chat.completions.create({
+          model: azureDeployment,
+          max_tokens: 500,
+          temperature: 0.7,
+          messages: [
+            {
+              role: 'system',
+              content: `${languageInstructions}\n\n${systemPrompt}\n\nGuidelines:\n- Be warm, friendly, and conversational\n- No emojis\n- Keep responses concise (2-3 sentences)\n- Sound natural, not robotic\n- Show genuine interest and excitement`
+            },
+            {
+              role: 'user',
+              content: userPrompt
+            }
+          ]
+        });
+
+        responseText = (response.choices[0]?.message?.content || 'No response generated').trim();
+        console.log('✅ Generated response via Azure OpenAI');
+      } catch (error) {
+        console.error('❌ Azure OpenAI request failed:', error);
+        if (language === 'ar') {
+          if (agentState === 'ask_idea') {
+            responseText = "مرحباً! أنا هنا لمساعدتك في تحويل فكرتك إلى مشروع حقيقي. ما هي الفكرة التجارية التي تفكر فيها؟";
+          } else if (agentState === 'ask_location') {
+            responseText = `"${ideaName}" تبدو فكرة رائعة! أود معرفة المزيد عن السوق المستهدف. في أي منطقة أو بلد تخطط لإطلاق هذا المشروع؟`;
+          } else {
+            responseText = "شكراً على المعلومات. دعنا نبدأ في بناء خطة العمل الخاصة بك!";
+          }
+        } else {
+          if (agentState === 'ask_idea') {
+            responseText = "Hi there! I'm here to help turn your vision into a solid business plan. What business idea are you thinking about?";
+          } else if (agentState === 'ask_location') {
+            responseText = `"${ideaName}" sounds really interesting! I'd love to learn more about your target market. Which region or country are you planning to launch in?`;
+          } else {
+            responseText = "Thanks for sharing that. Let's start building out your business framework!";
+          }
+        }
+      }
+
+      // [Rest of your existing generation flow continues...]
+      if (agentState === 'generate_framework') {
+        if (language === 'ar') {
+          responseText = `ممتاز! لدي كل ما أحتاجه:\n\n✅ المشروع: ${ideaName}\n\n✅ السوق: ${launchLocation}\n\nبدء إنتاج إطار العمل التجاري الكامل الآن...`;
+        } else {
+          responseText = `Perfect! I have everything I need:\n\n✅ Business: ${ideaName}\n✅ Market: ${launchLocation}\n\nStarting your complete business framework generation now...`;
+        }
+          
+        console.log(`🚀 GENERATION TRIGGERED! Starting sequential asset generation for "${ideaName}" in "${launchLocation}"...`);
+        
+        const generateAssets = async () => {
+            try {
+              console.log(`🚀 Starting asset generation for "${ideaName}" in "${launchLocation}"`);
+              console.log(`👤 Using authenticated user ID: ${(req as any).user?.id}`);
+              
+              const assets = [
+                { name: 'Lean Canvas', type: 'LEAN_CANVAS' },
+                { name: 'SWOT Analysis', type: 'SWOT' },
+                { name: 'User Personas', type: 'PERSONA' },
+                { name: 'User Stories', type: 'USER_STORIES' },
+                { name: 'Interview Questions', type: 'INTERVIEW_QUESTIONS' },
+                { name: 'Customer Journey Map', type: 'JOURNEY_MAP' },
+                { name: 'Marketing Plan', type: 'MARKETING_PLAN' },
+                { name: 'Brand Wheel', type: 'BRAND_WHEEL' },
+                { name: 'Brand Identity', type: 'BRAND_IDENTITY' },
+                { name: 'Competitor Analysis', type: 'COMPETITOR_MAP' },
+                { name: 'TAM/SAM/SOM Analysis', type: 'TAM_SAM_SOM' },
+                { name: 'Team Roles', type: 'TEAM_ROLES' },
+                { name: 'Pitch Deck Outline', type: 'PITCH_OUTLINE' }
+              ];
+
+              // Create a checklist status message that we'll update
+              const buildStatusText = (currentIndex: number, completed: boolean[] = []) => {
+                const lines = [language === 'ar' ? '🚀 جاري إنشاء إطار العمل الخاص بك:' : '🚀 Building your business framework:'];
+                assets.forEach((asset, idx) => {
+                  const assetName = language === 'ar' ? {
+                    'LEAN_CANVAS': 'نموذج الأعمال المبسط',
+                    'SWOT': 'تحليل SWOT',
+                    'PERSONA': 'شخصيات المستخدمين',
+                    'USER_STORIES': 'قصص المستخدمين',
+                    'INTERVIEW_QUESTIONS': 'أسئلة المقابلة',
+                    'JOURNEY_MAP': 'رحلة العميل',
+                    'MARKETING_PLAN': 'خطة التسويق',
+                    'BRAND_WHEEL': 'عجلة العلامة التجارية',
+                    'BRAND_IDENTITY': 'هوية العلامة التجارية',
+                    'COMPETITOR_MAP': 'خريطة المنافسين',
+                    'TAM_SAM_SOM': 'تحليل حجم السوق',
+                    'TEAM_ROLES': 'أدوار الفريق',
+                    'PITCH_OUTLINE': 'مخطط العرض'
+                  }[asset.type] || asset.name : asset.name;
+
+                  if (completed[idx]) {
+                    lines.push(`✅ ${assetName}`);
+                  } else if (idx === currentIndex) {
+                    lines.push(`🔄 ${assetName}...`);
+                  } else {
+                    lines.push(`⏳ ${assetName}`);
+                  }
+                });
+                return lines.join('\n');
+              };
+
+              const completedAssets: boolean[] = new Array(assets.length).fill(false);
+
+              const statusMessage = await storage.createMessage({
+                chatId,
+                role: "assistant",
+                text: buildStatusText(0, completedAssets),
+              });
+
+              for (let i = 0; i < assets.length; i++) {
+                const asset = assets[i];
+                console.log(`🔄 Generating ${asset.name}...`);
+
+                // Update status to show current asset being generated
+                await storage.updateMessage(statusMessage.id, {
+                  text: buildStatusText(i, completedAssets)
+                });
+
+                // Brief delay to show the "generating" status
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Generate asset using OpenAI
+                console.log(`🤖 Generating ${asset.name} for ${ideaName} in ${launchLocation} using OpenAI...`);
+
+                // Call OpenAI to generate real, custom content for this asset
+                let assetData;
+                try {
+                  const generatedAsset = await generateBusinessAsset({
+                    type: asset.type,
+                    context: `Launching in ${launchLocation}`,
+                    businessDescription: ideaName,
+                    additionalData: { language }
+                  });
+
+                  assetData = {
+                    title: generatedAsset.title || asset.name,
+                    summary: `AI-generated ${asset.name} for ${ideaName} in ${launchLocation}`,
+                    data: generatedAsset.data
+                  };
+
+                  console.log(`✅ OpenAI generated ${asset.name} successfully`);
+                } catch (aiError) {
+                  console.error(`❌ OpenAI generation failed for ${asset.name}:`, aiError);
+                  // Fallback to basic structure if AI fails
+                  assetData = {
+                    title: asset.name,
+                    summary: `${asset.name} for ${ideaName} in ${launchLocation}`,
+                    data: {
+                      note: 'AI generation unavailable - please regenerate this asset',
+                      businessIdea: ideaName,
+                      launchLocation: launchLocation
+                    }
+                  };
+                }
+
+                // Store the asset in database
+                console.log(`💾 Attempting to store ${asset.name} in database...`);
+                console.log(`📋 Asset data:`, { projectId: chat.projectId, kind: asset.type, title: assetData.title });
+                
+                try {
+                  const createdAsset = await storage.createAsset({
+                    projectId: chat.projectId,
+                    kind: asset.type as 'LEAN_CANVAS' | 'SWOT' | 'PERSONA' | 'JOURNEY_MAP' | 'MARKETING_PLAN' | 'COMPETITOR_MAP' | 'TAM_SAM_SOM' | 'PITCH_OUTLINE' | 'USER_STORIES' | 'INTERVIEW_QUESTIONS' | 'TEAM_ROLES' | 'BRAND_WHEEL' | 'BRAND_IDENTITY',
+                    title: assetData.title,
+                    data: assetData.data,
+                    language: language,
+                    createdById: (req as any).user?.id || chat.createdById || 'f07ddef9-f9eb-4ae0-969f-026eb133f3a0', // Use actual authenticated user ID
+                  });
+                  
+                  console.log(`✅ ${asset.name} stored successfully with ID: ${createdAsset.id}`);
+
+                  // Mark this asset as completed
+                  completedAssets[i] = true;
+
+                  // Update status to show asset completed
+                  await storage.updateMessage(statusMessage.id, {
+                    text: buildStatusText(i + 1 < assets.length ? i + 1 : i, completedAssets)
+                  });
+
+                  // Brief delay to show completion before next asset
+                  await new Promise(resolve => setTimeout(resolve, 800));
+                } catch (storageError) {
+                  console.error(`❌ Failed to store ${asset.name}:`, storageError);
+                  
+                  // Update status message to show error
+                  await storage.updateMessage(statusMessage.id, {
+                    text: `❌ Error generating ${asset.name} (${i + 1}/${assets.length})`
+                  });
+                  
+                  throw storageError; // Re-throw to trigger main error handler
+                }
+
+                
+                // Wait before next asset
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+
+              // Final status update - mark all as completed
+              completedAssets.fill(true);
+              await storage.updateMessage(statusMessage.id, {
+                text: language === 'ar'
+                  ? '🎉 اكتمل! جميع أصول الأعمال تم إنشاؤها بنجاح.\n\n' + assets.map(a => {
+                      const assetName = {
+                        'LEAN_CANVAS': 'نموذج الأعمال المبسط',
+                        'SWOT': 'تحليل SWOT',
+                        'PERSONA': 'شخصيات المستخدمين',
+                        'USER_STORIES': 'قصص المستخدمين',
+                        'INTERVIEW_QUESTIONS': 'أسئلة المقابلة',
+                        'JOURNEY_MAP': 'رحلة العميل',
+                        'MARKETING_PLAN': 'خطة التسويق',
+                        'BRAND_WHEEL': 'عجلة العلامة التجارية',
+                        'BRAND_IDENTITY': 'هوية العلامة التجارية',
+                        'COMPETITOR_MAP': 'خريطة المنافسين',
+                        'TAM_SAM_SOM': 'تحليل حجم السوق',
+                        'TEAM_ROLES': 'أدوار الفريق',
+                        'PITCH_OUTLINE': 'مخطط العرض'
+                      }[a.type] || a.name;
+                      return `✅ ${assetName}`;
+                    }).join('\n')
+                  : '🎉 Complete! All business assets generated successfully.\n\n' + assets.map(a => `✅ ${a.name}`).join('\n')
+              });
+
+              // Send a follow-up message encouraging user interaction
+              await storage.createMessage({
+                chatId,
+                role: "assistant",
+                text: language === 'ar'
+                  ? "🚀 إطار العمل التجاري الكامل جاهز الآن! يمكنك عرض جميع الأصول المُنشأة في اللوحة اليمنى. لا تتردد في طرح أسئلة حول أي أصل محدد، أو طلب تعديلات، أو اطلب مني التوسع في أقسام معينة. ما الذي تود استكشافه أولاً؟"
+                  : "🚀 Your complete business framework is now ready! You can view all the generated assets in the right panel. Feel free to ask me questions about any specific asset, request modifications, or ask me to expand on particular sections. What would you like to explore first?"
+              });
+
+            } catch (error) {
+              console.error('❌ Failed to generate business framework:', error);
+              console.error('Error details:', (error as Error).stack);
+              
+              // Send error message instead of updating non-existent status message
+              await storage.createMessage({
+                chatId,
+                role: "assistant",
+                text: "Error occurred during generation. Please try starting a new conversation."
+              });
+            }
+          };
+
+          // Start generation asynchronously but track completion
+          console.log(`⏰ Scheduling generation to start...`);
+          setImmediate(async () => {
+            console.log(`🚀 EXECUTING generateAssets() now!`);
+            await generateAssets();
+            console.log(`✅ Generation complete!`);
+          });
+      }
+
+      const agentMessage = await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: responseText,
+      });
+
+      res.json(agentMessage);
+
+    } catch (error) {
+      console.error("Error in agent chat:", error);
+      res.status(500).json({ message: "Failed to process agent message" });
+    }
+  });
+
+  // GPT Realtime API routes for expert consultations
+  app.post('/api/realtime/conversation/start', isAuthenticated, async (req: any, res) => {
+    try {
+      const { expertType, language } = req.body;
+
+      if (!expertType) {
+        return res.status(400).json({ error: 'Expert type is required' });
+      }
+
+      console.log(`Starting realtime conversation for ${expertType} expert in language ${language || 'en'}`);
+
+      // Fetch user's projects/ideas for context (same logic as text chat)
+      let userIdeas = '';
+      try {
+        const userId = req.user.id;
+        const organizations = await storage.getUserOrganizations(userId);
+        if (organizations && organizations.length > 0) {
+          const projects = await storage.getProjectsByOrg(organizations[0].id);
+          if (projects && projects.length > 0) {
+            const ideasSummary = projects
+              .map((p: any, idx: number) => {
+                const ideaInfo = p.description || p.title || 'Untitled idea';
+                return `${idx + 1}. ${ideaInfo}`;
+              })
+              .join('\n');
+
+            userIdeas = language === 'ar'
+              ? `\n\nأفكار المستخدم الحالية:\n${ideasSummary}\n\nاستخدم هذه المعلومات لتقديم نصائح أكثر تخصيصاً وذات صلة.`
+              : `\n\nUser's Current Ideas:\n${ideasSummary}\n\nUse this information to provide more personalized and relevant advice.`;
+
+            console.log(`📋 Loaded ${projects.length} ideas for expert context`);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user projects:', error);
+        // Continue without ideas context if fetch fails
+      }
+
+      // Get GPT Realtime connection details with expert configuration
+      const result = await getRealtimeConnection({
+        expertType: expertType as 'gtm' | 'finance' | 'product',
+        language: language || 'en',
+        userIdeas
+      });
+
+      // Generate unique session ID
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      res.json({
+        conversationId: sessionId,
+        conversation_id: sessionId,
+        websocketUrl: result.websocketUrl,
+        sessionConfig: result.sessionConfig,
+        status: 'started',
+        expertType
+      });
+    } catch (error) {
+      console.error('Error starting Realtime conversation:', error);
+      res.status(500).json({ error: 'Failed to start conversation' });
+    }
+  });
+
+  app.post('/api/realtime/conversation/end', isAuthenticated, async (req: any, res) => {
+    try {
+      const { conversationId } = req.body;
+
+      if (!conversationId) {
+        return res.status(400).json({ error: 'Conversation ID is required' });
+      }
+
+      console.log(`Ending realtime conversation: ${conversationId}`);
+
+      // End GPT Realtime conversation (cleanup happens on WebSocket close)
+      await endRealtimeConversation(conversationId);
+
+      res.json({
+        status: 'ended',
+        conversationId
+      });
+    } catch (error) {
+      console.error('Error ending Realtime conversation:', error);
+      res.status(500).json({ error: 'Failed to end conversation' });
+    }
+  });
+
+  app.post('/api/experts/text-chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const { message, expertType, agentId, language } = req.body;
+      
+      if (!message || !expertType) {
+        return res.status(400).json({ error: 'Message and expertType are required' });
+      }
+
+      // Fetch user's projects/ideas for context
+      let userIdeas = '';
+      try {
+        const userId = req.user.id;
+        const organizations = await storage.getUserOrganizations(userId);
+        const projects = await storage.getProjectsByOrg(organizations[0].id);
+        if (projects && projects.length > 0) {
+          const ideasSummary = projects
+            .map((p: any, idx: number) => {
+              const ideaInfo = p.description || p.title || 'Untitled idea';
+              return `${idx + 1}. ${ideaInfo}`;
+            })
+            .join('\n');
+          
+          userIdeas = language === 'ar' 
+            ? `\n\nأفكار المستخدم الحالية:\n${ideasSummary}\n\nاستخدم هذه المعلومات لتقديم نصائح أكثر تخصيصاً وذات صلة.`
+            : `\n\nUser's Current Ideas:\n${ideasSummary}\n\nUse this information to provide more personalized and relevant advice.`;
+          
+          console.log(`📋 Loaded ${projects.length} ideas for expert context`);
+        }
+      } catch (error) {
+        console.error('Error fetching user projects:', error);
+        // Continue without ideas context if fetch fails
+      }
+
+      // Create expert-specific system prompts with language support and user context
+      const createSystemPrompt = (expertType: string, language: string, userIdeas: string = '') => {
+        const languageInstruction = language === 'ar' 
+          ? 'IMPORTANT: Respond in Arabic only. You are an Arabic-speaking AI Business Cofounder (شريك ذكي في الأعمال). Use proper Arabic grammar and business terminology.' 
+          : 'Respond in English only.';
+        
+        const basePrompts = {
+          gtm: `You are a Go-to-Market Strategy Expert with 15+ years of experience helping startups and scale-ups launch products successfully. 
+
+          Your expertise includes:
+          - Market research and competitive analysis
+          - Customer segmentation and targeting
+          - Pricing strategy and positioning
+          - Sales funnel optimization
+          - Growth hacking and acquisition channels
+          - Partnership and distribution strategies${userIdeas}
+
+          Respond in a conversational, advisory tone as if you're a senior consultant. Keep responses focused, actionable, and ask insightful follow-up questions. Limit responses to 2-3 sentences maximum.`,
+                    
+                    finance: `You are a Finance and Investment Expert with 15+ years of experience in startup funding, financial planning, and venture capital.
+
+          Your expertise includes:
+          - Financial modeling and forecasting
+          - Investment rounds and valuation
+          - Unit economics and profitability analysis
+          - Cash flow management and runway planning
+          - Fundraising strategy and pitch preparation
+          - Financial risk assessment${userIdeas}
+
+          Respond in a conversational, advisory tone as if you're a senior financial consultant. Keep responses focused, actionable, and ask insightful follow-up questions. Limit responses to 2-3 sentences maximum.`,
+                    
+                    product: `You are a Product Strategy Expert with 15+ years of experience in product management, user experience, and product-market fit.
+
+          Your expertise includes:
+          - Product-market fit validation
+          - User research and customer feedback analysis
+          - Feature prioritization and roadmap planning
+          - User experience design and optimization
+          - Product analytics and metrics
+          - Agile development and iteration strategies${userIdeas}
+
+          Respond in a conversational, advisory tone as if you're a senior product consultant. Keep responses focused, actionable, and ask insightful follow-up questions. Limit responses to 2-3 sentences maximum.`
+        };
+        
+        const basePrompt = basePrompts[expertType as keyof typeof basePrompts];
+        return `${languageInstruction}\n\n${basePrompt}`;
+      };
+
+      // Get the appropriate system prompt with language support and user ideas
+      const systemPrompt = createSystemPrompt(expertType, language || 'en', userIdeas);
+      
+      if (!systemPrompt) {
+        return res.status(400).json({ error: 'Invalid expert type' });
+      }
+
+      console.log(`${expertType} expert responding to: ${message}${userIdeas ? ' (with user ideas context)' : ''}`);
+
+      if (!openai) {
+        return res.status(503).json({ error: 'OpenAI API not configured' });
+      }
+
+      // Use OpenAI to generate expert response
+      const openaiResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user', 
+            content: message
+          }
+        ],
+        max_tokens: 200,
+        temperature: 0.7
+      });
+
+      const response = openaiResponse.choices[0].message.content || 'I apologize, but I encountered an issue generating a response. Please try again.';
+      
+      res.json({ 
+        response,
+        expertType,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error in text chat:', error);
+      res.status(500).json({ error: 'Failed to process message' });
+    }
+  });
+
+  // SSE Agent endpoint for real-time generation
+  // ✅ SECURITY FIX (P1): Add AI rate limiter (50 req/hour)
+  app.post('/api/agent/start', isAuthenticated, aiRateLimiter, async (req: any, res) => {
+    try {
+      const { ideaName, launchLocation, projectId } = req.body;
+      const user = req.user;
+
+      if (!ideaName || !launchLocation || !projectId) {
+        return res.status(400).json({ message: 'Missing required parameters' });
+      }
+
+      console.log(`🚀 Starting agent for ${ideaName} in ${launchLocation}`);
+
+      // Set up SSE
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      const sendSSE = (data: any) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      // Import AgentRunner
+      const { AgentRunner, createBusinessPlan } = await import('./agent/runner.js');
+      
+      // Create agent plan and runner
+      const plan = createBusinessPlan(ideaName, launchLocation);
+      const runner = new AgentRunner(plan);
+
+      // Set up event handlers
+      runner.on('event', async (event: any) => {
+        try {
+          // Send real-time update via SSE
+          sendSSE(event);
+
+          // Also save status messages to chat for persistence
+          if (event.type === 'status') {
+            const chat = await storage.getChatsByProject(projectId);
+            if (chat && chat.length > 0) {
+              const chatId = chat[0].id;
+              
+              if (event.data.completed) {
+                // Step completed
+                await storage.createMessage({
+                  chatId,
+                  role: 'assistant',
+                  text: event.data.message
+                });
+              } else if (event.data.progress) {
+                // Update or create status message
+                await storage.createMessage({
+                  chatId,
+                  role: 'assistant',
+                  text: `${event.data.message} (${event.data.progress}/${event.data.total})`
+                });
+              }
+            }
+          }
+
+          // Handle completion
+          if (event.type === 'done') {
+            const chat = await storage.getChatsByProject(projectId);
+            if (chat && chat.length > 0) {
+              const chatId = chat[0].id;
+              
+              // Send completion message to chat
+              await storage.createMessage({
+                chatId,
+                role: 'assistant',
+                text: '🎉 Congratulations! Your complete business framework has been generated successfully! All 8 business assets are now ready for your review in the outputs panel.'
+              });
+            }
+            
+            // Close SSE connection
+            res.write('data: {"type":"complete"}\n\n');
+            res.end();
+          }
+
+          // Handle errors
+          if (event.type === 'error') {
+            const chat = await storage.getChatsByProject(projectId);
+            if (chat && chat.length > 0) {
+              const chatId = chat[0].id;
+              await storage.createMessage({
+                chatId,
+                role: 'assistant',
+                text: `❌ Generation failed: ${event.data.error}`
+              });
+            }
+            res.end();
+          }
+
+        } catch (error) {
+          console.error('Error handling agent event:', error);
+        }
+      });
+
+      // Start the agent (this will emit events as it progresses)
+      runner.start().catch((error) => {
+        console.error('Agent runner error:', error);
+        sendSSE({ type: 'error', data: { error: error.message } });
+        res.end();
+      });
+
+      // Handle client disconnect
+      req.on('close', () => {
+        console.log('Client disconnected from SSE');
+        res.end();
+      });
+
+    } catch (error) {
+      console.error('Error starting agent:', error);
+      res.status(500).json({ message: 'Failed to start agent' });
+    }
+  });
+
+  const httpServer = createServer(app);
+  
+  // OpenAI Chat API endpoint for Launch mode
+  app.post('/api/openai/chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const { messages, model = 'gpt-4', temperature = 0.7, max_tokens = 4000 } = req.body;
+
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: 'Messages array is required' });
+      }
+
+      if (!openai) {
+        return res.status(503).json({ error: 'OpenAI API not configured' });
+      }
+
+      // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4', // Using gpt-4 for now as gpt-5 might not be available yet
+        messages,
+        temperature,
+        max_tokens,
+      });
+
+      res.json(response);
+
+    } catch (error) {
+      console.error('OpenAI API Error:', error);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('rate limit')) {
+          return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
+        }
+        if (error.message.includes('insufficient_quota')) {
+          return res.status(402).json({ error: 'OpenAI quota exceeded. Please check your OpenAI account.' });
+        }
+        if (error.message.includes('invalid_api_key')) {
+          return res.status(401).json({ error: 'Invalid OpenAI API key.' });
+        }
+      }
+
+      res.status(500).json({ 
+        error: 'AI service temporarily unavailable',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Anthropic Claude API endpoint for ultra-advanced code generation
+  app.post('/api/anthropic/chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const { messages, model = 'claude-sonnet-4-5-20250929', temperature = 0.8, max_tokens = 8000 } = req.body;
+
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: 'Messages array is required' });
+      }
+
+      // Import Anthropic SDK
+      const Anthropic = (await import('@anthropic-ai/sdk')).default;
+      const anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY
+      });
+
+      // Handle system messages properly for Anthropic
+      let systemPrompt = '';
+      const userMessages = messages.filter(msg => {
+        if (msg.role === 'system') {
+          systemPrompt = msg.content;
+          return false;
+        }
+        return true;
+      });
+
+      console.log('🚀 Calling FikraHub AI for ultra-slick interface generation...');
+
+      const anthropicResponse = await anthropic.messages.create({
+        model,
+        max_tokens,
+        system: systemPrompt || undefined,
+        messages: userMessages,
+        temperature: 0.8
+      });
+
+      // Convert Anthropic response to OpenAI-compatible format
+      const content = anthropicResponse.content[0]?.type === 'text' 
+        ? anthropicResponse.content[0].text 
+        : 'No response generated';
+
+      console.log('✅ Claude response received, length:', content.length);
+
+      const compatibleResponse = {
+        choices: [{
+          message: {
+            content: content
+          }
+        }]
+      };
+
+      res.json(compatibleResponse);
+
+    } catch (error) {
+      console.error('Anthropic API Error:', error);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('rate limit')) {
+          return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
+        }
+        if (error.message.includes('quota')) {
+          return res.status(402).json({ error: 'Anthropic quota exceeded. Please check your account.' });
+        }
+        if (error.message.includes('api_key')) {
+          return res.status(401).json({ error: 'Invalid Anthropic API key.' });
+        }
+      }
+
+      res.status(500).json({ 
+        error: 'Claude AI service temporarily unavailable',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Vercel deployment routes
+  app.use('/api/vercel', vercelRoutes);
+
+    // Add this interface near the top of the file, after imports
+  interface AssetUpdateIntent {
+    assetTypes: string[]; // Changed from single to array
+    action: 'REGENERATE' | 'UPDATE' | 'MODIFY' | 'EXPAND' | 'CLARIFY' | 'DELETE' | 'REGENERATE_ALL';
+    modification: string;
+    targetFields?: { [assetType: string]: string }; // Map of asset type to field
+    isMultiple: boolean; // Flag for bulk operations
+  }
+
+  function parseAssetIntentResponse(responseText: string): AssetUpdateIntent | null {
+  try {
+    let jsonString = responseText.trim();
+    
+    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      responseText.match(/```\s*([\s\S]*?)\s*```/);
+    
+    if (jsonMatch) {
+      jsonString = jsonMatch[1] || jsonMatch[0];
+    }
+    
+    jsonString = jsonString.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+    const parsed = JSON.parse(jsonString);
+    
+    // Support both single and multiple asset updates
+    if ('assetTypes' in parsed || 'assetType' in parsed) {
+      // Convert single to array format for consistency
+      if ('assetType' in parsed && !('assetTypes' in parsed)) {
+        parsed.assetTypes = parsed.assetType ? [parsed.assetType] : [];
+        parsed.isMultiple = false;
+      } else {
+        parsed.isMultiple = parsed.assetTypes && parsed.assetTypes.length > 1;
+      }
+      
+      // ✅ CRITICAL FIX: Always return result if action exists, even with empty assetTypes
+      // This prevents falling through to generation logic
+      if (parsed.action) {
+        // Validate action types
+        const validActions = ['REGENERATE', 'UPDATE', 'MODIFY', 'EXPAND', 'CLARIFY', 'DELETE', 'REGENERATE_ALL'];
+        if (validActions.includes(parsed.action)) {
+          console.log(`✅ Valid intent detected: action=${parsed.action}, assetTypes=${parsed.assetTypes.length}`);
+          return parsed;
+        }
+      }
+    }
+    
+    console.log('⚠️ Parsed response missing required fields or invalid action');
+    return null;
+  } catch (error) {
+    console.error("❌ Failed to parse asset intent response:", error);
+    return null;
+  }
+  }
+
+  // ✅ Enhanced detectAssetIntent with better handling
+  async function detectAssetIntent(
+    userMessage: string,
+    existingAssets: any[],
+    language: string
+  ): Promise<AssetUpdateIntent | null> {
+    try {
+      // Use Azure OpenAI client
+      if (!openai) {
+        // Return null if AI service not configured
+        console.error('❌ Azure OpenAI client not configured');
+        return null;
+      }
+
+      const assetTypesList = existingAssets.map(a => a.kind).join(', ');
+
+      const response = await openai.chat.completions.create({
+        model: "",
+        max_tokens: 800,
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert business analyst. Respond ONLY with valid JSON, no other text.'
+          },
+          {
+            role: 'user',
+            content: `You are an expert business analyst. Analyze this user message and determine if they want to modify, delete, or regenerate business assets.
+
+  **User Message:** "${userMessage}"
+
+  **Available Business Assets:** ${assetTypesList}
+
+  **Your Task:**
+  1. Identify which asset types they want to modify (can be multiple or ALL)
+  2. Determine the action type:
+    - REGENERATE: Completely redo specific asset(s) from scratch
+    - REGENERATE_ALL: Regenerate ALL 13 assets (when user says "regenerate everything", "redo all", "recreate all", "update all data", "clarify all", "make all clearer")
+    - DELETE: User wants to delete and recreate asset(s) (keywords: delete, remove, clear, erase)
+    - UPDATE: Modify specific parts while keeping most content
+    - EXPAND: Add more details without removing existing content
+    - CLARIFY: Add explanations or make existing content clearer
+  3. Extract their specific modification request
+  4. Identify target fields if they mention specific sections
+
+  **CRITICAL RULES:**
+  - If user says "update/clarify/improve ALL data" or "make everything clearer" → use REGENERATE_ALL action with empty assetTypes array
+  - If user mentions specific assets → populate assetTypes array
+  - For general improvements across all assets → use REGENERATE_ALL
+  - ALWAYS set action field, never leave it undefined
+
+  **Response Format:**
+  You MUST respond with ONLY a valid JSON object, no other text. Format:
+
+  {
+    "assetTypes": ["ASSET_NAME_1", "ASSET_NAME_2"] or [],
+    "action": "REGENERATE" or "UPDATE" or "EXPAND" or "CLARIFY" or "DELETE" or "REGENERATE_ALL",
+    "modification": "user's specific request in plain text",
+    "targetFields": {"ASSET_NAME_1": "field_name"} or null,
+    "isMultiple": true or false
+  }
+
+  **Examples:**
+
+  User: "Update data more clear"
+  Response:
+  {
+    "assetTypes": [],
+    "action": "REGENERATE_ALL",
+    "modification": "make all data clearer and more comprehensive",
+    "targetFields": null,
+    "isMultiple": true
+  }
+
+  User: "Make everything clearer"
+  Response:
+  {
+    "assetTypes": [],
+    "action": "REGENERATE_ALL",
+    "modification": "clarify and improve all content",
+    "targetFields": null,
+    "isMultiple": true
+  }
+
+  User: "Clarify all assets"
+  Response:
+  {
+    "assetTypes": [],
+    "action": "REGENERATE_ALL",
+    "modification": "clarify all business assets",
+    "targetFields": null,
+    "isMultiple": true
+  }
+
+  User: "Update the SWOT analysis and user personas to focus more on Middle East market"
+  Response:
+  {
+    "assetTypes": ["SWOT", "PERSONA"],
+    "action": "UPDATE",
+    "modification": "focus more on Middle East market",
+    "targetFields": {"SWOT": "opportunities", "PERSONA": "demographics"},
+    "isMultiple": true
+  }
+
+  User: "Clarify the marketing plan"
+  Response:
+  {
+    "assetTypes": ["MARKETING_PLAN"],
+    "action": "CLARIFY",
+    "modification": "make marketing plan clearer with more details",
+    "targetFields": null,
+    "isMultiple": false
+  }
+
+  User: "Hello, how are you?"
+  Response:
+  {
+    "assetTypes": [],
+    "action": "UPDATE",
+    "modification": "",
+    "targetFields": null,
+    "isMultiple": false
+  }
+
+  **Important Rules:**
+  - If message is NOT about modifying assets, return empty assetTypes array with UPDATE action
+  - Asset types must EXACTLY match available list (case-sensitive)
+  - For "delete" keywords → use DELETE action
+  - For "regenerate everything/all" or "update all" → use REGENERATE_ALL action
+  - For general improvement requests without specific assets → use REGENERATE_ALL
+  - Return ONLY JSON, no explanations
+  - Support multiple assets in single request
+  - NEVER return undefined action`
+        }]
+      });
+
+      const text = response.choices[0]?.message?.content || '{}';
+
+      console.log('🤖 OpenAI response for intent detection:', text.substring(0, 300));
+      
+      const result = parseAssetIntentResponse(text);
+      
+      // ✅ CRITICAL FIX: Check if result exists and has valid action
+      if (result) {
+        // Check if it's a modification intent (not just casual chat)
+        const isModificationIntent = 
+          result.assetTypes.length > 0 || 
+          result.action === 'REGENERATE_ALL' ||
+          (result.modification && result.modification.trim().length > 0);
+        
+        if (isModificationIntent) {
+          console.log(`✅ Successfully detected modification intent:`, {
+            action: result.action,
+            assetTypes: result.assetTypes,
+            isMultiple: result.isMultiple,
+            modification: result.modification.substring(0, 50)
+          });
+          return result;
+        } else {
+          console.log('ℹ️ Result exists but not a modification intent (casual chat)');
+          return null;
+        }
+      }
+      
+      console.log('ℹ️ No valid asset modification intent detected');
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Error detecting asset intent:', error);
+      return null;
+    }
+  }
+
+  // ✅ Enhanced handleAssetUpdate to support bulk operations and delete
+  interface EnhancedAssetUpdateParams {
+    chatId: string;
+    projectId: string;
+    assetTypes: string[]; // Now supports multiple
+    action: string;
+    modification: string;
+    targetFields?: { [key: string]: string };
+    ideaName: string;
+    launchLocation: string;
+    language: string;
+    userId: string;
+  }
+
+  async function handleBulkAssetUpdate(params: EnhancedAssetUpdateParams) {
+  const {
+    chatId,
+    projectId,
+    assetTypes,
+    action,
+    modification,
+    targetFields,
+    ideaName,
+    launchLocation,
+    language,
+    userId
+  } = params;
+
+  try {
+    const assets = await storage.getAssetsByProject(projectId);
+    console.log(`🔍 Handling bulk asset update: action=${action}, assets=${assetTypes.join(', ') || 'ALL'}`);
+    
+    // ✅ CRITICAL: If assetTypes is empty but action is CLARIFY/UPDATE/EXPAND, treat as REGENERATE_ALL
+    if (assetTypes.length === 0 && (action === 'CLARIFY' || action === 'UPDATE' || action === 'EXPAND')) {
+      console.log(`⚠️ Empty assetTypes with ${action} action - converting to REGENERATE_ALL to avoid creating new assets`);
+      
+      const statusMessage = await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: language === 'ar'
+          ? `🔄 جاري ${action === 'CLARIFY' ? 'توضيح' : action === 'EXPAND' ? 'توسيع' : 'تحديث'} جميع الأصول الـ 13...\n\n📝 التعديل: "${modification}"\n\n⏱️ هذا قد يستغرق بضع دقائق...`
+          : `🔄 ${action === 'CLARIFY' ? 'Clarifying' : action === 'EXPAND' ? 'Expanding' : 'Updating'} all 13 assets...\n\n📝 Modification: "${modification}"\n\n⏱️ This may take a few minutes...`
+      });
+
+      // Get all asset types to update
+      const allAssetTypes = [
+        'LEAN_CANVAS', 'SWOT', 'PERSONA', 'USER_STORIES', 
+        'INTERVIEW_QUESTIONS', 'JOURNEY_MAP', 'MARKETING_PLAN',
+        'BRAND_WHEEL', 'BRAND_IDENTITY', 'COMPETITOR_MAP',
+        'TAM_SAM_SOM', 'TEAM_ROLES', 'PITCH_OUTLINE'
+      ];
+
+      let completed = 0;
+      const total = allAssetTypes.length;
+
+      for (const assetType of allAssetTypes) {
+        const existingAsset = assets.find((a: any) => a.kind === assetType);
+        
+        if (!existingAsset) {
+          console.log(`⚠️ Asset ${assetType} not found, skipping...`);
+          continue;
+        }
+
+        completed++;
+        console.log(`🔄 [${completed}/${total}] ${action}ing ${assetType}...`);
+
+        // Update progress
+        await storage.updateMessage(statusMessage.id, {
+          text: language === 'ar'
+            ? `🔄 جاري ${action === 'CLARIFY' ? 'التوضيح' : action === 'EXPAND' ? 'التوسيع' : 'التحديث'}... (${completed}/${total})\n\n📝 الآن: ${assetType.replace(/_/g, ' ')}`
+            : `🔄 ${action === 'CLARIFY' ? 'Clarifying' : action === 'EXPAND' ? 'Expanding' : 'Updating'}... (${completed}/${total})\n\n📝 Current: ${assetType.replace(/_/g, ' ')}`
+        });
+
+        const enhancedPrompt = buildUpdatePrompt({
+          assetType,
+          action,
+          modification,
+          existingData: existingAsset.data,
+          ideaName,
+          launchLocation,
+          language
+        });
+
+        const updatedAsset = await generateBusinessAsset({
+          type: assetType,
+          context: enhancedPrompt,
+          businessDescription: ideaName,
+          additionalData: { language, modification, action }
+        });
+
+        // ✅ UPDATE existing asset, don't create new one
+        await storage.updateAsset(existingAsset.id, {
+          data: updatedAsset.data,
+          updatedAt: new Date()
+        });
+
+        // Brief delay between assets
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      await storage.updateMessage(statusMessage.id, {
+        text: language === 'ar'
+          ? `✅ تم ${action === 'CLARIFY' ? 'توضيح' : action === 'EXPAND' ? 'توسيع' : 'تحديث'} جميع الأصول الـ 13 بنجاح!\n\n📝 التعديل المطبق: "${modification}"\n\n💡 يمكنك الآن مراجعة جميع التحديثات.`
+          : `✅ Successfully ${action === 'CLARIFY' ? 'clarified' : action === 'EXPAND' ? 'expanded' : 'updated'} all 13 assets!\n\n📝 Applied modification: "${modification}"\n\n💡 You can now review all updates.`
+      });
+
+      await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: language === 'ar'
+          ? `🎉 تم تحديث إطار العمل الكامل! هل تريد إجراء أي تعديلات إضافية؟`
+          : `🎉 Complete framework update done! Would you like any additional modifications?`
+      });
+
+      return;
+    }
+    
+    // ✅ Handle REGENERATE_ALL - regenerate all 13 assets
+    if (action === 'REGENERATE_ALL') {
+      console.log('🔄 REGENERATE_ALL detected - regenerating all 13 assets...');
+      
+      const statusMessage = await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: language === 'ar'
+          ? `🔄 جاري إعادة توليد جميع الأصول الـ 13...\n\n📝 التعديل: "${modification}"\n\n⏱️ هذا قد يستغرق بضع دقائق...`
+          : `🔄 Regenerating all 13 assets...\n\n📝 Modification: "${modification}"\n\n⏱️ This may take a few minutes...`
+      });
+
+      // Get all asset types to regenerate
+      const allAssetTypes = [
+        'LEAN_CANVAS', 'SWOT', 'PERSONA', 'USER_STORIES', 
+        'INTERVIEW_QUESTIONS', 'JOURNEY_MAP', 'MARKETING_PLAN',
+        'BRAND_WHEEL', 'BRAND_IDENTITY', 'COMPETITOR_MAP',
+        'TAM_SAM_SOM', 'TEAM_ROLES', 'PITCH_OUTLINE'
+      ];
+
+      let completed = 0;
+      const total = allAssetTypes.length;
+
+      for (const assetType of allAssetTypes) {
+        const existingAsset = assets.find((a: any) => a.kind === assetType);
+        
+        if (!existingAsset) {
+          console.log(`⚠️ Asset ${assetType} not found, skipping...`);
+          continue;
+        }
+
+        completed++;
+        console.log(`🔄 [${completed}/${total}] Regenerating ${assetType}...`);
+
+        // Update progress
+        await storage.updateMessage(statusMessage.id, {
+          text: language === 'ar'
+            ? `🔄 جاري إعادة التوليد... (${completed}/${total})\n\n📝 الآن: ${assetType.replace(/_/g, ' ')}`
+            : `🔄 Regenerating... (${completed}/${total})\n\n📝 Current: ${assetType.replace(/_/g, ' ')}`
+        });
+
+        const enhancedPrompt = buildUpdatePrompt({
+          assetType,
+          action: 'REGENERATE',
+          modification,
+          existingData: existingAsset.data,
+          ideaName,
+          launchLocation,
+          language
+        });
+
+        const regeneratedAsset = await generateBusinessAsset({
+          type: assetType,
+          context: enhancedPrompt,
+          businessDescription: ideaName,
+          additionalData: { language, modification, action: 'REGENERATE' }
+        });
+
+        // ✅ UPDATE existing asset, don't create new one
+        await storage.updateAsset(existingAsset.id, {
+          data: regeneratedAsset.data,
+          updatedAt: new Date()
+        });
+
+        // Brief delay between assets
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      await storage.updateMessage(statusMessage.id, {
+        text: language === 'ar'
+          ? `✅ تم إعادة توليد جميع الأصول الـ 13 بنجاح!\n\n📝 التعديل المطبق: "${modification}"\n\n💡 يمكنك الآن مراجعة جميع التحديثات.`
+          : `✅ Successfully regenerated all 13 assets!\n\n📝 Applied modification: "${modification}"\n\n💡 You can now review all updates.`
+      });
+
+      await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: language === 'ar'
+          ? `🎉 تمت إعادة بناء إطار العمل الكامل! هل تريد إجراء أي تعديلات إضافية؟`
+          : `🎉 Complete framework rebuild done! Would you like any additional modifications?`
+      });
+
+      return;
+    }
+
+      // ✅ Handle DELETE action with auto-regeneration
+      if (action === 'DELETE') {
+        console.log(`🗑️ DELETE detected for assets: ${assetTypes.join(', ')}`);
+        
+        const statusMessage = await storage.createMessage({
+          chatId,
+          role: "assistant",
+          text: language === 'ar'
+            ? `🗑️ جاري حذف وإعادة إنشاء ${assetTypes.length} أصل...\n\n📝 ${assetTypes.map(t => t.replace(/_/g, ' ')).join(', ')}`
+            : `🗑️ Deleting and recreating ${assetTypes.length} asset(s)...\n\n📝 ${assetTypes.map(t => t.replace(/_/g, ' ')).join(', ')}`
+        });
+
+        for (let i = 0; i < assetTypes.length; i++) {
+          const assetType = assetTypes[i];
+          const existingAsset = assets.find((a: any) => a.kind === assetType);
+          
+          if (!existingAsset) {
+            console.log(`⚠️ Asset ${assetType} not found for deletion`);
+            continue;
+          }
+
+          console.log(`🗑️ [${i + 1}/${assetTypes.length}] Deleting and regenerating ${assetType}...`);
+
+          // Update progress
+          await storage.updateMessage(statusMessage.id, {
+            text: language === 'ar'
+              ? `🔄 [${i + 1}/${assetTypes.length}] جاري حذف وإعادة إنشاء ${assetType.replace(/_/g, ' ')}...`
+              : `🔄 [${i + 1}/${assetTypes.length}] Deleting and recreating ${assetType.replace(/_/g, ' ')}...`
+          });
+
+          // Generate fresh asset (simulates delete + recreate)
+          const enhancedPrompt = `Create a completely new ${assetType} for "${ideaName}" in "${launchLocation}".
+
+  User's request: "${modification}"
+
+  Generate fresh content from scratch with:
+  - Latest 2024/2025 market data
+  - Comprehensive analysis
+  - Actionable insights
+  - ${language === 'ar' ? 'Arabic language' : 'English language'}`;
+
+          const newAsset = await generateBusinessAsset({
+            type: assetType,
+            context: enhancedPrompt,
+            businessDescription: ideaName,
+            additionalData: { language, modification, action: 'DELETE' }
+          });
+
+          await storage.updateAsset(existingAsset.id, {
+            data: newAsset.data,
+            updatedAt: new Date()
+          });
+
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        await storage.updateMessage(statusMessage.id, {
+          text: language === 'ar'
+            ? `✅ تم حذف وإعادة إنشاء ${assetTypes.length} أصل بنجاح!\n\n🗑️ الأصول المحذوفة والمعاد إنشاؤها:\n${assetTypes.map(t => `• ${t.replace(/_/g, ' ')}`).join('\n')}\n\n💡 جميع البيانات جديدة ومحدثة.`
+            : `✅ Successfully deleted and recreated ${assetTypes.length} asset(s)!\n\n🗑️ Deleted and recreated:\n${assetTypes.map(t => `• ${t.replace(/_/g, ' ')}`).join('\n')}\n\n💡 All data is fresh and updated.`
+        });
+
+        await storage.createMessage({
+          chatId,
+          role: "assistant",
+          text: language === 'ar'
+            ? `هل تريد إجراء أي تعديلات أخرى؟`
+            : `Would you like to make any other changes?`
+        });
+
+        return;
+      }
+
+      // ✅ Handle standard bulk updates (UPDATE, EXPAND, CLARIFY)
+      if (assetTypes.length > 1) {
+        console.log(`🔄 Bulk ${action} for ${assetTypes.length} assets: ${assetTypes.join(', ')}`);
+        
+        const statusMessage = await storage.createMessage({
+          chatId,
+          role: "assistant",
+          text: language === 'ar'
+            ? `🔄 جاري تحديث ${assetTypes.length} أصول...\n\n📝 ${assetTypes.map(t => t.replace(/_/g, ' ')).join(', ')}`
+            : `🔄 Updating ${assetTypes.length} assets...\n\n📝 ${assetTypes.map(t => t.replace(/_/g, ' ')).join(', ')}`
+        });
+
+        for (let i = 0; i < assetTypes.length; i++) {
+          const assetType = assetTypes[i];
+          const targetField = targetFields?.[assetType];
+          const existingAsset = assets.find((a: any) => a.kind === assetType);
+          
+          if (!existingAsset) {
+            console.log(`⚠️ Asset ${assetType} not found`);
+            continue;
+          }
+
+          console.log(`🔄 [${i + 1}/${assetTypes.length}] ${action} ${assetType}...`);
+
+          // Update progress
+          await storage.updateMessage(statusMessage.id, {
+            text: language === 'ar'
+              ? `🔄 [${i + 1}/${assetTypes.length}] جاري ${action === 'UPDATE' ? 'تحديث' : action === 'EXPAND' ? 'توسيع' : 'توضيح'} ${assetType.replace(/_/g, ' ')}...`
+              : `🔄 [${i + 1}/${assetTypes.length}] ${action}ing ${assetType.replace(/_/g, ' ')}...`
+          });
+
+          const enhancedPrompt = buildUpdatePrompt({
+            assetType,
+            action,
+            modification,
+            targetField,
+            existingData: existingAsset.data,
+            ideaName,
+            launchLocation,
+            language
+          });
+
+          const updatedAsset = await generateBusinessAsset({
+            type: assetType,
+            context: enhancedPrompt,
+            businessDescription: ideaName,
+            additionalData: { language, modification, action, targetField }
+          });
+
+          await storage.updateAsset(existingAsset.id, {
+            data: updatedAsset.data,
+            updatedAt: new Date()
+          });
+
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        await storage.updateMessage(statusMessage.id, {
+          text: language === 'ar'
+            ? `✅ تم تحديث ${assetTypes.length} أصول بنجاح!\n\n📝 الأصول المحدثة:\n${assetTypes.map(t => `• ${t.replace(/_/g, ' ')}`).join('\n')}\n\n💡 التعديل المطبق: "${modification}"`
+            : `✅ Successfully updated ${assetTypes.length} assets!\n\n📝 Updated assets:\n${assetTypes.map(t => `• ${t.replace(/_/g, ' ')}`).join('\n')}\n\n💡 Applied: "${modification}"`
+        });
+
+        await storage.createMessage({
+          chatId,
+          role: "assistant",
+          text: language === 'ar'
+            ? `هل تريد إجراء أي تعديلات إضافية؟`
+            : `Would you like any additional modifications?`
+        });
+
+        return;
+      }
+
+      // ✅ Single asset update (existing logic)
+      const assetType = assetTypes[0];
+      const targetField = targetFields?.[assetType];
+      const existingAsset = assets.find((a: any) => a.kind === assetType);
+      
+      if (!existingAsset) {
+        throw new Error(`Asset ${assetType} not found`);
+      }
+
+      console.log(`🔄 Single ${action} for ${assetType}...`);
+
+      const actionText = language === 'ar' 
+        ? action === 'REGENERATE' ? 'إعادة توليد' : action === 'EXPAND' ? 'توسيع' : 'تحديث'
+        : action === 'REGENERATE' ? 'Regenerating' : action === 'EXPAND' ? 'Expanding' : 'Updating';
+
+      const assetNameAr = {
+        'LEAN_CANVAS': 'نموذج الأعمال',
+        'SWOT': 'تحليل SWOT',
+        'PERSONA': 'شخصيات المستخدمين',
+        'USER_STORIES': 'قصص المستخدمين',
+        'INTERVIEW_QUESTIONS': 'أسئلة المقابلة',
+        'JOURNEY_MAP': 'رحلة العميل',
+        'MARKETING_PLAN': 'خطة التسويق',
+        'BRAND_WHEEL': 'عجلة العلامة',
+        'BRAND_IDENTITY': 'هوية العلامة',
+        'COMPETITOR_MAP': 'تحليل المنافسين',
+        'TAM_SAM_SOM': 'تحليل السوق',
+        'TEAM_ROLES': 'أدوار الفريق',
+        'PITCH_OUTLINE': 'مخطط العرض'
+      }[assetType] || assetType;
+
+      const assetDisplayName = language === 'ar' ? assetNameAr : assetType.replace(/_/g, ' ');
+
+      const statusMessage = await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: language === 'ar'
+          ? `🔄 جاري ${actionText} ${assetDisplayName}...\n\n📝 التعديل المطلوب: "${modification}"`
+          : `🔄 ${actionText} ${assetDisplayName}...\n\n📝 Requested change: "${modification}"`
+      });
+
+      const enhancedPrompt = buildUpdatePrompt({
+        assetType,
+        action,
+        modification,
+        targetField,
+        existingData: existingAsset.data,
+        ideaName,
+        launchLocation,
+        language
+      });
+
+      const regeneratedAsset = await generateBusinessAsset({
+        type: assetType,
+        context: enhancedPrompt,
+        businessDescription: ideaName,
+        additionalData: { language, modification, action, targetField }
+      });
+
+      await storage.updateAsset(existingAsset.id, {
+        data: regeneratedAsset.data,
+        updatedAt: new Date()
+      });
+
+      await storage.updateMessage(statusMessage.id, {
+        text: language === 'ar'
+          ? `✅ تم ${actionText} ${assetDisplayName} بنجاح!\n\n📝 التعديل المطبق: "${modification}"\n\n💡 يمكنك الآن مراجعة التحديث.`
+          : `✅ ${assetDisplayName} ${action.toLowerCase()}ed successfully!\n\n📝 Applied change: "${modification}"\n\n💡 You can now review the update.`
+      });
+
+      await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: language === 'ar'
+          ? `هل تريد إجراء أي تعديلات أخرى؟`
+          : `Would you like to make any other changes?`
+      });
+
+    } catch (error) {
+      console.error(`❌ Failed to update assets:`, error);
+      
+      await storage.createMessage({
+        chatId,
+        role: "assistant",
+        text: language === 'ar'
+          ? `❌ عذراً، حدث خطأ أثناء التحديث. يرجى المحاولة مرة أخرى.`
+          : `❌ Sorry, an error occurred during update. Please try again.`
+      });
+    }
+  }
+
+  // Add this function after detectAssetIntent
+  function buildUpdatePrompt(params: {
+    assetType: string;
+    action: string;
+    modification: string;
+    targetField?: string;
+    existingData: any;
+    ideaName: string;
+    launchLocation: string;
+    language: string;
+  }): string {
+    const { assetType, action, modification, targetField, existingData, ideaName, launchLocation, language } = params;
+
+    let prompt = `You are updating an existing ${assetType} for: "${ideaName}" launching in "${launchLocation}".
+
+  **Current ${assetType} Data:**
+  ${JSON.stringify(existingData, null, 2)}
+
+  **User's Request:** "${modification}"
+  **Action:** ${action}
+  ${targetField ? `**Focus Field:** ${targetField}` : ''}
+
+  **Instructions:**
+  `;
+
+    if (action === 'REGENERATE') {
+      prompt += `
+  - Completely regenerate the ${assetType} from scratch
+  - Apply user's modification: "${modification}"
+  - Keep the same JSON structure
+  - Make it comprehensive and detailed
+  - Use latest 2024/2025 data and insights
+  `;
+    } else if (action === 'UPDATE') {
+      prompt += `
+  - Keep most existing content unchanged
+  - Only modify parts related to: "${modification}"
+  ${targetField ? `- Focus specifically on the "${targetField}" section` : ''}
+  - Maintain consistency across all sections
+  - Improve quality while applying changes
+  `;
+    } else if (action === 'EXPAND') {
+      prompt += `
+  - Keep ALL existing content
+  - Add more details about: "${modification}"
+  ${targetField ? `- Expand the "${targetField}" section with additional insights` : ''}
+  - Add relevant examples, data, metrics
+  - Make it more comprehensive and actionable
+  `;
+    } else if (action === 'CLARIFY') {
+      prompt += `
+  - Keep existing content
+  - Add clarification about: "${modification}"
+  - Provide more specific examples and details
+  - Make the content easier to understand
+  `;
+    }
+
+    prompt += `
+  **Language:** ${language === 'ar' ? 'Arabic (العربية)' : 'English'}
+  **Output:** Return the complete updated ${assetType} in the exact same JSON structure.`;
+
+    return prompt;
+  }
+
+  // Use memory storage for GCS upload (no local filesystem)
+  const uploadLogo = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      // Accept images only
+      const allowedMimes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/svg+xml',
+        'image/webp'
+      ];
+
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only JPEG, PNG, GIF, SVG, and WebP images are allowed.'));
+      }
+    }
+  });
+
+  // ✅ SECURITY FIX (P1): Add file upload rate limiter (10 uploads/hour)
+  app.post('/api/upload/logo', isAuthenticated, fileUploadLimiter, uploadLogo.single('logo'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      // SECURITY: Validate file content matches declared type (magic number validation)
+      const validation = await validateUploadedFile(req.file, {
+        allowedExtensions: ['.png', '.jpg', '.jpeg', '.svg', '.webp'],
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'],
+        maxSizeInBytes: 5 * 1024 * 1024, // 5MB
+        validateContent: 'image'
+      });
+
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: 'File validation failed',
+          details: validation.error
+        });
+      }
+
+      // Get user's organization ID for multi-tenant isolation
+      const userId = req.user.id;
+      const membership = await db.query.organizationMembers.findFirst({
+        where: eq(organizationMembers.userId, userId)
+      });
+
+      // Upload to Google Cloud Storage
+      const { uploadToGCS } = await import('./lib/gcsUpload');
+      const result = await uploadToGCS({
+        file: req.file,
+        folder: 'logos',
+        organizationId: membership?.orgId
+      });
+
+      console.log(`✅ Logo uploaded to GCS: ${result.filename}`);
+      console.log(`🔗 Public URL: ${result.url}`);
+
+      res.json({
+        success: true,
+        url: result.url,
+        filename: result.filename,
+        size: result.size,
+        mimetype: result.mimetype
+      });
+
+    } catch (error) {
+      console.error('❌ Logo upload error:', error);
+
+      if (error instanceof multer.MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            error: 'File too large',
+            details: 'Logo must be less than 5MB'
+          });
+        }
+      }
+
+      res.status(500).json({
+        error: 'Failed to upload logo',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get('/api/presentation/:fileId/pdf', isAuthenticated, async (req: any, res) => {
+    try {
+      const { fileId } = req.params;
+
+      // SECURITY: Validate fileId to prevent path traversal attacks
+      if (!/^[a-zA-Z0-9_-]+$/.test(fileId)) {
+        return res.status(400).json({ error: 'Invalid file ID format' });
+      }
+
+      // Use basename to prevent directory traversal
+      const safeFileId = path.basename(fileId);
+
+      console.log(`📥 Converting PPTX to PDF: ${safeFileId}`);
+
+      // Check if PDF already exists in cache
+      const cachedPdfPath = path.join(process.cwd(), 'public', 'pdfs', `${safeFileId}.pdf`);
+
+      // SECURITY: Verify the resolved path is within allowed directory
+      const resolvedPath = path.resolve(cachedPdfPath);
+      const allowedDir = path.resolve(process.cwd(), 'public', 'pdfs');
+      if (!resolvedPath.startsWith(allowedDir)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      if (fs.existsSync(cachedPdfPath)) {
+        console.log(`✅ Serving cached PDF: ${safeFileId}.pdf`);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${safeFileId}.pdf"`);
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+
+        const pdfBuffer = fs.readFileSync(cachedPdfPath);
+        return res.send(pdfBuffer);
+      }
+
+      // Find the local PPTX file — fileId is the filename without extension
+      const localPptxPath = path.join(process.cwd(), 'uploads', 'pitch', `${safeFileId}.pptx`);
+
+      if (!fs.existsSync(localPptxPath)) {
+        return res.status(404).json({ error: 'PPTX file not found on server' });
+      }
+
+      // Pass the buffer directly — no URL/SSRF concerns
+      const pptxBuffer = fs.readFileSync(localPptxPath);
+      const { convertPptxToPdf } = await import('./google-driver.js');
+      const pdfRelUrl = await convertPptxToPdf(pptxBuffer);
+
+      // pdfRelUrl is like /pdfs/converted-xxx.pdf
+      const generatedPdfPath = path.join(process.cwd(), 'public', pdfRelUrl);
+
+      // Rename to use safeFileId for caching
+      const newPdfPath = path.join(process.cwd(), 'public', 'pdfs', `${safeFileId}.pdf`);
+      if (fs.existsSync(generatedPdfPath)) {
+        fs.renameSync(generatedPdfPath, newPdfPath);
+      }
+
+      console.log(`✅ PDF generated and cached: ${safeFileId}.pdf`);
+
+      // Send PDF file
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${safeFileId}.pdf"`);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+
+      const pdfBuffer = fs.readFileSync(newPdfPath);
+      res.send(pdfBuffer);
+      
+    } catch (error) {
+      console.error('❌ PDF conversion error:', error);
+
+      // SECURITY: Only expose error details in development
+      res.status(500).json({
+        error: 'Failed to convert presentation to PDF',
+        ...(process.env.NODE_ENV === 'development' && {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          hint: 'Make sure google-credentials.json is configured'
+        })
+      });
+    }
+  });
+
+  // Password reset: request reset (store token in DB and email link)
+  app.post('/api/workspaces/:slug/forgot-password', passwordResetLimiter, async (req: any, res) => {
+    try {
+      const { slug } = req.params;
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ error: "Email required" });
+
+      // Find workspace/org
+      const [org] = await db.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
+      if (!org) return res.status(404).json({ error: "Workspace not found" });
+
+      // Find user in this org (use timing-safe check to prevent email enumeration)
+      const user = await storage.getUserByEmailOrganization(email, org.id);
+
+      // Always return success to prevent email enumeration
+      // If user not found, we'll just not send email but return 200
+      if (!user) {
+        console.log(`Password reset requested for non-existent email: ${email}`);
+        // Return success anyway to prevent email enumeration
+        return res.json({ success: true });
+      }
+
+      // Generate cryptographically secure token
+      const { randomBytes } = await import('crypto');
+      const token = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+      // Persist token
+      await storage.createPasswordResetToken(token, user.id, org.id, expiresAt);
+
+      const hostUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const resetUrl = `${hostUrl}/w/${slug}/reset-password?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(user.id)}`;
+
+      // Render email (use template if present)
+      let html = `<p>Hi ${user.firstName || user.username || ''},</p>
+                  <p>We received a request to reset your password for workspace <strong>${org.name}</strong>.</p>
+                  <p>Click the link below to reset your password (valid for 30 minutes):</p>
+                  <p><a href="${resetUrl}">Reset password</a></p>
+                  <p>If you didn't request this, you can safely ignore this email.</p>`;
+
+      // Try send via Resend if configured
+      if (resendClient) {
+        try {
+          await resendClient.emails.send({
+            from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+            to: user.email,
+            subject: `Reset your password for ${org.name}`,
+            html
+          });
+        } catch (err) {
+          console.error('Failed to send reset email via Resend:', err);
+        }
+      } else {
+        console.log('Reset email (no mailer configured):', { to: user.email, resetUrl });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "Failed to send reset email" });
+    }
+  });
+
+  // Password reset: verify token and update password (one-time)
+  // SECURITY: Use centralized password validation middleware
+  app.post('/api/workspaces/:slug/reset-password',
+    passwordResetLimiter,
+    passwordValidation(),
+    handleValidationErrors,
+    async (req: any, res) => {
+    try {
+      const { slug } = req.params;
+      const { token, userId, password } = req.body;
+
+      if (!token || !userId) {
+        return res.status(400).json({ error: "Missing token or userId" });
+      }
+
+      // find workspace/org
+      const [org] = await db.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
+      if (!org) return res.status(404).json({ error: "Workspace not found" });
+
+      // SECURITY FIX (P2): Use database transaction to prevent race condition
+      // Atomically check token validity, mark as used, and update password
+      const hashed = await hashPassword(password);
+
+      let tokenRow: any;
+      try {
+        await db.transaction(async (tx) => {
+          // Fetch and mark token as used in a single atomic operation
+          const [token_record] = await tx
+            .update(passwordResetTokens)
+            .set({ used: true, usedAt: new Date() })
+            .where(and(
+              eq(passwordResetTokens.token, token),
+              eq(passwordResetTokens.userId, userId),
+              eq(passwordResetTokens.orgId, org.id),
+              eq(passwordResetTokens.used, false)
+            ))
+            .returning();
+
+          if (!token_record) {
+            throw new Error('Invalid or already used token');
+          }
+
+          tokenRow = token_record;
+
+          // Check expiry
+          if (new Date(token_record.expiresAt).getTime() < Date.now()) {
+            throw new Error('Expired token');
+          }
+
+          // Update password in the same transaction
+          await tx.update(users)
+            .set({ password: hashed })
+            .where(eq(users.id, userId));
+        });
+      } catch (error: any) {
+        if (error.message === 'Invalid or already used token') {
+          return res.status(400).json({ error: "Invalid or used token" });
+        }
+        if (error.message === 'Expired token') {
+          return res.status(400).json({ error: "Expired token" });
+        }
+        throw error;
+      }
+
+      // auto-login if possible
+      const invitedUser = await storage.getUser(userId);
+      if (typeof req.logIn === 'function') {
+        req.logIn(invitedUser, (err: any) => {
+          if (err) {
+            console.error('Auto-login after reset failed:', err);
+            if (req.session) (req.session as any).userId = invitedUser?.id;
+            return res.status(500).json({ error: 'Password updated but session creation failed' });
+          }
+          return res.json({ success: true, user: invitedUser });
+        });
+        return;
+      }
+
+      if (req.session) (req.session as any).userId = invitedUser?.id;
+      res.json({ success: true, user: invitedUser });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // ✅ Upload evaluation criteria JSON endpoint
+  // SECURITY FIX (P1): Added fileUploadLimiter to prevent DoS
+  app.post('/api/organizations/:orgId/upload-criteria',
+    isAuthenticated,
+    isOrgAdmin,
+    fileUploadLimiter,
+    uploadCriteria.single('criteria'), 
+    async (req: any, res) => {
+      try {
+        const { orgId } = req.params;
+        const userId = req.user.id;
+        
+        if (!req.file) {
+          return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        // Read and validate JSON content
+        const fileContent = fs.readFileSync(req.file.path, 'utf-8');
+        let jsonData;
+        
+        try {
+          jsonData = JSON.parse(fileContent);
+          
+          // Validate JSON structure (basic validation)
+          if (!jsonData || typeof jsonData !== 'object') {
+            fs.unlinkSync(req.file.path); // Delete invalid file
+            return res.status(400).json({ 
+              error: 'Invalid JSON structure',
+              details: 'File must contain a valid JSON object' 
+            });
+          }
+          
+          // Optional: Add more specific validation for evaluation criteria format
+          // Example: check for required fields like metrics, weights, etc.
+          
+        } catch (parseError) {
+          fs.unlinkSync(req.file.path); // Delete invalid file
+          return res.status(400).json({ 
+            error: 'Invalid JSON file',
+            details: 'File contains malformed JSON' 
+          });
+        }
+
+        // Generate file metadata (cryptographically secure)
+        const fileId = `criteria_${Date.now()}_${randomBytes(6).toString('hex')}`;
+        const filePath = `/uploads/evaluation-criteria/${req.file.filename}`;
+        
+        const fileMetadata = {
+          id: fileId,
+          name: req.file.originalname,
+          path: filePath,
+          uploadedAt: new Date().toISOString(),
+          uploadedBy: userId,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        };
+
+        // Get current organization
+        const org = await storage.getOrganization(orgId);
+        if (!org) {
+          fs.unlinkSync(req.file.path); // Delete file if org not found
+          return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        // Get existing files array or initialize empty array
+        const existingFiles = Array.isArray(org.evaluationCriteriaFiles) 
+          ? org.evaluationCriteriaFiles 
+          : [];
+
+        // Add new file to array
+        const updatedFiles = [...existingFiles, fileMetadata];
+
+        // Update organization with new files array
+        await storage.updateOrganization(orgId, {
+          evaluationCriteriaFiles: updatedFiles
+        });
+
+        console.log(`✅ Evaluation criteria uploaded: ${req.file.filename} for org ${orgId}`);
+        console.log(`📁 File path: ${req.file.path}`);
+        console.log(`🔗 Access URL: ${filePath}`);
+
+        res.json({
+          success: true,
+          file: fileMetadata,
+          totalFiles: updatedFiles.length
+        });
+
+      } catch (error) {
+        console.error('❌ Criteria upload error:', error);
+        
+        // Clean up uploaded file on error
+        if (req.file?.path && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        
+        if (error instanceof multer.MulterError) {
+          if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ 
+              error: 'File too large',
+              details: 'JSON file must be less than 2MB' 
+            });
+          }
+        }
+
+        res.status(500).json({ 
+          error: 'Failed to upload evaluation criteria',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+  });
+
+  // ✅ Get all evaluation criteria files for organization
+  // SECURITY FIX (P0): Added requireOrgMembership to prevent IDOR
+  app.get('/api/organizations/:orgId/criteria-files',
+    isAuthenticated,
+    requireOrgMembership,
+    async (req: any, res) => {
+      try {
+        const { orgId } = req.params;
+        
+        const org = await storage.getOrganization(orgId);
+        if (!org) {
+          return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        const files = Array.isArray(org.evaluationCriteriaFiles) 
+          ? org.evaluationCriteriaFiles 
+          : [];
+
+        res.json({
+          success: true,
+          files,
+          totalFiles: files.length
+        });
+
+      } catch (error) {
+        console.error('❌ Error fetching criteria files:', error);
+        res.status(500).json({ 
+          error: 'Failed to fetch evaluation criteria files' 
+        });
+      }
+  });
+
+  // ✅ Delete evaluation criteria file
+  app.delete('/api/organizations/:orgId/criteria-files/:fileId', 
+    isAuthenticated, 
+    isOrgAdmin, 
+    async (req: any, res) => {
+      try {
+        const { orgId, fileId } = req.params;
+        
+        const org = await storage.getOrganization(orgId);
+        if (!org) {
+          return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        const files = Array.isArray(org.evaluationCriteriaFiles) 
+          ? org.evaluationCriteriaFiles 
+          : [];
+
+        // Find file to delete
+        const fileToDelete = files.find((f: any) => f.id === fileId);
+        if (!fileToDelete) {
+          return res.status(404).json({ error: 'File not found' });
+        }
+
+        // Delete physical file
+        const physicalPath = path.join(process.cwd(), 'uploads', 'evaluation-criteria', path.basename(fileToDelete.path));
+        if (fs.existsSync(physicalPath)) {
+          fs.unlinkSync(physicalPath);
+          console.log(`🗑️ Deleted physical file: ${physicalPath}`);
+        }
+
+        // Remove from database
+        const updatedFiles = files.filter((f: any) => f.id !== fileId);
+        await storage.updateOrganization(orgId, {
+          evaluationCriteriaFiles: updatedFiles
+        });
+
+        console.log(`✅ Deleted criteria file: ${fileId} from org ${orgId}`);
+
+        res.json({
+          success: true,
+          deletedFileId: fileId,
+          remainingFiles: updatedFiles.length
+        });
+
+      } catch (error) {
+        console.error('❌ Error deleting criteria file:', error);
+        res.status(500).json({ 
+          error: 'Failed to delete evaluation criteria file' 
+        });
+      }
+  });
+
+  // ✅ Download/view evaluation criteria file content
+  // SECURITY FIX (P0): Added requireOrgMembership to prevent IDOR
+  app.get('/api/organizations/:orgId/criteria-files/:fileId/content',
+    isAuthenticated,
+    requireOrgMembership,
+    async (req: any, res) => {
+      try {
+        const { orgId, fileId } = req.params;
+        
+        const org = await storage.getOrganization(orgId);
+        if (!org) {
+          return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        const files = Array.isArray(org.evaluationCriteriaFiles) 
+          ? org.evaluationCriteriaFiles 
+          : [];
+
+        const file = files.find((f: any) => f.id === fileId);
+        if (!file) {
+          return res.status(404).json({ error: 'File not found' });
+        }
+
+        // Read file content
+        const physicalPath = path.join(process.cwd(), 'uploads', 'evaluation-criteria', path.basename(file.path));
+        
+        if (!fs.existsSync(physicalPath)) {
+          return res.status(404).json({ 
+            error: 'File not found on disk',
+            details: 'Physical file may have been deleted' 
+          });
+        }
+
+        const content = fs.readFileSync(physicalPath, 'utf-8');
+        const jsonData = JSON.parse(content);
+
+        res.json({
+          success: true,
+          file: {
+            id: file.id,
+            name: file.name,
+            uploadedAt: file.uploadedAt,
+            uploadedBy: file.uploadedBy
+          },
+          content: jsonData
+        });
+
+      } catch (error) {
+        console.error('❌ Error reading criteria file:', error);
+        res.status(500).json({ 
+          error: 'Failed to read evaluation criteria file' 
+        });
+      }
+  });
+
+  app.post('/api/organizations/:orgId/evaluation-criteria-text',
+    isAuthenticated,
+    isOrgAdmin,
+    async (req: any, res) => {
+      try {
+        const { orgId } = req.params;
+        const { criteriaText } = req.body;
+
+        // ✅ Allow undefined or empty string
+        if (criteriaText !== undefined && typeof criteriaText !== 'string') {
+          return res.status(400).json({ error: 'Criteria text must be a string' });
+        }
+
+        const trimmedText = (criteriaText || '').trim();
+
+        // ✅ Validate JSON format only if not empty
+        if (trimmedText !== '') {
+          try {
+            JSON.parse(trimmedText);
+          } catch (e) {
+            return res.status(400).json({ 
+              error: 'Invalid JSON format',
+              details: 'Criteria text must be valid JSON or empty' 
+            });
+          }
+        }
+
+        // Update organization - store empty string if empty
+        await storage.updateOrganization(orgId, {
+          evaluationCriteriaText: trimmedText
+        });
+
+        console.log(`✅ Evaluation criteria text ${trimmedText ? 'saved' : 'cleared'} for org ${orgId}`);
+
+        res.json({
+          success: true,
+          message: trimmedText 
+            ? 'Evaluation criteria saved successfully' 
+            : 'Evaluation criteria cleared successfully'
+        });
+
+      } catch (error) {
+        console.error('❌ Error saving criteria text:', error);
+        res.status(500).json({ 
+          error: 'Failed to save evaluation criteria',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+  });
+
+  // ✅ NEW: Get evaluation criteria text (legacy)
+  app.get('/api/organizations/:orgId/evaluation-criteria-text',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { orgId } = req.params;
+        
+        const org = await storage.getOrganization(orgId);
+        if (!org) {
+          return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        res.json({
+          success: true,
+          criteriaText: org.evaluationCriteriaText || ''
+        });
+
+      } catch (error) {
+        console.error('❌ Error fetching criteria text:', error);
+        res.status(500).json({ 
+          error: 'Failed to fetch evaluation criteria' 
+        });
+      }
+  });
+
+  app.post('/api/projects/:projectId/evaluate',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { projectId } = req.params;
+        const userId = req.user.id;
+
+        // Get project
+        const project = await storage.getProject(projectId);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Get organization
+        const org = await storage.getOrganization(project.orgId);
+        if (!org) {
+          return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        // Determine evaluation criteria source
+        let criteriaFiles = org.evaluationCriteriaFiles || [];
+        let criteriaText = org.evaluationCriteriaText || '';
+
+        // Check if project is linked to a challenge with custom criteria
+        if (project.challengeId) {
+          const [challenge] = await db
+            .select()
+            .from(challenges)
+            .where(eq(challenges.id, project.challengeId));
+
+          if (challenge?.evaluationCriteria && challenge.evaluationCriteria.trim()) {
+            // Prioritize challenge-specific criteria
+            criteriaFiles = [];
+            criteriaText = challenge.evaluationCriteria;
+            console.log('📋 Using challenge-specific evaluation criteria');
+          }
+        }
+
+        if (!criteriaFiles.length && !criteriaText) {
+          return res.status(400).json({
+            error: 'No evaluation criteria configured',
+            details: 'Please configure evaluation criteria in workspace settings first'
+          });
+        }
+
+        const { systemPrompt, files: filesUsed, combined } = await parseEvaluationCriteria(
+          criteriaFiles,
+          criteriaText
+        );
+
+        console.log('📊 Generating evaluation with criteria:', {
+          filesUsed,
+          hasTextCriteria: !!criteriaText,
+          combinedKeys: Object.keys(combined)
+        });
+
+        // Build prompt
+        const userPrompt = buildProjectEvaluationPrompt(project);
+
+        // Check if OpenAI is available
+        if (!openai) {
+          return res.status(503).json({
+            error: 'AI service not configured',
+            details: 'Azure OpenAI credentials are not set'
+          });
+        }
+
+        // ✅ Call Azure OpenAI API with retry logic
+        let attempts = 0;
+        const maxAttempts = 3;
+        let evaluationData = null;
+
+        while (attempts < maxAttempts && !evaluationData) {
+          attempts++;
+          console.log(`🤖 Attempt ${attempts}/${maxAttempts} - Calling Azure OpenAI API...`);
+
+          try {
+            const response = await openai.chat.completions.create({
+              model: '', // Empty string when deployment is in baseURL
+              max_tokens: 4096,
+              temperature: 0.3, // ✅ Lower temperature for more consistent JSON
+              messages: [
+                {
+                  role: 'system',
+                  content: systemPrompt
+                },
+                {
+                  role: 'user',
+                  content: userPrompt
+                }
+              ],
+              response_format: { type: 'json_object' } // Request JSON mode
+            });
+
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+              throw new Error('Unexpected response from Azure OpenAI');
+            }
+
+            console.log('📝 Azure OpenAI response received, length:', content.length);
+            console.log('📄 Response preview:', content.substring(0, 200));
+
+            // ✅ Use robust parser
+            evaluationData = parseEvaluationResponse(content);
+
+            if (!evaluationData) {
+              console.warn(`⚠️ Attempt ${attempts} failed to parse JSON, retrying...`);
+              
+              // Add small delay before retry
+              if (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            } else {
+              console.log(`✅ Successfully parsed evaluation on attempt ${attempts}`);
+            }
+
+          } catch (parseError) {
+            console.error(`❌ Attempt ${attempts} failed:`, parseError);
+            
+            if (attempts >= maxAttempts) {
+              throw parseError;
+            }
+            
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        // ✅ Final validation
+        if (!evaluationData) {
+          console.error('❌ All parsing attempts failed');
+          return res.status(500).json({ 
+            error: 'Failed to parse AI response',
+            details: 'The AI returned invalid JSON format after multiple attempts. Please try again.',
+            hint: 'This might be a temporary issue with the AI service.'
+          });
+        }
+
+        // ✅ Validate data integrity
+        if (typeof evaluationData.overallScore !== 'number' || 
+            evaluationData.overallScore < 0 || 
+            evaluationData.overallScore > 100) {
+          console.warn('⚠️ Invalid overall score, using default');
+          evaluationData.overallScore = 50;
+        }
+
+        if (!Array.isArray(evaluationData.metrics) || evaluationData.metrics.length === 0) {
+          console.warn('⚠️ Invalid or empty metrics array, using defaults');
+          evaluationData.metrics = [
+            {
+              name: 'Market Opportunity',
+              score: 70,
+              rationale: 'Evaluation data incomplete - please regenerate',
+              icon: '📊',
+              trend: 'N/A'
+            }
+          ];
+        }
+
+        if (!Array.isArray(evaluationData.strengths)) {
+          evaluationData.strengths = ['Evaluation incomplete - please regenerate'];
+        }
+
+        if (!Array.isArray(evaluationData.recommendations)) {
+          evaluationData.recommendations = ['Evaluation incomplete - please regenerate'];
+        }
+
+        // Save to database
+        const evaluation = await storage.createProjectEvaluation({
+          projectId,
+          orgId: project.orgId,
+          overallScore: evaluationData.overallScore,
+          metrics: evaluationData.metrics,
+          strengths: evaluationData.strengths,
+          recommendations: evaluationData.recommendations,
+          insights: evaluationData.insights || 'No insights generated',
+          evaluatedBy: userId,
+          criteriaSnapshot: {
+            files: filesUsed,
+            text: criteriaText
+          }
+        });
+
+        console.log(`✅ Evaluation created for project ${projectId}`);
+
+        res.json({
+          success: true,
+          evaluation
+        });
+
+      } catch (error) {
+        console.error('❌ Error generating evaluation:', error);
+        
+        res.status(500).json({ 
+          error: 'Failed to generate evaluation',
+          details: error instanceof Error ? error.message : 'Unknown error',
+          hint: 'Please check your evaluation criteria configuration and try again.'
+        });
+      }
+  });
+
+  // ✅ Get latest evaluation for a project
+  app.get('/api/projects/:projectId/evaluation',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { projectId } = req.params;
+
+        const evaluation = await storage.getLatestProjectEvaluation(projectId);
+
+        if (!evaluation) {
+          return res.status(404).json({ 
+            error: 'No evaluation found',
+            details: 'Generate an evaluation first'
+          });
+        }
+
+        res.json({
+          success: true,
+          evaluation
+        });
+
+      } catch (error) {
+        console.error('❌ Error fetching evaluation:', error);
+        res.status(500).json({ 
+          error: 'Failed to fetch evaluation' 
+        });
+      }
+  });
+
+  // ✅ Get all evaluations for a project (history)
+  app.get('/api/projects/:projectId/evaluations',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { projectId } = req.params;
+
+        const evaluations = await storage.getProjectEvaluations(projectId);
+
+        res.json({
+          success: true,
+          evaluations,
+          total: evaluations.length
+        });
+
+      } catch (error) {
+        console.error('❌ Error fetching evaluations:', error);
+        res.status(500).json({ 
+          error: 'Failed to fetch evaluations' 
+        });
+      }
+  });
+
+  // ✅ Delete evaluation
+  app.delete('/api/projects/:projectId/evaluations/:evaluationId',
+    isAuthenticated,
+    isOrgAdmin,
+    async (req: any, res) => {
+      try {
+        const { evaluationId } = req.params;
+
+        await storage.deleteProjectEvaluation(evaluationId);
+
+        console.log(`✅ Evaluation deleted: ${evaluationId}`);
+
+        res.json({
+          success: true,
+          message: 'Evaluation deleted successfully'
+        });
+
+      } catch (error) {
+        console.error('❌ Error deleting evaluation:', error);
+        res.status(500).json({ 
+          error: 'Failed to delete evaluation' 
+        });
+      }
+  });
+
+  return httpServer;
+}

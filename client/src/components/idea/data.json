@@ -1,0 +1,1202 @@
+[
+    {
+        "id": "fbf188a1-47ae-4ac6-94ba-d18385c85592",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "PITCH_OUTLINE",
+        "title": "Take Care Cat: Launching in Vietnam",
+        "data": {
+            "slides": [
+                {
+                    "title": "Introduction to Take Care Cat",
+                    "content": "Overview of the Take Care Cat brand and its mission.",
+                    "keyPoints": [
+                        "Innovative pet care solutions",
+                        "Focus on cat wellness",
+                        "Unique market positioning"
+                    ],
+                    "slideNumber": 1
+                },
+                {
+                    "title": "Market Opportunity in Vietnam",
+                    "content": "Analysis of the pet care market in Vietnam and growth potential.",
+                    "keyPoints": [
+                        "Growing pet ownership trends",
+                        "Increasing disposable income",
+                        "Untapped market potential"
+                    ],
+                    "slideNumber": 2
+                },
+                {
+                    "title": "Target Audience",
+                    "content": "Identifying the key demographics and psychographics.",
+                    "keyPoints": [
+                        "Urban cat owners",
+                        "Middle to upper-income segments",
+                        "Health-conscious pet parents"
+                    ],
+                    "slideNumber": 3
+                },
+                {
+                    "title": "Product Offering",
+                    "content": "Description of products and services offered by Take Care Cat.",
+                    "keyPoints": [
+                        "Premium cat food",
+                        "Wellness and grooming products",
+                        "Health monitoring services"
+                    ],
+                    "slideNumber": 4
+                },
+                {
+                    "title": "Competitive Analysis",
+                    "content": "Comparison with existing competitors in Vietnam.",
+                    "keyPoints": [
+                        "Limited premium offerings",
+                        "Differentiation through quality",
+                        "Focus on comprehensive care"
+                    ],
+                    "slideNumber": 5
+                },
+                {
+                    "title": "Marketing Strategy",
+                    "content": "Plan for brand awareness and customer acquisition.",
+                    "keyPoints": [
+                        "Digital marketing campaigns",
+                        "Partnerships with local pet stores",
+                        "Community engagement initiatives"
+                    ],
+                    "slideNumber": 6
+                },
+                {
+                    "title": "Sales Strategy",
+                    "content": "Approach to distribution and sales channels.",
+                    "keyPoints": [
+                        "E-commerce platforms",
+                        "Retail partnerships",
+                        "Direct-to-consumer sales"
+                    ],
+                    "slideNumber": 7
+                },
+                {
+                    "title": "Operations Plan",
+                    "content": "Logistics and supply chain management strategy.",
+                    "keyPoints": [
+                        "Local supply chain partnerships",
+                        "Efficient distribution networks",
+                        "Sustainability practices"
+                    ],
+                    "slideNumber": 8
+                },
+                {
+                    "title": "Financial Projections",
+                    "content": "Revenue and profit forecasts for the next 5 years.",
+                    "keyPoints": [
+                        "Expected market share",
+                        "Projected growth rates",
+                        "Break-even analysis"
+                    ],
+                    "slideNumber": 9
+                },
+                {
+                    "title": "Team and Advisors",
+                    "content": "Introduction to the leadership team and advisors.",
+                    "keyPoints": [
+                        "Experienced management team",
+                        "Industry experts",
+                        "Advisory board with local insights"
+                    ],
+                    "slideNumber": 10
+                },
+                {
+                    "title": "Funding Requirements",
+                    "content": "Detailed funding needs for launching in Vietnam.",
+                    "keyPoints": [
+                        "Capital to scale operations",
+                        "Investment in marketing",
+                        "Product development funds"
+                    ],
+                    "slideNumber": 11
+                },
+                {
+                    "title": "Use of Funds",
+                    "content": "Allocation of the requested funding.",
+                    "keyPoints": [
+                        "Marketing and brand awareness",
+                        "Product inventory and supply chain",
+                        "Technology and infrastructure"
+                    ],
+                    "slideNumber": 12
+                },
+                {
+                    "title": "Risk and Mitigation",
+                    "content": "Identifying potential risks and mitigation strategies.",
+                    "keyPoints": [
+                        "Regulatory challenges",
+                        "Market entry barriers",
+                        "Competitive response"
+                    ],
+                    "slideNumber": 13
+                },
+                {
+                    "title": "Impact and Vision",
+                    "content": "Long-term vision and impact of Take Care Cat in Vietnam.",
+                    "keyPoints": [
+                        "Transforming pet care industry",
+                        "Enhancing pet wellness",
+                        "Building a community of cat lovers"
+                    ],
+                    "slideNumber": 14
+                },
+                {
+                    "title": "Conclusion and Next Steps",
+                    "content": "Summary of the pitch and call to action for investors.",
+                    "keyPoints": [
+                        "Exciting investment opportunity",
+                        "Strong market potential",
+                        "Invitation to join us in this journey"
+                    ],
+                    "slideNumber": 15
+                }
+            ],
+            "fundingAsk": {
+                "use": [
+                    {
+                        "amount": "800,000 USD",
+                        "category": "Marketing and brand awareness"
+                    },
+                    {
+                        "amount": "600,000 USD",
+                        "category": "Product inventory and supply chain"
+                    },
+                    {
+                        "amount": "400,000 USD",
+                        "category": "Technology and infrastructure"
+                    },
+                    {
+                        "amount": "200,000 USD",
+                        "category": "Operational expenses"
+                    }
+                ],
+                "amount": "2 million USD"
+            }
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:36:33.334Z",
+        "updatedAt": "2025-11-12T08:36:33.334Z"
+    },
+    {
+        "id": "2f0c4921-4782-40c5-9978-6c7b3d7d0bf2",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "TEAM_ROLES",
+        "title": "Team Roles for Take Care Cat Launch in VN",
+        "data": {
+            "roles": [
+                {
+                    "name": "Venture Lead",
+                    "description": "The key driver for the Take Care Cat venture, overseeing the project launch, strategic alignment, and stakeholder engagement.",
+                    "responsibilities_1": "Define and communicate the overall vision and roadmap for the venture",
+                    "responsibilities_2": "Coordinate cross-functional teams to ensure timely project delivery",
+                    "responsibilities_3": "Engage with investors, partners, and stakeholders to secure resources",
+                    "driving_motivators_1": "Desire to build a successful and impactful business",
+                    "driving_motivators_2": "Passion for animal welfare and the venture's mission",
+                    "driving_motivators_3": "Commitment to fostering team collaboration and innovation",
+                    "personal_attributes_1": "Strong leadership and decision-making skills",
+                    "personal_attributes_2": "Excellent communication and networking abilities",
+                    "personal_attributes_3": "Resilience and adaptability to navigate challenges"
+                },
+                {
+                    "name": "Tech Lead",
+                    "description": "Responsible for the technical development and maintenance of the Take Care Cat platform, ensuring robust and scalable solutions.",
+                    "responsibilities_1": "Lead the design and implementation of the platform architecture",
+                    "responsibilities_2": "Ensure high-quality code standards and technical documentation",
+                    "responsibilities_3": "Evaluate and integrate new technologies to enhance platform features",
+                    "driving_motivators_1": "Passion for creating innovative technical solutions",
+                    "driving_motivators_2": "Interest in leveraging technology for animal care",
+                    "driving_motivators_3": "Continuous learning and professional growth",
+                    "personal_attributes_1": "Strong problem-solving and analytical skills",
+                    "personal_attributes_2": "Expertise in relevant programming languages and technologies",
+                    "personal_attributes_3": "Ability to work collaboratively in a fast-paced environment"
+                },
+                {
+                    "name": "Marketing Lead",
+                    "description": "Drives brand awareness, customer acquisition, and engagement for Take Care Cat through strategic marketing efforts.",
+                    "responsibilities_1": "Develop and execute comprehensive marketing strategies",
+                    "responsibilities_2": "Identify and optimize customer acquisition channels",
+                    "responsibilities_3": "Analyze marketing performance metrics and adjust campaigns as needed",
+                    "driving_motivators_1": "Desire to create impactful marketing campaigns",
+                    "driving_motivators_2": "Interest in building a loyal customer base",
+                    "driving_motivators_3": "Excitement about growing a brand in the pet care industry",
+                    "personal_attributes_1": "Creative thinker with a strong understanding of digital marketing",
+                    "personal_attributes_2": "Data-driven mindset with excellent analytical skills",
+                    "personal_attributes_3": "Strong communication and storytelling abilities"
+                },
+                {
+                    "name": "Finance Lead",
+                    "description": "Oversees financial planning, budgeting, and resource allocation to ensure the venture's financial health and sustainability.",
+                    "responsibilities_1": "Manage financial forecasting, budgeting, and reporting",
+                    "responsibilities_2": "Develop fundraising strategies and maintain investor relations",
+                    "responsibilities_3": "Ensure compliance with financial regulations and risk management",
+                    "driving_motivators_1": "Commitment to ensuring the venture's financial success",
+                    "driving_motivators_2": "Desire to optimize financial resources for maximum impact",
+                    "driving_motivators_3": "Passion for supporting business growth through smart financial decisions",
+                    "personal_attributes_1": "Strong analytical and financial modeling skills",
+                    "personal_attributes_2": "Detail-oriented with high accuracy in financial reporting",
+                    "personal_attributes_3": "Strategic thinker with a focus on financial sustainability"
+                },
+                {
+                    "name": "Operations Lead",
+                    "description": "Ensures efficient day-to-day operations, process optimization, and logistical excellence for the Take Care Cat venture.",
+                    "responsibilities_1": "Design and implement operational processes and systems",
+                    "responsibilities_2": "Manage supply chain, logistics, and vendor relationships",
+                    "responsibilities_3": "Track operational metrics to ensure quality and efficiency",
+                    "driving_motivators_1": "Passion for creating efficient operational systems",
+                    "driving_motivators_2": "Desire to solve operational challenges and improve processes",
+                    "driving_motivators_3": "Commitment to enabling team focus on growth and innovation",
+                    "personal_attributes_1": "Strong organizational and project management skills",
+                    "personal_attributes_2": "Proactive problem solver with a process improvement mindset",
+                    "personal_attributes_3": "Ability to manage multiple priorities and work under pressure"
+                }
+            ]
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:36:11.050Z",
+        "updatedAt": "2025-11-12T08:36:11.050Z"
+    },
+    {
+        "id": "cadde123-5805-40a9-ac98-bcdab5d37e87",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "TAM_SAM_SOM",
+        "title": "Market Size Analysis for Take Care Cat in Vietnam",
+        "data": {
+            "sam": {
+                "value": 100000000,
+                "method": "Bottom-up",
+                "currency": "USD",
+                "description": "SAM focuses on urban cat owners who are more likely to spend on premium care services.",
+                "geographicScope": "Urban areas in Vietnam"
+            },
+            "som": {
+                "value": 10000000,
+                "method": "Value theory",
+                "currency": "USD",
+                "timeline": "5 years",
+                "captureRate": "10%",
+                "description": "SOM is based on capturing 10% of the SAM within 5 years through targeted marketing and service differentiation."
+            },
+            "tam": {
+                "value": 500000000,
+                "method": "Top-down",
+                "sources": [
+                    "Statista",
+                    "Vietnam Pet Market Report",
+                    "Euromonitor International"
+                ],
+                "currency": "USD",
+                "description": "The TAM represents the entire potential market for cat care services and products in Vietnam, including all cat owners."
+            },
+            "assumptions": [
+                {
+                    "impact": "If incorrect, SAM could be overestimated.",
+                    "assumption": "Urban cat owners are more likely to spend on premium services.",
+                    "confidence": "high"
+                },
+                {
+                    "impact": "If incorrect, initial revenue projections may fall short.",
+                    "assumption": "Market can be penetrated by 0.5% in the first year.",
+                    "confidence": "medium"
+                },
+                {
+                    "impact": "If incorrect, long-term revenue goals may need adjustment.",
+                    "assumption": "10% of SAM can be captured within 5 years.",
+                    "confidence": "medium"
+                },
+                {
+                    "impact": "If incorrect, customer acquisition costs could rise.",
+                    "assumption": "Marketing efforts will effectively reach target customers.",
+                    "confidence": "medium"
+                }
+            ],
+            "marketTrends": [
+                "Increasing pet ownership in urban areas",
+                "Growing awareness of pet health and wellness",
+                "Rise in disposable income among Vietnamese households"
+            ],
+            "growthDrivers": [
+                "Urbanization leading to higher pet ownership",
+                "Cultural shift towards pet companionship",
+                "Expansion of online retail channels for pet products"
+            ],
+            "marketPenetration": {
+                "year1": {
+                    "revenue": "$500,000",
+                    "customers": 1000,
+                    "percentage": "0.5%"
+                },
+                "year3": {
+                    "revenue": "$2,500,000",
+                    "customers": 5000,
+                    "percentage": "2.5%"
+                },
+                "year5": {
+                    "revenue": "$5,000,000",
+                    "customers": 10000,
+                    "percentage": "5%"
+                }
+            },
+            "revenueProjection": {
+                "year1": {
+                    "value": "$500,000",
+                    "revenue": "$500,000"
+                },
+                "year3": {
+                    "value": "$2,500,000",
+                    "revenue": "$2,500,000"
+                },
+                "year5": {
+                    "value": "$5,000,000",
+                    "revenue": "$5,000,000"
+                }
+            }
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:35:40.645Z",
+        "updatedAt": "2025-11-12T08:35:40.645Z"
+    },
+    {
+        "id": "414fb8fc-a5f2-41aa-b4ca-7c03eebb9aa7",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "COMPETITOR_MAP",
+        "title": "Competitor Analysis for Take Care Cat in Vietnam",
+        "data": {
+            "threats": [
+                "Established competitors with significant market share",
+                "Price wars among players",
+                "Increasing operational costs",
+                "Consumer loyalty to existing brands",
+                "Entry of international players"
+            ],
+            "overview": "The pet care market in Vietnam is growing rapidly, driven by an increasing number of pet owners and a rising middle class. The market is characterized by a mix of local and international competitors, each vying for market share through diverse service offerings and pricing strategies.",
+            "marketGaps": [
+                "Lack of specialized pet healthcare services",
+                "Limited availability of organic pet products",
+                "Few options for pet insurance",
+                "Inadequate pet-friendly public spaces",
+                "Scarcity of comprehensive pet training programs"
+            ],
+            "competitors": [
+                {
+                    "name": "Pet Mart Vietnam",
+                    "pricing": "Mid-market: $10-200 per product",
+                    "threats": [
+                        "Strong brand loyalty can limit new entrants",
+                        "Ability to leverage economies of scale"
+                    ],
+                    "strengths": [
+                        "Extensive retail network",
+                        "Strong brand recognition",
+                        "Diverse product offerings",
+                        "Established supply chain",
+                        "Comprehensive customer loyalty program"
+                    ],
+                    "weaknesses": [
+                        "Higher pricing compared to local competitors",
+                        "Limited online presence",
+                        "Potential over-reliance on physical stores"
+                    ],
+                    "description": "Pet Mart is a leading pet retail chain in Vietnam offering a wide range of pet products and services.",
+                    "keyProducts": [
+                        "Pet food",
+                        "Pet accessories",
+                        "Grooming services",
+                        "Veterinary care"
+                    ],
+                    "marketShare": "~35% (Market leader)",
+                    "opportunities": [
+                        "Focus on online retail can open new channels",
+                        "Expansion into rural areas"
+                    ],
+                    "marketPosition": "Market Leader",
+                    "targetAudience": "Urban pet owners",
+                    "competitiveAdvantage": [
+                        "Established brand reputation",
+                        "Nationwide retail presence",
+                        "Comprehensive product range"
+                    ]
+                },
+                {
+                    "name": "FamiPet",
+                    "pricing": "Premium: $50-300 per service",
+                    "threats": [
+                        "Attracts high-spending customers",
+                        "Enhances customer experience with premium services"
+                    ],
+                    "strengths": [
+                        "Premium product lineup",
+                        "High customer satisfaction",
+                        "Modern stores with appealing design"
+                    ],
+                    "weaknesses": [
+                        "Higher price point",
+                        "Limited geographic reach",
+                        "Relatively small market share"
+                    ],
+                    "description": "FamiPet is a growing pet care provider focusing on premium pet services and products.",
+                    "keyProducts": [
+                        "Luxury pet grooming",
+                        "Premium pet food",
+                        "Pet health supplements"
+                    ],
+                    "marketShare": "15-20%",
+                    "opportunities": [
+                        "Expand to mid-range products",
+                        "Increase online marketing efforts"
+                    ],
+                    "marketPosition": "Strong Challenger",
+                    "targetAudience": "Affluent pet owners",
+                    "competitiveAdvantage": [
+                        "High-quality service standards",
+                        "Exclusive product offerings"
+                    ]
+                },
+                {
+                    "name": "PetCity",
+                    "pricing": "Economy: $5-150 per product",
+                    "threats": [
+                        "Aggressive online sales strategy",
+                        "Broadening product catalog"
+                    ],
+                    "strengths": [
+                        "Competitive pricing",
+                        "Growing online presence",
+                        "Wide range of products"
+                    ],
+                    "weaknesses": [
+                        "Inconsistent service quality",
+                        "Limited premium product range",
+                        "Smaller customer base"
+                    ],
+                    "description": "PetCity is a well-known pet retailer offering competitive prices and a variety of pet products.",
+                    "keyProducts": [
+                        "Affordable pet food",
+                        "Basic pet accessories",
+                        "Pet toys"
+                    ],
+                    "marketShare": "5% (Growing rapidly)",
+                    "opportunities": [
+                        "Invest in customer service training",
+                        "Introduce loyalty programs"
+                    ],
+                    "marketPosition": "Emerging Player",
+                    "targetAudience": "Price-sensitive pet owners",
+                    "competitiveAdvantage": [
+                        "Lower cost structure",
+                        "Expanding e-commerce capabilities"
+                    ]
+                }
+            ],
+            "recommendations": [
+                "Develop a strong online presence and e-commerce platform",
+                "Focus on differentiated services, such as specialized healthcare",
+                "Implement competitive pricing strategies",
+                "Foster community engagement through pet events",
+                "Invest in customer service excellence",
+                "Leverage technology for personalized marketing"
+            ],
+            "competitiveAdvantages": [
+                "Potential to offer innovative digital solutions",
+                "Ability to tailor services to local needs",
+                "Opportunity to build strong community engagement",
+                "Flexibility to adapt pricing strategies",
+                "Potential to leverage technology for customer insights"
+            ]
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:35:25.978Z",
+        "updatedAt": "2025-11-12T08:35:25.978Z"
+    },
+    {
+        "id": "ab376af0-32f2-45bf-b5fc-735a533e4030",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "BRAND_WHEEL",
+        "title": "Take Care Cat Brand Wheel",
+        "data": {
+            "vision": "To become the most trusted cat care provider in Vietnam, known for our commitment to excellence and innovation. We envision a future where every cat receives the love and care they deserve, and where pet owners have peace of mind knowing their companions are in expert hands.",
+            "mission": "To provide exceptional care for cats by offering reliable and innovative pet services that enhance their well-being. Our mission is to create a supportive environment for cat owners in Vietnam, ensuring their pets receive the highest quality of care and attention.",
+            "personality": "Caring (always prioritizing the well-being of cats), Innovative (seeking new ways to enhance pet care), Reliable (dependable and trustworthy in all interactions), Friendly (approachable and warm to both pets and owners), Knowledgeable (expertise in feline care), Empathetic (understanding the needs of cats and their owners)",
+            "brand_values": "Compassion (showing genuine care for every cat), Innovation (embracing new technologies for better care), Reliability (providing consistent and dependable services), Expertise (leveraging deep knowledge of feline behavior), Community (building a supportive network of cat lovers), Integrity (maintaining honest and transparent practices)",
+            "brand_positioning": "As the pioneering cat care service in Vietnam, we stand out by combining traditional pet care practices with cutting-edge technology to deliver unmatched service quality. Our brand is synonymous with trust, love, and a deep understanding of feline needs, setting us apart from other pet care providers."
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:34:41.776Z",
+        "updatedAt": "2025-11-12T08:34:41.776Z"
+    },
+    {
+        "id": "be52d087-11fd-4cff-a81c-bf4a1a99f18d",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "MARKETING_PLAN",
+        "title": "Take Care Cat: 12-Month Marketing Plan for Vietnam Launch",
+        "data": {
+            "budget": {
+                "total": "$100,000 annually",
+                "breakdown": [
+                    {
+                        "amount": "$25,000",
+                        "channel": "Social Media Marketing",
+                        "percentage": 25
+                    },
+                    {
+                        "amount": "$20,000",
+                        "channel": "Content Marketing & SEO",
+                        "percentage": 20
+                    },
+                    {
+                        "amount": "$20,000",
+                        "channel": "Email Marketing",
+                        "percentage": 20
+                    },
+                    {
+                        "amount": "$15,000",
+                        "channel": "Events & Partnerships",
+                        "percentage": 15
+                    },
+                    {
+                        "amount": "$10,000",
+                        "channel": "Paid Advertising",
+                        "percentage": 10
+                    },
+                    {
+                        "amount": "$10,000",
+                        "channel": "Brand & Creative",
+                        "percentage": 10
+                    }
+                ]
+            },
+            "funnel": {
+                "awareness": [
+                    "Social media campaigns targeting cat owners",
+                    "Content marketing through blogs and pet advice columns",
+                    "SEO for top cat care keywords",
+                    "Influencer partnerships with pet influencers",
+                    "PR and media coverage in pet-related publications"
+                ],
+                "retention": [
+                    "Loyalty programs with exclusive offers",
+                    "Regular follow-up emails with pet care tips",
+                    "Customer feedback surveys",
+                    "Exclusive content for community members",
+                    "Interactive social media campaigns for engagement"
+                ],
+                "conversion": [
+                    "Limited-time promotions and discounts",
+                    "Personalized email follow-ups with purchase incentives",
+                    "Live chat support for product inquiries",
+                    "Simplified checkout process",
+                    "Customer testimonials on product pages"
+                ],
+                "consideration": [
+                    "Email campaigns with care tips and product info",
+                    "Webinars on cat health and wellness",
+                    "Case studies showcasing product effectiveness",
+                    "Free samples at pet events",
+                    "Retargeting ads for website visitors"
+                ]
+            },
+            "channels": {
+                "budget": "$100,000 annually",
+                "digital": [
+                    "Social Media (Facebook/Instagram) - Engaging content and influencer partnerships",
+                    "Email Marketing - Personalized newsletters and promotions",
+                    "SEO/Content Marketing - Blog posts and expert advice",
+                    "Online Communities - Engage with pet forums and groups",
+                    "E-commerce Platforms - Targeted ads and promotions"
+                ],
+                "traditional": [
+                    "Print Ads in Pet Magazines",
+                    "Participation in Pet Trade Shows",
+                    "Direct Mail Campaigns"
+                ]
+            },
+            "timeline": [
+                {
+                    "phase": "Q1: Launch Preparation",
+                    "duration": "3 months",
+                    "activities": [
+                        "Develop brand identity and messaging",
+                        "Set up website with SEO optimization",
+                        "Create social media profiles and initial content",
+                        "Develop lead magnets (e.g., ebooks, guides)",
+                        "Establish email marketing automation",
+                        "Engage with pet influencers and partners",
+                        "Set up analytics and tracking tools"
+                    ]
+                },
+                {
+                    "phase": "Q2-Q3: Growth and Engagement",
+                    "duration": "6 months",
+                    "activities": [
+                        "Launch targeted social media campaigns",
+                        "Expand blog and content production",
+                        "Host monthly webinars on cat care",
+                        "Implement and promote loyalty program",
+                        "Increase presence in online pet communities",
+                        "Run promotional campaigns and discounts",
+                        "Secure media features in pet magazines"
+                    ]
+                },
+                {
+                    "phase": "Q4: Optimization and Retention",
+                    "duration": "3 months",
+                    "activities": [
+                        "Analyze and optimize high-performing channels",
+                        "Scale budget for successful campaigns",
+                        "Enhance customer loyalty initiatives",
+                        "Launch holiday/seasonal marketing campaigns",
+                        "Focus on conversion rate optimization",
+                        "Build and engage customer community",
+                        "Plan strategy for the next year"
+                    ]
+                }
+            ],
+            "messaging": {
+                "brandVoice": "Friendly, trustworthy, and knowledgeable with a touch of warmth.",
+                "keyMessages": [
+                    "Keep your cat healthy and happy with our premium products.",
+                    "Trusted by pet owners for quality and safety.",
+                    "Sustainably sourced ingredients for eco-friendly pet care.",
+                    "Convenient solutions for busy urban pet owners.",
+                    "Join a community of cat lovers who care."
+                ],
+                "valueProposition": "Premium cat care products designed for the health and happiness of your feline friends."
+            },
+            "targeting": {
+                "demographics": [
+                    "Ages 25-45",
+                    "Middle to upper-middle class income",
+                    "Urban residents",
+                    "University educated",
+                    "Professionals and young families"
+                ],
+                "psychographics": [
+                    "Health-conscious",
+                    "Value quality and convenience",
+                    "Animal lovers",
+                    "Concerned with sustainability",
+                    "Seek trust and reliability in brands"
+                ],
+                "primaryAudience": "Pet owners in urban areas who prioritize the health and well-being of their cats."
+            }
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:34:32.413Z",
+        "updatedAt": "2025-11-12T08:34:32.413Z"
+    },
+    {
+        "id": "e4909af2-1838-41ca-a3af-c10e444efb0c",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "JOURNEY_MAP",
+        "title": "Customer Journey Map for 'Take Care Cat' Launch in Vietnam",
+        "data": {
+            "stages": [
+                {
+                    "name": "Awareness",
+                    "actions": [
+                        "See social media ads",
+                        "Hear about the product from friends",
+                        "Read online reviews"
+                    ],
+                    "emotions": [
+                        "Curiosity",
+                        "Interest"
+                    ],
+                    "painPoints": [
+                        "Skepticism about product effectiveness",
+                        "Overwhelming choices in the market"
+                    ],
+                    "description": "The potential customer becomes aware of the 'Take Care Cat' product.",
+                    "touchpoints": [
+                        "Social media platforms",
+                        "Word of mouth",
+                        "Online blogs"
+                    ],
+                    "opportunities": [
+                        "Engage with informative and eye-catching ads",
+                        "Use testimonials to build trust"
+                    ]
+                },
+                {
+                    "name": "Consideration",
+                    "actions": [
+                        "Compare with other cat care products",
+                        "Visit the product website",
+                        "Consult with other pet owners"
+                    ],
+                    "emotions": [
+                        "Hopefulness",
+                        "Skepticism"
+                    ],
+                    "painPoints": [
+                        "Confusion over product benefits",
+                        "Difficulty in finding reliable information"
+                    ],
+                    "description": "The customer evaluates 'Take Care Cat' as a potential choice.",
+                    "touchpoints": [
+                        "Product website",
+                        "Online comparison sites",
+                        "Pet owner forums"
+                    ],
+                    "opportunities": [
+                        "Provide clear product benefits",
+                        "Offer detailed FAQs"
+                    ]
+                },
+                {
+                    "name": "Purchase",
+                    "actions": [
+                        "Add product to cart",
+                        "Complete online purchase",
+                        "Receive confirmation email"
+                    ],
+                    "emotions": [
+                        "Excitement",
+                        "Anxiety about purchase"
+                    ],
+                    "painPoints": [
+                        "Complicated checkout process",
+                        "Concerns about payment security"
+                    ],
+                    "description": "The customer decides to purchase 'Take Care Cat'.",
+                    "touchpoints": [
+                        "E-commerce platform",
+                        "Email",
+                        "Payment gateway"
+                    ],
+                    "opportunities": [
+                        "Simplify checkout process",
+                        "Offer secure payment options"
+                    ]
+                },
+                {
+                    "name": "Experience",
+                    "actions": [
+                        "Unbox the product",
+                        "Follow usage instructions",
+                        "Observe cat's reaction"
+                    ],
+                    "emotions": [
+                        "Satisfaction",
+                        "Concern about product effectiveness"
+                    ],
+                    "painPoints": [
+                        "Complicated instructions",
+                        "Lack of immediate results"
+                    ],
+                    "description": "The customer uses 'Take Care Cat' for the first time.",
+                    "touchpoints": [
+                        "Product packaging",
+                        "Instruction manual",
+                        "Customer support"
+                    ],
+                    "opportunities": [
+                        "Provide easy-to-follow instructions",
+                        "Offer customer support for queries"
+                    ]
+                },
+                {
+                    "name": "Advocacy",
+                    "actions": [
+                        "Leave a product review",
+                        "Recommend to friends",
+                        "Share on social media"
+                    ],
+                    "emotions": [
+                        "Loyalty",
+                        "Pride in sharing"
+                    ],
+                    "painPoints": [
+                        "Lack of incentive to share",
+                        "Negative feedback from others"
+                    ],
+                    "description": "The customer shares their experience with 'Take Care Cat' with others.",
+                    "touchpoints": [
+                        "Review websites",
+                        "Social media platforms",
+                        "Word of mouth"
+                    ],
+                    "opportunities": [
+                        "Encourage reviews with incentives",
+                        "Create a community for sharing experiences"
+                    ]
+                }
+            ],
+            "persona": "Cat Owner in Vietnam"
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:34:12.264Z",
+        "updatedAt": "2025-11-12T08:34:12.264Z"
+    },
+    {
+        "id": "871ca8ed-b195-43d1-87c3-3b39b8a1c3e5",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "INTERVIEW_QUESTIONS",
+        "title": "Customer Interview Questions for 'Take Care Cat' Business Idea",
+        "data": {
+            "wrapUp": {
+                "question_14": "Is there anything else about cat care that we haven't discussed?",
+                "question_15": "Do you know anyone else who faces similar cat care challenges that we could talk to?",
+                "question_16": "On a scale of 1-10, how interested would you be in trying a new cat care solution like this?"
+            },
+            "inDepth": {
+                "question_1": "Can you describe your current routine for taking care of your cat?",
+                "question_2": "What are the biggest challenges you face in caring for your cat?",
+                "question_3": "How do you currently find solutions when you have a problem with your cat's care?",
+                "question_4": "What have you tried so far to improve your cat care routine?",
+                "question_5": "What would an ideal cat care solution look like for you?",
+                "question_6": "How much time do you spend on cat care each week?",
+                "question_7": "What concerns or hesitations do you have about using a new cat care service?",
+                "question_8": "Who else is involved in the decision-making process for cat care solutions in your household?",
+                "question_9": "What are the biggest frustrations with existing cat care solutions?",
+                "question_10": "How important is finding a better cat care solution to you, on a scale of 1-10?"
+            },
+            "demographic": {
+                "question_11": "What is your role or occupation?",
+                "question_12": "How long have you been a cat owner?",
+                "question_13": "What geographic area do you live in?"
+            }
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:33:53.957Z",
+        "updatedAt": "2025-11-12T08:33:53.957Z"
+    },
+    {
+        "id": "72acf91c-f3f7-4fc6-a1d1-6c743f558d60",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "USER_STORIES",
+        "title": "User Stories for Take Care Cat - VN Launch",
+        "data": {
+            "stories": [
+                {
+                    "userStory": "As a new user, I want to register for an account using my email, so that I can start using the Take Care Cat app.",
+                    "acceptanceCriteria": "User should be able to navigate to the registration page. User should be able to input email, password, and confirm password. System should send a confirmation email within 5 minutes. User should be able to confirm email by clicking the link. User should see an error message if the email is already registered or invalid."
+                },
+                {
+                    "userStory": "As a cat owner, I want to schedule a feeding reminder, so that I can ensure my cat is fed on time.",
+                    "acceptanceCriteria": "User should be able to set a feeding schedule from the app. User should receive a notification at the scheduled time. User should be able to snooze or dismiss the notification. If the app is offline, the user should still receive a notification."
+                },
+                {
+                    "userStory": "As a registered user, I want to update my profile information, so that my account reflects my current details.",
+                    "acceptanceCriteria": "User should be able to navigate to the profile page. User should be able to edit name, contact information, and address. Changes should be saved upon submission. User should see a confirmation message after successful update. User should see an error message if any required field is empty or invalid."
+                },
+                {
+                    "userStory": "As a cat owner, I want to track my cat's vaccination records, so that I can keep up to date with their health needs.",
+                    "acceptanceCriteria": "User should be able to add vaccination details including date, type, and vet information. User should be able to upload a vaccination certificate. System should notify user a week before the next vaccination is due. User should be able to view and edit vaccination history."
+                },
+                {
+                    "userStory": "As a user, I want to access customer support through the app, so that I can get help with any issues I encounter.",
+                    "acceptanceCriteria": "User should be able to navigate to the support section. User should be able to choose between live chat, email, or FAQs. System should connect user to a support agent within 5 minutes if live chat is selected. User should receive an acknowledgment email if email support is chosen. FAQs should cover common issues and be searchable."
+                }
+            ]
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:33:44.149Z",
+        "updatedAt": "2025-11-12T08:33:44.149Z"
+    },
+    {
+        "id": "64dde5bd-8904-4c39-822d-f64bbbbab802",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "SWOT",
+        "title": "SWOT Analysis for Take Care Cat Launch in Vietnam",
+        "data": {
+            "threats": [
+                "Intense competition from established local brands",
+                "Potential regulatory changes affecting pet care products",
+                "Cultural differences in pet care practices",
+                "Economic fluctuations impacting consumer spending"
+            ],
+            "strengths": [
+                "Strong brand reputation in pet care industry",
+                "High-quality and innovative cat care products",
+                "Experienced management team with knowledge of Asian markets",
+                "Established supply chain and logistics network"
+            ],
+            "weaknesses": [
+                "Limited brand recognition in Vietnam",
+                "Higher price point compared to local competitors",
+                "Dependence on international suppliers for raw materials",
+                "Lack of localized marketing strategies"
+            ],
+            "opportunities": [
+                "Growing pet ownership trend in Vietnam",
+                "Increasing disposable income among Vietnamese consumers",
+                "Expansion of e-commerce platforms in Vietnam",
+                "Potential to partner with local pet stores for distribution"
+            ]
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:33:03.509Z",
+        "updatedAt": "2025-11-12T08:33:03.509Z"
+    },
+    {
+        "id": "2acb5e26-9144-44ff-89e1-2e65dd61b2d4",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "PERSONA",
+        "title": "Personas for 'Take Care Cat' in Vietnam",
+        "data": {
+            "personas": [
+                {
+                    "age": 29,
+                    "name": "Fatima Al Mansouri",
+                    "role": "Marketing Manager",
+                    "goals": [
+                        "Ensure my cat is healthy and happy",
+                        "Find reliable pet care services",
+                        "Balance work and pet responsibilities",
+                        "Connect with other pet owners",
+                        "Access affordable pet care products"
+                    ],
+                    "quote": "My cat is like my family, and I want the best care for her.",
+                    "income": "$45,000/year",
+                    "channels": [
+                        "Facebook",
+                        "Instagram",
+                        "Local pet stores",
+                        "Veterinary clinics"
+                    ],
+                    "industry": "Retail",
+                    "location": "Dubai, UAE",
+                    "behaviors": [
+                        "Uses social media to connect with pet communities",
+                        "Shops online for pet products",
+                        "Regularly visits pet forums",
+                        "Seeks advice from veterinarians",
+                        "Prefers convenient and quick services"
+                    ],
+                    "education": "Bachelor's Degree in Business Administration",
+                    "painPoints": [
+                        "Limited time to take care of my cat",
+                        "Finding trustworthy pet sitters",
+                        "Lack of quality pet care products",
+                        "High cost of veterinary services",
+                        "Difficulty in finding cat-friendly spaces"
+                    ]
+                },
+                {
+                    "age": 35,
+                    "name": "Omar Al Falasi",
+                    "role": "Software Developer",
+                    "goals": [
+                        "Keep my cat entertained and active",
+                        "Stay informed about the latest in pet care",
+                        "Find tech solutions for pet care",
+                        "Create a safe environment for my cat",
+                        "Reduce pet care costs"
+                    ],
+                    "quote": "Technology should make it easier to care for my pet.",
+                    "income": "$55,000/year",
+                    "channels": [
+                        "LinkedIn",
+                        "YouTube",
+                        "Tech blogs",
+                        "Pet care apps"
+                    ],
+                    "industry": "Technology",
+                    "location": "Abu Dhabi, UAE",
+                    "behaviors": [
+                        "Researches tech solutions for pet care",
+                        "Participates in online pet care webinars",
+                        "Follows pet influencers for tips",
+                        "Uses mobile apps for pet management",
+                        "Prefers automated pet care solutions"
+                    ],
+                    "education": "Master's Degree in Computer Science",
+                    "painPoints": [
+                        "Finding time to play with my cat",
+                        "Identifying reliable pet gadgets",
+                        "Managing pet expenses",
+                        "Locating trustworthy pet care information",
+                        "Integrating pet care into a busy schedule"
+                    ]
+                },
+                {
+                    "age": 22,
+                    "name": "Aisha Al Suwaidi",
+                    "role": "University Student",
+                    "goals": [
+                        "Learn more about pet care",
+                        "Meet other pet owners",
+                        "Find affordable pet care solutions",
+                        "Ensure my cat's well-being on a student budget",
+                        "Balance studies and pet care"
+                    ],
+                    "quote": "As a student, I need to learn how to care for my cat without overspending.",
+                    "income": "$12,000/year",
+                    "channels": [
+                        "TikTok",
+                        "Online student forums",
+                        "University events",
+                        "Pet care workshops"
+                    ],
+                    "industry": "Education",
+                    "location": "Sharjah, UAE",
+                    "behaviors": [
+                        "Engages in online pet communities",
+                        "Seeks budget-friendly pet care options",
+                        "Attends pet care workshops and events",
+                        "Watches videos for pet care tips",
+                        "Uses student discounts for pet products"
+                    ],
+                    "education": "Bachelor's Degree in Progress",
+                    "painPoints": [
+                        "Limited budget for pet expenses",
+                        "Inexperience in pet care",
+                        "Finding reliable advice and resources",
+                        "Managing time between studies and pet care",
+                        "Access to affordable pet care products"
+                    ]
+                }
+            ]
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:33:27.512Z",
+        "updatedAt": "2025-11-12T08:29:56.724Z"
+    },
+    {
+        "id": "15ecba70-b2a8-4a1e-8843-3e69441963f5",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "BRAND_IDENTITY",
+        "title": "Take Care Cat Brand Identity",
+        "data": {
+            "color_des": "The lavender color palette is inspired by the calming and nurturing essence of cat companionship, symbolizing tranquility and care that Initial Conversation aims to provide to every feline friend and owner.",
+            "logo_idea": "The logo features a stylized silhouette of a cat intertwined with a heart, symbolizing the deep bond and care Initial Conversation fosters between pets and their owners. The flowing lines emphasize grace and affection, capturing the essence of companionship.",
+            "typography": "The brand uses Comfortaa as the main font for its rounded, friendly appearance, which mirrors the comforting nature of caring for cats. This is complemented by Montserrat for its modern and clean look, ensuring readability and a contemporary feel.",
+            "brand_voice": "The brand voice is compassionate, reassuring, and knowledgeable, designed to offer expert advice and comfort to cat owners. We communicate with empathy and clarity, making cat care accessible and straightforward.",
+            "color_hex_1": "#E6E6FA",
+            "color_hex_2": "#D8BFD8",
+            "color_hex_3": "#C8A2C8",
+            "color_hex_4": "#7C5271",
+            "color_hex_5": "#5B3758",
+            "brand_values": "Compassion (providing loving care for every cat), Expertise (offering knowledgeable guidance), Trust (building reliable relationships), Community (fostering a network of cat lovers)",
+            "color_name_1": "Light Lavender",
+            "color_name_2": "Lavender Mist",
+            "color_name_3": "Lavender",
+            "color_name_4": "Royal Lavender",
+            "color_name_5": "Deep Lavender",
+            "customer_promise": "We promise to offer comprehensive and loving care solutions for your feline friends, ensuring their well-being and happiness while providing you with peace of mind.",
+            "imagery_photography": "Imagery highlights serene and playful moments between cats and their owners, captured in warm, natural lighting to emphasize authenticity and emotional connections. Photos showcase a mix of indoor comfort and outdoor exploration, reflecting a balanced cat lifestyle.",
+            "brand_personality_traits": "Compassionate, Trustworthy, Knowledgeable, Friendly, Supportive"
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:35:01.430Z",
+        "updatedAt": "2025-11-12T08:28:43.318Z"
+    },
+    {
+        "id": "ba0dbf4a-368d-4f9d-a579-837a2cf6771b",
+        "projectId": "fa80d059-c885-4b51-b631-77c6ea92074d",
+        "kind": "LEAN_CANVAS",
+        "title": "Take Care Cat Lean Canvas",
+        "data": {
+            "problem": [
+                "Busy professionals lack time for cat care",
+                "Limited access to high-quality cat grooming services",
+                "Difficulty finding reliable cat sitters",
+                "Lack of trustworthy information on cat care services in UAE",
+                "High costs of cat care services"
+            ],
+            "channels": [
+                "Mobile application",
+                "Social media marketing",
+                "Partnerships with veterinary clinics",
+                "Online advertising",
+                "Collaboration with pet supply stores"
+            ],
+            "solution": [
+                "On-demand cat grooming services with home visits",
+                "Subscription-based cat care packages",
+                "Trusted and rated cat sitters available through app",
+                "Providing reliable information on care services via app",
+                "Offering discounts and special deals for subscribers"
+            ],
+            "keyMetrics": [
+                "Number of active monthly subscribers",
+                "Customer satisfaction ratings",
+                "Service repeat usage rate",
+                "Daily app engagement rate",
+                "Number of new partnerships with veterinary clinics"
+            ],
+            "costStructure": [
+                "Labor costs for professional services",
+                "Marketing and customer acquisition",
+                "Technology and app maintenance",
+                "Content and information development",
+                "Transportation for home visit services"
+            ],
+            "revenueStreams": [
+                "Subscription fees",
+                "One-time service fees",
+                "Affiliate product sales",
+                "In-app paid advertising",
+                "Sponsorships and partnerships"
+            ],
+            "unfairAdvantage": "Exclusive network of certified and trusted cat care professionals in the UAE.",
+            "customerSegments": [
+                "Urban professionals with cats",
+                "Elderly cat owners needing assistance",
+                "Households owning multiple cats"
+            ],
+            "uniqueValueProposition": "Convenient, reliable, and high-quality cat care solutions for busy cat owners in the UAE."
+        },
+        "markdown": null,
+        "language": "en",
+        "html": null,
+        "diagram": null,
+        "createdById": "37bba501-6e5e-4a2d-8843-c93e1769fb6e",
+        "createdAt": "2025-11-12T08:32:51.822Z",
+        "updatedAt": "2025-11-12T07:27:27.377Z"
+    }
+]

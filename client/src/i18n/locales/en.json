@@ -1,0 +1,1953 @@
+{
+  "newChat": {
+    "title": "Create conversation",
+    "choose": "Choose how to build your conversation",
+    "buildWithAI": "Build with AI",
+    "buildManual": "Build manually",
+    "note": "Build with AI creates project + chat automatically."
+  },
+  "manual": {
+    "step1": {
+      "title": "What is your idea? Explain it comprehensively.",
+      "placeholder": "Describe the idea in detail..."
+    },
+    "step2": {
+      "title": "Where are you launching your idea?"
+    },
+    "step3": {
+      "title": "What makes your idea unique?",
+      "placeholder": "List what makes your idea different..."
+    },
+    "step4": {
+      "title": "What makes your idea unique?",
+      "placeholder": "Summarize uniqueness..."
+    },
+    "step5": {
+      "title": "What’s your idea name?"
+    },
+    "generateIdeas": "Generate Ideas"
+  },
+  "comments": {
+    "thread": "Messages",
+    "loading": "Loading messages...",
+    "noMessages": "No messages yet",
+    "placeholder": "Add a comment...",
+    "posted": "Comment posted",
+    "postError": "Failed to post comment",
+    "sending": "Sending...",
+    "send": "Send"
+  },
+  "adminAssets": {
+    "leanCanvas": {
+      "noData": "No Lean Canvas data available",
+      "problem": "Problem",
+      "solution": "Solution",
+      "uniqueValueProposition": "Unique Value Proposition",
+      "customerSegments": "Customer Segments",
+      "channels": "Channels",
+      "keyMetrics": "Key Metrics",
+      "costStructure": "Cost Structure",
+      "revenueStreams": "Revenue Streams",
+      "unfairAdvantage": "Unfair Advantage"
+    },
+    "businessModel": {
+      "noData": "No Business Model data available",
+      "customerSegments": "Customer Segments",
+      "revenueStreams": "Revenue Streams",
+      "keyActivities": "Key Activities",
+      "keyPartners": "Key Partners",
+      "costStructure": "Cost Structure",
+      "keyAssumptions": "Key Assumptions",
+      "confidence": "confidence"
+    },
+    "tamSamSom": {
+      "noData": "No TAM/SAM/SOM data available",
+      "marketSizeAnalysis": "Market Size Analysis",
+      "marketSize": "Market Size",
+      "tam": "Total Addressable Market",
+      "sam": "Serviceable Addressable Market",
+      "som": "Serviceable Obtainable Market",
+      "marketTrends": "Market Trends",
+      "growthDrivers": "Growth Drivers",
+      "marketPenetration": "Market Penetration Projections",
+      "year1": "Year 1",
+      "year3": "Year 3",
+      "year5": "Year 5",
+      "customers": "customers",
+      "revenue": "revenue",
+      "keyAssumptions": "Key Assumptions",
+      "impact": "Impact",
+      "analysisNotes": "Analysis Notes",
+      "method": "Method"
+    }
+  },
+  "aiOutputs": {
+    "title": "All AI-Generated Outputs",
+    "all": "All",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "noOutputs": "No AI-generated outputs yet for this idea.",
+    "outputsWillAppear": "AI outputs will appear here as they are generated.",
+    "pitchSlides": "Pitch Slides",
+    "fundingAsk": "Funding Ask",
+    "responsibilities": "Responsibilities",
+    "motivators": "Key Motivators",
+    "attributes": "Personal Attributes",
+    "overview": "Overview",
+    "competitors": "Competitors",
+    "strengths": "Strengths",
+    "weaknesses": "Weaknesses",
+    "recommendations": "Recommendations",
+    "useOfFunds": "Use of Funds",
+    "marketingBudget": "Marketing Budget",
+    "targetAudience": "Target Audience",
+    "demographics": "Demographics",
+    "marketingChannels": "Marketing Channels",
+    "digitalChannels": "Digital Channels",
+    "traditionalChannels": "Traditional Channels",
+    "marketingFunnel": "Marketing Funnel",
+    "awareness": "Awareness",
+    "consideration": "Consideration",
+    "conversion": "Conversion",
+    "retention": "Retention",
+    "timeline": "Timeline",
+    "messaging": "Messaging",
+    "brandVoice": "Brand Voice",
+    "persona": "Persona",
+    "actions": "Actions",
+    "emotions": "Emotions",
+    "painPoints": "Pain Points",
+    "opportunities": "Opportunities",
+    "inDepthQuestions": "In-Depth Questions",
+    "demographicQuestions": "Demographic Questions",
+    "wrapUpQuestions": "Wrap-Up Questions",
+    "acceptanceCriteria": "Acceptance Criteria",
+    "visualIdentity": "Visual Identity",
+    "logoIdea": "Logo Idea",
+    "typography": "Typography",
+    "colorPalette": "Color Palette",
+    "brandValues": "Brand Values",
+    "brandPersonality": "Brand Personality",
+    "customerPromise": "Customer Promise",
+    "imageryPhotography": "Imagery & Photography"
+  },
+  "adminIdea": {
+    "updateSuccess": "Idea updated successfully",
+    "updateFailed": "Failed to update idea",
+    "deleteSuccess": "Idea deleted successfully",
+    "deleteFailed": "Failed to delete idea",
+    "commentSuccess": "Comment added successfully",
+    "commentFailed": "Failed to add comment",
+    "commentEmpty": "Comment cannot be empty",
+    "statusUpdateSuccess": "Status updated successfully",
+    "statusUpdateFailed": "Failed to update status",
+    "evaluationSuccess": "Evaluation generated successfully",
+    "evaluationFailed": "Failed to generate evaluation",
+    "notFound": "Idea not found",
+    "backToIdeas": "Back to Ideas",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteTitle": "Delete Idea",
+    "deleteConfirm": "Are you sure you want to delete this idea? This action cannot be undone.",
+    "cancel": "Cancel",
+    "deleting": "Deleting...",
+    "tabs": {
+      "overview": "Overview",
+      "aiOutputs": "AI Outputs",
+      "lifecycle": "Lifecycle"
+    },
+    "summary": "Summary",
+    "details": "Details",
+    "status": "Status",
+    "created": "Created",
+    "lastUpdated": "Last Updated",
+    "owner": "Owner",
+    "comments": "Comments",
+    "editTitle": "Edit Idea",
+    "editDescription": "Update the idea details",
+    "titleLabel": "Title",
+    "descriptionLabel": "Description",
+    "tagsLabel": "Tags (comma-separated)",
+    "updating": "Updating...",
+    "updateButton": "Update Idea"
+  },
+  "brandIdentity": {
+    "title": "Brand Identity",
+    "noData": "No brand identity data available",
+    "colorPalette": "Color Palette",
+    "typography": "Typography",
+    "headline": "Headline",
+    "subheadline": "Subheadline",
+    "bodyText": "Body Text",
+    "sampleTitle": "Sample Headline",
+    "sampleSubtitle": "Supporting text for headlines",
+    "sampleText": "This is sample body text to demonstrate the typography in use. It shows how the font looks in paragraph form with proper spacing and readability.",
+    "logoIdea": "Logo Concept",
+    "imageryPhotography": "Imagery & Photography Style",
+    "personalityTraits": "Brand Personality",
+    "brandVoice": "Brand Voice",
+    "brandValues": "Brand Values",
+    "customerPromise": "Customer Promise"
+  },
+  "centerPanel": {
+    "error": "Error",
+    "deleteError": "Failed to delete chat. Please try again.",
+    "copy": "Copy",
+    "duplicateError": "Failed to duplicate chat. Please try again.",
+    "unauthorized": "Unauthorized",
+    "unauthorizedDesc": "You are logged out. Logging in again...",
+    "sendError": "Failed to send message. Please try again.",
+    "analyzingQuery": "Analyzing your query...",
+    "researchFailed": "Research Failed",
+    "researchError": "An error occurred during research. Please try again.",
+    "noChatSelected": "No chat selected",
+    "selectChat": "Select a conversation to start chatting",
+    "launchpad": "Launchpad",
+    "duplicating": "Duplicating...",
+    "duplicate": "Duplicate",
+    "confirmDelete": "Are you sure you want to delete this chat?",
+    "deleting": "Deleting...",
+    "delete": "Delete",
+    "challengeSubmission": "Challenge Submission",
+    "submittingTo": "Submitting to",
+    "submittingToDesc": "Your idea will be submitted to this challenge when you're ready",
+    "challengeCleared": "Challenge context cleared",
+    "challengeClearedDesc": "You're no longer submitting to a specific challenge",
+    "creatingFramework": "Creating your business framework...",
+    "thinking": "AI is thinking...",
+    "generatingAssets": "Generating business assets step by step...",
+    "assetFlow": "Lean Canvas → SWOT → Personas → Journey → Marketing → Competitors → TAM/SAM/SOM → Pitch",
+    "aiThinking": "AI is thinking...",
+    "inputPlaceholder": "Ask a question or describe your business idea..."
+  },
+  "interviewQuestionsPreview": {
+    "title": "Interview Questions",
+    "inDepth": "In-Depth",
+    "demographic": "Demographic",
+    "wrapUp": "Wrap-Up",
+    "questionsCount": "{{count}} questions",
+    "noQuestions": "No questions in this category",
+    "moreQuestions": "+{{count}} more...",
+    "totalQuestions": "total questions"
+  },
+  "brandWheelPreview": {
+    "title": "Brand Wheel",
+    "mission": "Mission",
+    "vision": "Vision",
+    "positioning": "Positioning",
+    "values": "Values",
+    "personality": "Personality",
+    "itemsCount": "{{count}} items"
+  },
+  "brandIdentityPreview": {
+    "title": "Brand Identity",
+    "colorPalette": "Color Palette",
+    "typographyLogo": "Typography & Logo",
+    "brandPersonality": "Brand Personality",
+    "typography": "Typography",
+    "logo": "Logo",
+    "traits": "Traits",
+    "voice": "Voice"
+  },
+  "brandWheel": {
+    "title": "Brand Wheel",
+    "subtitle": "Your brand's core identity and values",
+    "mission": "Mission",
+    "vision": "Vision",
+    "brandPositioning": "Brand Positioning",
+    "brandValues": "Brand Values",
+    "personality": "Personality",
+    "brandSummary": "Brand Summary",
+    "coreValues": "Core Values",
+    "personalityTraits": "Personality Traits",
+    "positioning": "Positioning",
+    "noData": "No brand wheel data available"
+  },
+  "competitorMap": {
+    "title": "Competitor Analysis",
+    "subtitle": "Strategic competitive landscape overview",
+    "marketShare": "Market Share",
+    "strengths": "Strengths",
+    "weaknesses": "Weaknesses",
+    "keyProducts": "Key Products",
+    "pricing": "Pricing",
+    "target": "Target Audience",
+    "marketGaps": "Market Gaps & Opportunities",
+    "ourAdvantages": "Our Competitive Advantages",
+    "competitiveThreats": "Competitive Threats",
+    "strategicRecommendations": "Strategic Recommendations"
+  },
+  "competitorMapPreview": {
+    "title": "Competitor Analysis",
+    "competitors": "Competitors",
+    "marketInsights": "Market Insights",
+    "strategy": "Strategy",
+    "marketShare": "Market Share",
+    "strengthsCount": "{{count}} Strengths",
+    "weaknessesCount": "{{count}} Weaknesses",
+    "noData": "No competitors data",
+    "marketGaps": "Market Gaps",
+    "opportunitiesIdentified": "{{count}} opportunities identified",
+    "noGapsIdentified": "No gaps identified",
+    "competitiveThreats": "Competitive Threats",
+    "threatsToMonitor": "{{count}} threats to monitor",
+    "noThreatsIdentified": "No threats identified",
+    "advantages": "Advantages",
+    "yourAdvantages": "Your Advantages",
+    "noAdvantagesListed": "No advantages listed",
+    "topRecommendation": "Top Recommendation",
+    "noRecommendationsAvailable": "No recommendations available",
+    "moreStrategies": "+{{count}} more strategies"
+  },
+  "marketingPreview": {
+    "title": "Marketing Plan",
+    "awareness": "Awareness",
+    "consider": "Consider",
+    "convert": "Convert",
+    "retain": "Retain",
+    "totalBudget": "Total Budget",
+    "targeting": "Targeting",
+    "messaging": "Messaging"
+  },
+  "journeyMapPreview": {
+    "title": "Customer Journey",
+    "defaultPersona": "Target Customer",
+    "loading": "Mapping journey...",
+    "personaJourney": "{{persona}} journey"
+  },
+  "leanCanvasPreview": {
+    "title": "Lean Canvas",
+    "problem": "Problem",
+    "solution": "Solution",
+    "valueProp": "Value Prop",
+    "customers": "Customers",
+    "revenue": "Revenue",
+    "metrics": "Metrics"
+  },
+  "pitchOutlinePreview": {
+    "title": "Pitch Deck Outline",
+    "slidePresentation": "{{count}} slide presentation",
+    "fundingAsk": "Funding Ask"
+  },
+  "pitchOutline": {
+    "title": "Pitch Deck Outline",
+    "subtitle": "Structured presentation flow for investor pitch",
+    "keyPoints": "Key Points",
+    "keyMessages": "Key Messages",
+    "callToAction": "Call to Action",
+    "generateTitle": "Generate Pitch Deck Files",
+    "generatedDecks": "Generated Pitch Decks",
+    "deckNumber": "Pitch Deck #{{number}}",
+    "template": "Template",
+    "theme": "Theme",
+    "color": "Color",
+    "generating": "Generating...",
+    "generationFailed": "Generation failed",
+    "tryAgain": "Please try again",
+    "confirmDelete": "Are you sure you want to delete this generation?",
+    "deleteFailed": "Failed to delete generation",
+    "deleteError": "Error deleting generation",
+    "generateDeck": "Generate Pitch Deck",
+    "generateDescription": "Create professional PPTX presentations from your pitch outline with customizable templates",
+    "createNew": "Create New Pitch Deck",
+    "customize": "Customize & Generate",
+    "customizationOptions": "Customization Options",
+    "templateStyle": "Template Style",
+    "modernBusiness": "Modern Business",
+    "minimalClean": "Minimal Clean",
+    "creativeBold": "Creative Bold",
+    "corporateProfessional": "Corporate Professional",
+    "colorScheme": "Color Scheme",
+    "oceanBlue": "Ocean Blue",
+    "forestGreen": "Forest Green",
+    "royalPurple": "Royal Purple",
+    "vibrantOrange": "Vibrant Orange",
+    "darkMode": "Dark Mode",
+    "themeFocus": "Theme Focus",
+    "professional": "Professional",
+    "startupPitch": "Startup Pitch",
+    "techInnovation": "Tech Innovation",
+    "consulting": "Consulting",
+    "typography": "Typography",
+    "interModern": "Inter (Modern)",
+    "robotoClean": "Roboto (Clean)",
+    "arialClassic": "Arial (Classic)",
+    "helveticaElegant": "Helvetica (Elegant)",
+    "appendix": "Appendix"
+  },
+  "genericAsset": {
+    "title": "Business Asset",
+    "subtitle": "Generated business analysis and insights"
+  },
+  "interviewQuestions": {
+    "title": "Customer Validation Interviews",
+    "noQuestions": "No interview questions generated yet",
+    "questionsCount": "{{count}} questions across {{categories}} categories",
+    "questionCount": "{{count}} questions",
+    "questionCount_one": "{{count}} question",
+    "disclaimers": "Disclaimers",
+    "demographic": "Demographic",
+    "inDepth": "In-Depth",
+    "wrapUp": "Wrap-Up",
+    "disclaimersContent": "Purpose:\nThe purpose of the interview is to help us gain a better understanding of...\n\nExpectations:\n• Throughout the interview if there's anything you don't feel comfortable responding to, feel free to let me know.\n• There are no right or wrong answers. The goal of this interview is to hear your unique perspective about your experiences.\n• I'll be taking notes throughout the interview, so if I am looking away from the camera, it means I'm busy typing.\n\nDisclaimer:\nQuick reminder, this session is recorded for referencing later. Can you please confirm you're happy for us move ahead."
+  },
+  "swot": {
+    "title": "SWOT Analysis",
+    "subtitle": "Strategic analysis of internal and external factors",
+    "strengths": "Strengths",
+    "weaknesses": "Weaknesses",
+    "opportunities": "Opportunities",
+    "threats": "Threats",
+    "impact": "Impact",
+    "score": "Score",
+    "growth": "Growth",
+    "timeline": "Timeline",
+    "probability": "Probability",
+    "mitigation": "Mitigation",
+    "noItems": "No items identified",
+    "items": "Items",
+    "opportunitiesLabel": "Opportunities",
+    "threatsLabel": "Threats",
+    "avgScore": "Avg: {{score}}/10",
+    "market": "Market",
+    "highRisk": "{{count}} High Risk",
+    "strategicProfile": "Strategic Profile",
+    "risk": "Risk",
+    "opportunity": "Opportunity"
+  },
+  "journeyMap": {
+    "title": "Customer Journey Map",
+    "subtitle": "Understanding the customer experience across all touchpoints",
+    "targetPersona": "Target Persona",
+    "goal": "Goal",
+    "touchpoints": "Touchpoints",
+    "painPoints": "Pain Points",
+    "opportunities": "Opportunities",
+    "emotions": "Emotions",
+    "keyInsights": "Key Insights",
+    "overview": "Journey Overview"
+  },
+  "leanCanvas": {
+    "title": "Lean Canvas",
+    "subtitle": "One-page business model overview",
+    "problem": "Problem",
+    "solution": "Solution",
+    "keyMetrics": "Key Metrics",
+    "uniqueValueProposition": "Unique Value Proposition",
+    "unfairAdvantage": "Unfair Advantage",
+    "channels": "Channels",
+    "customerSegments": "Customer Segments",
+    "costStructure": "Cost Structure",
+    "revenueStreams": "Revenue Streams"
+  },
+  "marketingPlan": {
+    "title": "Marketing Plan",
+    "subtitle": "Comprehensive marketing strategy and execution plan",
+    "targeting": "Targeting",
+    "primaryAudience": "Primary Audience",
+    "demographics": "Demographics",
+    "messaging": "Messaging",
+    "valueProposition": "Value Proposition",
+    "keyMessages": "Key Messages",
+    "marketingFunnel": "Marketing Funnel",
+    "awareness": "Awareness",
+    "consideration": "Consideration",
+    "conversion": "Conversion",
+    "retention": "Retention",
+    "budgetOverview": "Budget Overview",
+    "totalBudget": "Total Marketing Budget",
+    "launchTimeline": "Launch Timeline",
+    "targetAudience": "Target Audience",
+    "notDefined": "Not defined",
+    "traitsCount": "{{count}} traits",
+    "brandVoice": "Brand Voice",
+    "channels": "Channels",
+    "marketingChannels": "Marketing Channels",
+    "budget": "Budget",
+    "notSpecified": "Not specified",
+    "digital": "Digital",
+    "traditional": "Traditional",
+    "funnel": "Funnel",
+    "customerJourney": "Customer Journey",
+    "tactics": "{{count}} tactics",
+    "budgetTimeline": "Budget & Timeline",
+    "budgetItems": "Budget Items",
+    "timelinePhases": "Timeline Phases",
+    "timelineNotDefined": "Timeline not defined"
+  },
+  "userStories": {
+    "title": "User Stories",
+    "noStories": "No user stories generated yet",
+    "storiesCount": "{{count}} stories generated",
+    "storiesCount_one": "{{count}} story generated",
+    "storyLabel": "User story",
+    "acceptanceCriteria": "Acceptance Criteria",
+    "defaultRole": "User",
+    "criteriaCount": "{{count}} acceptance criteria",
+    "criteriaCount_one": "{{count}} acceptance criterion",
+    "storyCount": "Story {{current}}/{{total}}",
+    "loading": "User stories loading..."
+  },
+  "tamSamSom": {
+    "title": "Market Size Analysis",
+    "subtitle": "TAM, SAM, SOM breakdown and revenue projections",
+    "methodology": "Methodology",
+    "tam": "TAM",
+    "sam": "SAM",
+    "som": "SOM",
+    "tamFull": "Total Addressable Market",
+    "samFull": "Serviceable Addressable Market",
+    "somFull": "Serviceable Obtainable Market",
+    "marketPenetration": "Market Penetration",
+    "year1": "Year 1",
+    "year3": "Year 3",
+    "year5": "Year 5",
+    "globalMarket": "Global Market",
+    "addressable": "Addressable",
+    "obtainable": "Obtainable",
+    "defaultTimeframe": "5-7 years",
+    "revenueProjection": "Revenue Projection",
+    "fiveYear": "5 Year",
+    "conservative": "Conservative",
+    "realistic": "Realistic",
+    "optimistic": "Optimistic"
+  },
+  "teamRoles": {
+    "title": "Team Roles",
+    "noData": "No team roles data available",
+    "responsibilities": "Responsibilities",
+    "personalAttributes": "Personal Attributes",
+    "drivingMotivators": "Driving Motivators",
+    "summary": "Team Summary",
+    "summaryDesc": "Key roles identified for your venture",
+    "noRoles": "No team roles available",
+    "roleCount": "{{current}}/{{total}}",
+    "attributes": "Attributes",
+    "motivators": "Motivators",
+    "viewRole": "View {{name}}"
+  },
+  "personas": {
+    "title": "User Personas",
+    "subtitle": "Detailed profiles of your target customers",
+    "noData": "No personas data available",
+    "yearsOld": "years old",
+    "goals": "Goals",
+    "painPoints": "Pain Points",
+    "behaviors": "Behaviors",
+    "techUsage": "Technology Usage",
+    "proficiency": "Proficiency",
+    "dailyTools": "Daily Tools",
+    "platforms": "Platforms",
+    "adoptionStyle": "Adoption Style",
+    "decisionInfluence": "Decision Influence",
+    "defaultName": "Persona",
+    "defaultOccupation": "Professional",
+    "age": "Age {{age}}",
+    "loading": "Personas loading..."
+  },
+  "experts": {
+    "title": "Talk to Experts",
+    "subtitle": "Get personalized advice from industry specialists",
+    "connecting": "Connecting...",
+    "listening": "Listening...",
+    "talking": "Talking...",
+    "callExpert": "Call Expert",
+    "endCall": "End Call",
+    "typeMessage": "Type your message...",
+    "modes": {
+      "audio": "Audio",
+      "text": "Text"
+    }
+  },
+  "common": {
+    "locale": "en-US",
+    "saving": "Saving...",
+    "submit": "Submit",
+    "copy": "Copy",
+    "duplicate": "Duplicate",
+    "notSpecified": "Not specified",
+    "view": "View",
+    "na": "N/A",
+    "download": "Download",
+    "refresh": "Refresh",
+    "notAvailable": "N/A",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "export": "Export",
+    "import": "Import",
+    "settings": "Settings",
+    "help": "Help",
+    "logout": "Logout",
+    "login": "Login",
+    "templates": "Templates",
+    "waiting": "Waiting...",
+    "show": "Show",
+    "entries": "entries",
+    "type": "Type",
+    "description": "Description",
+    "created": "Created",
+    "lastActivity": "Last Activity",
+    "actions": "Actions",
+    "noIdeasYet": "No ideas yet",
+    "startCreating": "Start creating your first project idea",
+    "welcomeBack": "Welcome back!",
+    "send": "Send",
+    "backToChallenges": "Back to Challenges"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "myIdeas": "My Ideas",
+    "challenges": "Challenges",
+    "radar": "Radar",
+    "experts": "Experts",
+    "chat": "Chat",
+    "projects": "Projects",
+    "assets": "Assets",
+    "profile": "Profile",
+    "allConversations": "All Conversations"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Your venture building command center",
+    "overview": "Overview",
+    "recentProjects": "Recent Projects",
+    "quickActions": "Quick Actions",
+    "newProject": "New Project",
+    "viewAll": "View All",
+    "whatsYourIdea": "What's your idea today?",
+    "explainBriefly": "Explain your idea briefly...",
+    "shareIdea": "Share your business idea and I'll help you build a complete framework",
+    "currentMode": "Current mode:",
+    "starting": "Starting...",
+    "enter": "Enter",
+    "greetings": {
+      "backAtIt": "Back at it, {{name}}",
+      "salam": "Salam {{name}}, what's your idea today?",
+      "welcome": "Welcome, {{name}}",
+      "feelingCreative": "Feeling creative? Let's get it started.",
+      "readyTo": "Ready to take it from 0 to 1?"
+    },
+    "modes": {
+      "develop": {
+        "title": "Develop Mode",
+        "description": "Build and refine your business idea",
+        "placeholder": "Explain your idea briefly...",
+        "greeting": "{{greeting}}"
+      },
+      "research": {
+        "title": "Research Mode",
+        "description": "Discover and analyze opportunities",
+        "placeholder": "What would you like to research?",
+        "greeting": "Let's find your next big idea"
+      },
+      "launch": {
+        "title": "Launch Mode",
+        "description": "Build and deploy your product",
+        "placeholder": "Describe what you want to build...",
+        "greeting": "Let's build something amazing",
+        "comingSoon": "Coming Soon",
+        "disabled": "Launch mode is currently disabled"
+      }
+    },
+    "generationModes": {
+      "speed": "Speed:",
+      "lite": {
+        "label": "Lite",
+        "description": "⚡ Lite: Fast, 2 pages"
+      },
+      "pro": {
+        "label": "Pro",
+        "description": "🚀 Pro: Balanced, 4 pages"
+      },
+      "max": {
+        "label": "Max",
+        "description": "💎 Max: Premium, 6 pages"
+      }
+    },
+    "helpText": {
+      "pressEnter": "Press",
+      "toSubmit": "to submit"
+    },
+    "admin": {
+      "betaMode": "Beta Mode"
+    },
+    "stats": {
+      "totalProjects": "Total Projects",
+      "activeChats": "Active Chats",
+      "assetsGenerated": "Assets Generated",
+      "completionRate": "Completion Rate"
+    }
+  },
+  "projects": {
+    "title": "My Ideas",
+    "subtitle": "Turn ideas into organized projects",
+    "createNew": "Create a new idea",
+    "noProjects": "No ideas yet",
+    "noProjectsDesc": "Start building your first project",
+    "projectCreated": "Project created!",
+    "projectCreatedDesc": "Let's start building your project together.",
+    "projectUpdated": "Project successfully updated",
+    "projectDeleted": "Project successfully deleted",
+    "newConversation": "New conversation",
+    "newConversationDescription": "New conversation to explore your ideas",
+    "manageIdeas": "Manage and track all your project ideas",
+    "loginToView": "Please log in to view your ideas",
+    "ideaTitle": "Idea Title",
+    "showingIdeas": "Showing {{start}} to {{end}} of {{total}} ideas",
+    "totalIdeas": "{{count}} ideas",
+    "totalIdeas_one": "{{count}} idea",
+    "loadingIdeas": "Loading ideas...",
+    "confirmDelete": "Are you sure you want to delete this idea?",
+    "deleteSuccess": "Idea deleted successfully",
+    "deleteError": "Failed to delete idea",
+    "duplicateSuccess": "Idea duplicated successfully",
+    "duplicateError": "Failed to duplicate idea"
+  },
+  "chat": {
+    "allAssetsGenerated": "All assets generated successfully ✅",
+    "generatingAssets": "Generating business assets step by step...",
+    "researchPlaceholder": "What would you like to research?",
+    "attach": "Attach file",
+    "voice": "Voice input",
+    "modeDevelop": "Develop",
+    "modeResearch": "Research",
+    "sendHint": "Press Enter to send • Shift + Enter for new line",
+    "title": "AI Cofounder Chat",
+    "subtitle": "Building your venture with AI-powered insights",
+    "cofounderName": "Fikra AI",
+    "thinking": "FikraHub Cofounder is thinking...",
+    "creatingFramework": "🔄 Creating business framework...",
+    "frameworkComplete": "Business framework complete!",
+    "helpTurnIdea": "I'll help you turn your idea into a complete business framework! Let's start with two quick questions.",
+    "businessIdeaQuestion": "1. What's your business idea or product name? 💡",
+    "launchLocationQuestion": "2. Where will you launch this business? 🌍",
+    "ideaPlaceholder": "e.g., AI-powered fitness app, Eco-friendly packaging startup...",
+    "locationPlaceholder": "e.g., United States, Europe, Saudi Arabia, Global...",
+    "letsGo": "Let's Go!",
+    "launchFirstQuestion": "2. Where will you launch first? 🌍",
+    "launchFirstPlaceholder": "e.g., United States, Europe, Middle East, Southeast Asia...",
+    "generatingFramework": "Generating Your Business Framework...",
+    "generateMyFramework": "Generate My Business Framework",
+    "willGenerate": "I'll generate: Lean Canvas • SWOT • User Personas • Journey Map • Marketing Plan • Competitor Analysis • TAM/SAM/SOM • Pitch Outline",
+    "newChat": "New Chat",
+    "noChatSelected": "No chat selected",
+    "selectConversation": "Select a conversation to start chatting",
+    "typeMessage": "Type your message...",
+    "send": "Send",
+    "welcomeBack": "Welcome back, {{name}}!",
+    "thinking": "AI is thinking...",
+    "generating": "Generating response...",
+    "error": "Failed to send message. Please try again.",
+    "unauthorized": "You are logged out. Logging in again...",
+    "noMessages": "No messages yet",
+    "startConversation": "Start a conversation with your AI cofounder",
+    "loading": "Loading your conversation...",
+    "notFound": "Chat not found",
+    "notFoundDesc": "This conversation doesn't exist or you don't have access to it.",
+    "modes": {
+      "fast": "Fast",
+      "balanced": "Balanced",
+      "advanced": "Advanced",
+      "fastDesc": "Quick responses with Claude Haiku",
+      "balancedDesc": "Best quality with Claude Sonnet",
+      "advancedDesc": "Detailed responses with Claude Sonnet",
+      "ideation": "Ideation",
+      "strategy": "Strategy", 
+      "execution": "Execution",
+      "analysis": "Analysis"
+    }
+  },
+  "assets": {
+    "title": "Business Assets",
+    "subtitle": "AI-generated business framework overview",
+    "generated": "generated",
+    "noAssets": "No assets yet",
+    "noAssetsDesc": "Assets will appear here as you chat with the AI",
+    "clickToView": "Click to view details",
+    "backToOverview": "Back to Overview",
+    "viewDetails": "View Details",
+    "export": "Export",
+    "loading": "Loading assets...",
+    "noChatSelected": "No chat selected",
+    "noChatDesc": "Start a conversation to generate business assets",
+    "businessAsset": "Business Asset Generated",
+    "assets": {
+      "leanCanvas": "Lean Canvas",
+      "swot": "SWOT",
+      "personas": "Personas",
+      "userStories": "User Stories",
+      "interviewQuestions": "Interview Questions",
+      "journey": "Journey",
+      "marketing": "Marketing",
+      "brandWheel": "Brand Wheel",
+      "brandIdentity": "Brand Identity",
+      "competitors": "Competitors",
+      "tamSamSom": "TAM/SAM/SOM",
+      "teamRoles": "Team Roles",
+      "pitch": "Pitch"
+    },
+    
+    "status": {
+      "complete": "Complete",
+      "inProgress": "In Progress",
+      "queued": "Queued",
+      "unknown": "Unknown"
+    },
+    
+    "categories": {
+      "all": "All",
+      "strategy": "Strategy",
+      "market": "Market",
+      "customer": "Customer",
+      "marketing": "Marketing",
+      "pitch": "Pitch"
+    },
+    
+    "categoryDesc": {
+      "strategy": "Core business strategy & analysis",
+      "market": "Market research & competition",
+      "customer": "User research & experience",
+      "marketing": "Marketing plans & campaigns",
+      "pitch": "Investor presentations"
+    },
+    
+    "types": {
+      "SWOT": "SWOT Analysis",
+      "LEAN_CANVAS": "Lean Canvas",
+      "PERSONA": "User Personas",
+      "USER_STORIES": "User Stories",
+      "INTERVIEW_QUESTIONS": "Interview Questions",
+      "TAM_SAM_SOM": "Market Size",
+      "COMPETITOR_MAP": "Competitor Map",
+      "JOURNEY_MAP": "Journey Map",
+      "MARKETING_PLAN": "Marketing Plan",
+      "BRAND_WHEEL": "Brand Wheel",
+      "BRAND_IDENTITY": "Brand Identity",
+      "TEAM_ROLES": "Team Roles",
+      "PITCH_OUTLINE": "Pitch Outline"
+    },
+    
+    "typeDesc": {
+      "SWOT": "Strengths, weaknesses, opportunities, threats",
+      "LEAN_CANVAS": "9-block business model overview",
+      "PERSONA": "Target customer profiles",
+      "USER_STORIES": "User stories and acceptance criteria",
+      "INTERVIEW_QUESTIONS": "User interview questions",
+      "TAM_SAM_SOM": "TAM/SAM/SOM analysis",
+      "COMPETITOR_MAP": "Competitive landscape analysis",
+      "JOURNEY_MAP": "Customer journey analysis",
+      "MARKETING_PLAN": "Comprehensive marketing strategy",
+      "BRAND_WHEEL": "Brand identity and values",
+      "BRAND_IDENTITY": "Visual and verbal brand elements",
+      "TEAM_ROLES": "Roles and responsibilities within the team",
+      "PITCH_OUTLINE": "Investor presentation structure"
+    },
+    
+    "empty": {
+      "noCategory": "No {{category}} Assets",
+      "noCategoryDesc": "{{description}} will appear here as you chat with the AI",
+      "strategy": "No Strategy Assets",
+      "strategyDesc": "Core business strategy & analysis will appear here as you chat with the AI",
+      "market": "No Market Assets",
+      "marketDesc": "Market research & competition will appear here as you chat with the AI",
+      "customer": "No Customer Assets",
+      "customerDesc": "User research & experience will appear here as you chat with the AI",
+      "marketing": "No Marketing Assets",
+      "marketingDesc": "Marketing plans & campaigns will appear here as you chat with the AI",
+      "pitch": "No Pitch Assets",
+      "pitchDesc": "Investor presentations will appear here as you chat with the AI"
+    },
+    
+    "swot": {
+      "strengths": "Strengths",
+      "weaknesses": "Weaknesses",
+      "opportunities": "Opportunities",
+      "threats": "Threats"
+    },
+    
+    "leanCanvas": {
+      "problem": "Problem",
+      "solution": "Solution",
+      "channels": "Channels",
+      "keyMetrics": "Key Metrics",
+      "uniqueValueProposition": "Unique Value Proposition",
+      "unfairAdvantage": "Unfair Advantage",
+      "customerSegments": "Customer Segments",
+      "costStructure": "Cost Structure",
+      "revenueStreams": "Revenue Streams"
+    },
+    
+    "defaults": {
+      "noItemsIdentified": "No items identified",
+      "notSpecified": "Not specified"
+    },
+
+    "viewMode": {
+      "hub": "Hub View",
+      "chat": "Chat View"
+    },
+
+    "hubView": {
+      "title": "Business Outputs",
+      "expand": "View Details",
+      "categories": {
+        "strategy": "Strategy",
+        "businessModel": "Business Model",
+        "customer": "Customer",
+        "marketing": "Marketing",
+        "market": "Market Analysis",
+        "team": "Team",
+        "pitch": "Pitch",
+        "other": "Other"
+      }
+    }
+  },
+  "auth": {
+    "welcome": "Welcome to FikraHub",
+    "subtitle": "Your AI-powered venture building platform",
+    "loginWithReplit": "Continue with Replit",
+    "loggingIn": "Logging in...",
+    "notAuthenticated": "Not authenticated",
+    "signIn": "Sign in to your account",
+    "signInDesc": "Enter your credentials to access FikraHub",
+    "createAccount": "Create your account",
+    "createAccountDesc": "Join FikraHub and start building your ventures",
+    "username": "Username",
+    "password": "Password",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email Address",
+    "chooseUsername": "Choose a username",
+    "enterPassword": "Enter your password",
+    "enterFirstName": "Enter your first name",
+    "enterLastName": "Enter your last name",
+    "enterEmail": "Enter your email address",
+    "freePlan": "Free Plan",
+    "logout": "Logout"
+  },
+  "landing": {
+    "hero": {
+      "title": "Transform Ideas into Ventures with AI",
+      "subtitle": "FikraHub is your intelligent cofounder that helps you build comprehensive business frameworks through natural conversations",
+      "cta": "Start Building Now",
+      "learnMore": "Learn More"
+    },
+    "features": {
+      "title": "Everything You Need to Build",
+      "aiCofounder": {
+        "title": "AI Cofounder",
+        "desc": "Chat with AI to develop your business strategy step-by-step"
+      },
+      "assets": {
+        "title": "Business Assets",
+        "desc": "Generate lean canvas, personas, SWOT analysis, and more"
+      },
+      "realtime": {
+        "title": "Real-time Insights",
+        "desc": "Get instant feedback and suggestions as you build"
+      }
+    }
+  },
+  "sidebar": {
+    "collapsed": "Expand sidebar",
+    "expanded": "Collapse sidebar",
+    "quickStats": "Quick Stats",
+    "recentActivity": "Recent Activity",
+    "newIdea": "New Idea",
+    "startWithIdea": "Start with \"What's your idea today?\""
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "switchToLight": "Switch to Light Mode",
+    "switchToDark": "Switch to Dark Mode"
+  },
+  "user": {
+    "freePlan": "Free Plan",
+    "credits": "Credits",
+    "creditsRemaining": "{{used}}/{{total}}"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "network": "Network error. Please check your connection.",
+    "unauthorized": "You need to log in to access this feature",
+    "forbidden": "You don't have permission to access this resource",
+    "notFound": "The requested resource was not found",
+    "validation": "Please check your input and try again",
+    "pageNotFound": "Page Not Found",
+    "pageNotFoundDesc": "The page you're looking for doesn't exist or has been moved.",
+    "goHome": "Go Home",
+    "failedToCreate": "Failed to create project. Please try again.",
+    "noDescription": "No description",
+    "failedToFetch": "Failed to fetch data",
+    "failedToCreateChat": "Failed to create chat"
+  },
+  "settings": {
+    "title": "Settings",
+    "quickSettings": "Quick Settings",
+    "essentialOptions": "Essential options for your experience",
+    "light": "Light",
+    "dark": "Dark",
+    "description": "Manage your account settings and preferences.",
+    "profile": "Profile",
+    "theme": "Theme",
+    "language": "Language",
+    "alerts": "Alerts",
+    "privacy": "Privacy",
+    "data": "Data",
+    "profileImage": "Profile Image URL",
+    "profileImagePlaceholder": "https://example.com/avatar.jpg",
+    "emailNotifications": "Email Notifications",
+    "emailNotificationsDesc": "Receive updates via email",
+    "pushNotifications": "Push Notifications",
+    "pushNotificationsDesc": "Receive browser notifications",
+    "soundEffects": "Sound Effects",
+    "soundEffectsDesc": "Play sounds for notifications",
+    "autoSave": "Auto-Save",
+    "autoSaveDesc": "Automatically save your work",
+    "profileVisibility": "Profile Visibility",
+    "dataRetention": "Data Retention",
+    "public": "Public",
+    "private": "Private",
+    "exportData": "Export Data",
+    "exportDataDesc": "Download all your data in JSON format",
+    "dangerZone": "Danger Zone",
+    "deleteAccount": "Delete Account",
+    "deleteAccountDesc": "Permanently delete your account and all associated data",
+    "deleteConfirmation": "Are you sure you want to permanently delete your account? This action cannot be undone.",
+    "saving": "Saving...",
+    "saveProfile": "Save Profile",
+    "exporting": "Exporting...",
+    "deleting": "Deleting...",
+    "30days": "30 Days",
+    "90days": "90 Days",
+    "1year": "1 Year",
+    "forever": "Forever",
+    "profileUpdated": "Profile Updated",
+    "profileUpdatedDesc": "Your profile has been successfully updated.",
+    "settingsUpdated": "Settings Updated",
+    "settingsUpdatedDesc": "Your preferences have been saved.",
+    "dataExported": "Data Exported",
+    "dataExportedDesc": "Your data has been successfully exported.",
+    "accountDeleted": "Account Deleted",
+    "accountDeletedDesc": "Your account has been permanently deleted.",
+    "updateFailed": "Update Failed",
+    "updateFailedDesc": "Failed to update profile.",
+    "exportFailed": "Export Failed",
+    "exportFailedDesc": "Failed to export data.",
+    "deletionFailed": "Deletion Failed",
+    "deletionFailedDesc": "Failed to delete account."
+  },
+  "challenges": {
+    "title": "Challenges",
+    "subtitle": "Join innovative challenges and compete with entrepreneurs across the MENA region",
+    "activeChallenges": "{{count}} Active Challenges",
+    "upcomingChallenges": "{{count}} Upcoming",
+    "submissions": "{{count}} submissions",
+    "submissionsLabel": "Submissions",
+    "errorFetch": "Failed to fetch challenges",
+    "status": {
+      "active": "Active",
+      "upcoming": "Upcoming",
+      "ended": "Ended",
+      "draft": "Draft"
+    },
+    "delete": {
+      "button": "Delete challenge",
+      "confirm": "Are you sure you want to delete this challenge? This action cannot be undone.",
+      "successTitle": "Challenge deleted",
+      "successDesc": "The challenge has been successfully deleted.",
+      "errorGeneric": "Failed to delete challenge"
+    },
+    "timeLeft": {
+      "ended": "Ended",
+      "startsIn": "Starts in {{days}} days",
+      "endsToday": "Ends today",
+      "oneDay": "1 day left",
+      "daysLeft": "{{days}} days left"
+    },
+    "filters": {
+      "all": "All Challenges",
+      "active": "Active",
+      "upcoming": "Upcoming",
+      "ended": "Ended"
+    },
+    "empty": {
+      "title": "No challenges found",
+      "noCreated": "No challenges have been created yet",
+      "tryFilters": "Try adjusting your filters to see more challenges"
+    },
+    "create": {
+      "button": "Create Challenge",
+      "title": "Create New Challenge",
+      "description": "Create a new innovation challenge for your workspace",
+      "successTitle": "Challenge Created",
+      "successDesc": "Your challenge has been created successfully",
+      "errorGeneric": "Failed to create challenge",
+      "missingFieldsTitle": "Missing Fields",
+      "missingFieldsDesc": "Please fill in all required fields"
+    },
+    "form": {
+      "title": "Title",
+      "titlePlaceholder": "NEOM Smart City Solutions",
+      "slug": "URL Slug",
+      "slugPlaceholder": "neom-smart-city",
+      "shortDescription": "Short Description",
+      "shortDescriptionPlaceholder": "Brief one-liner about the challenge",
+      "description": "Description",
+      "descriptionPlaceholder": "Detailed description of the challenge...",
+      "deadline": "Deadline",
+      "date": "Date",
+      "time": "Time",
+      "selectDate": "Select date",
+      "status": "Status",
+      "emoji": "Emoji",
+      "maxSubmissions": "Max Submissions",
+      "prize": "Prize (optional)",
+      "prizePlaceholder": "37,500 SAR",
+      "tags": "Tags (comma-separated)",
+      "tagsPlaceholder": "AI, NEOM, Smart Cities, Vision 2030",
+      "evaluationCriteria": "Evaluation Criteria (Optional)",
+      "evaluationCriteriaPlaceholder": "Enter evaluation criteria for this challenge...\n\nExample:\n- Innovation and creativity (30%)\n- Technical feasibility (25%)\n- Market potential (25%)\n- Team capability (20%)",
+      "evaluationCriteriaHelp": "Optional. If not provided, organization-level criteria will be used. This text will be used by AI to evaluate submitted ideas."
+    },
+    "manageIdeas": "Manage Ideas"
+  },
+  "radar": {
+    "title": "Radar",
+    "subtitle": "Stay updated with the latest developments in MENA technology, innovation, and business",
+    "loadMore": "Load More Stories",
+    "noNews": "No news available for this topic",
+    "unknownSource": "Unknown",
+    "sources": "{{count}} sources",
+    "topics": {
+      "forYou": "For You",
+      "innovation": "Innovation",
+      "ai": "Artificial Intelligence",
+      "investments": "MENA Investments",
+      "ycStartups": "YC Startups (MENA)"
+    },
+    "timeAgo": {
+      "justNow": "Just now",
+      "oneHour": "1 hour ago",
+      "hours": "{{count}} hours ago",
+      "oneDay": "1 day ago",
+      "days": "{{count}} days ago"
+    },
+    "widgets": {
+      "aiTools": {
+        "title": "Latest AI Tools",
+        "viewAll": "View All Tools",
+        "tags": {
+          "new": "New",
+          "updated": "Updated",
+          "hot": "Hot",
+          "featured": "Featured"
+        },
+        "categories": {
+          "languageModel": "Language Model",
+          "imageGeneration": "Image Generation",
+          "codeEditor": "Code Editor",
+          "searchAI": "Search AI",
+          "videoAI": "Video AI"
+        }
+      },
+      "companies": {
+        "title": "Trending Companies"
+      },
+      "interests": {
+        "title": "Save Interests",
+        "description": "Select topics and interests to customize your Radar experience",
+        "save": "Save Interests",
+        "categories": {
+          "tech": "Tech & Science",
+          "finance": "Finance",
+          "arts": "Arts & Culture",
+          "sports": "Sports",
+          "entertainment": "Entertainment"
+        }
+      }
+    },
+    "errors": {
+      "fetchFailed": "Failed to fetch news",
+      "unableToLoad": "Unable to load news at the moment",
+      "checkConnection": "Please check your connection and try again"
+    },
+    "reader": {
+      "backToRadar": "Back to Radar",
+      "viewOriginal": "View Original Article",
+      "by": "By",
+      "keyPoints": "Key Points",
+      "relatedTo": "Related to",
+      "sampleContent1": "This is the full article content that would be extracted from the original source using a content extraction API like Mercury Reader or Diffbot. The content includes the complete text, images, and formatting from the original article.",
+      "sampleContent2": "In a real implementation, this content would be fetched from the article URL and processed to remove ads, navigation, and other non-content elements, providing a clean reading experience within the platform.",
+      "sampleContent3": "The article extraction would preserve important formatting like headings, paragraphs, lists, and embedded media while ensuring fast loading and consistent styling with the platform's design."
+    }
+  },
+  "challenge": {
+    "notFound": "Challenge Not Found",
+    "backToChallenges": "Back to Challenges",
+    "deadline": "Deadline",
+    "daysLeft": "{{count}} days left",
+    "daysLeft_one": "{{count}} day left",
+    "ended": "Ended",
+    "submissions": "{{count}} submissions",
+    "submissions_one": "{{count}} submission",
+    "description": "Challenge Description",
+    "myIdeas": "My Challenge Ideas ({{count}})",
+    "creating": "Creating...",
+    "createIdea": "Create Idea",
+    "noIdeasYet": "No ideas yet. Create your first one!",
+    "delete": {
+      "button": "Delete challenge",
+      "confirm": "Are you sure you want to delete this challenge? This will also delete all associated projects and submissions. This action cannot be undone.",
+      "successTitle": "Challenge deleted",
+      "successDesc": "The challenge and all associated projects have been successfully deleted.",
+      "errorGeneric": "Failed to delete challenge"
+    },
+    "table": {
+      "title": "Title",
+      "type": "Type",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "openInNewTab": "Open in New Tab",
+    "confirmDelete": "Delete this idea?",
+    "submissionsTitle": "Submissions ({{count}})",
+    "noSubmissionsYet": "No submissions yet. Be the first to submit!",
+    "submissionProgress": "Submission Progress",
+    "capacity": "Capacity",
+    "challengeStatus": "Challenge Status",
+    "statusLabel": "Status",
+    "timeLeft": "Time Left",
+    "days": "d",
+    "status": {
+      "active": "Active",
+      "upcoming": "Upcoming",
+      "ended": "Ended",
+      "draft": "Draft"
+    },
+    "submitSolution": "Submit Your Solution",
+    "submitYourSolution": "Submit Your Solution",
+    "submitDescription": "Share your innovative solution to this challenge",
+    "form": {
+      "title": "Solution Title *",
+      "titlePlaceholder": "My Smart City Solution",
+      "description": "Description *",
+      "descriptionPlaceholder": "Describe your solution and how it addresses the challenge...",
+      "demoUrl": "Demo URL (optional)"
+    },
+    "submitSolutionButton": "Submit Solution",
+    "fillRequired": "Please fill in all required fields",
+    "submitSuccess": "Submission sent successfully!",
+    "submitFailed": "Failed to submit",
+    "by": "by",
+    "viewDemo": "View Demo",
+    "score": "Score",
+    "projectDeleted": "Project deleted successfully",
+    "projectDuplicated": "Project duplicated successfully",
+    "deleteFailed": "Failed to delete project",
+    "duplicateFailed": "Failed to duplicate project",
+    "navigationFailed": "Failed to navigate to project",
+    "noOrganization": "No organization found",
+    "createProjectFailed": "Failed to create project",
+    "createChatFailed": "Failed to create chat",
+    "createIdeaFailed": "Failed to create idea",
+    "submitIdea": "Submit Your Idea",
+    "createYourIdea": "Create Your Idea",
+    "step": "Step",
+    "of": "of",
+    "step1Description": "Enter your idea title and detailed description",
+    "step2Description": "Add appendix/references and any additional details (optional)",
+    "step3Description": "Review your submission details before confirming",
+    "reviewBeforeCreate": "Review your idea details before creating",
+    "ideaTitle": "Idea Title",
+    "ideaTitlePlaceholder": "Enter your idea title",
+    "characters": "characters",
+    "projectUrl": "Appendix/References",
+    "appendixPlaceholder": "Add links to supporting documents, research papers, or related resources",
+    "optional": "optional",
+    "title": "Title",
+    "url": "URL",
+    "reviewSubmissionNote": "Please review your idea carefully. You can edit it later before submitting to the challenge.",
+    "back": "Back",
+    "next": "Next",
+    "titleRequired": "Title is required",
+    "descriptionMinLength": "Description must be at least 50 characters",
+    "submitting": "Submitting...",
+    "creatingIdea": "Creating...",
+    "submitToChallenge": "Submit to Challenge",
+    "createIdeaButton": "Create Idea",
+    "projectSubmitted": "Project submitted successfully!",
+    "submissionCreated": "Submission created successfully!",
+    "submissionFailed": "Failed to create submission",
+    "confirmSubmit": "Submit this project to the challenge? This action cannot be undone.",
+    "submit": "Submit",
+    "chooseCreationMethod": "How would you like to create your idea?",
+    "chooseMethodDescription": "Choose your preferred method for developing your challenge submission",
+    "buildWithAI": "Build with AI",
+    "buildWithAIDescription": "Use our AI assistant to help develop your idea through an interactive chat experience. Perfect for brainstorming and iterative development.",
+    "submitViaForm": "Submit via Form",
+    "submitViaFormDescription": "Fill out a quick 3-step form to create your idea. Once created, you can click Submit to enter the challenge.",
+    "buildManually": "Build Manually",
+    "buildManuallyDescription": "Fill out a structured 4-step form to define your idea comprehensively. Includes idea description, location, uniqueness, and naming.",
+    "submissionDisabled": "Submission options are currently disabled for this workspace. Please contact your workspace administrator.",
+    "descriptionPlaceholder": "Describe your idea in detail (minimum 50 characters)",
+    "ideaCreated": "Idea created successfully! Click Submit to enter the challenge.",
+    "ideaCreationFailed": "Failed to create idea",
+    "viewDetails": "View Details",
+    "submittedBy": "Submitted by",
+    "noDescription": "No description provided",
+    "submittedAt": "Submitted At",
+    "openProject": "Open Project",
+    "feedback": "Feedback"
+  },
+  "project": {
+    "type": {
+      "research": "Research",
+      "develop": "MVP",
+      "launch": "Idea"
+    }
+  },
+  "admin": {
+    "settings-page": {
+      "title": "Workspace Settings",
+      "description": "Customize your workspace appearance and URL",
+      "success": {
+        "title": "Settings updated",
+        "description": "Workspace settings have been successfully updated"
+      },
+      "error": {
+        "title": "Error updating settings"
+      },
+      "logoUrl": {
+        "label": "Logo URL",
+        "placeholder": "https://example.com/logo.png",
+        "description": "URL to your workspace logo image"
+      },
+      "primaryColor": {
+        "label": "Primary Color",
+        "description": "Choose your workspace's primary brand color"
+      },
+      "slug": {
+        "label": "Workspace URL Slug",
+        "description": "Custom URL for your workspace (lowercase letters, numbers, and hyphens only)"
+      },
+      "preview": {
+        "title": "Preview",
+        "description": "How your workspace will appear to users"
+      }
+    },
+    "criteria": {
+      "text": {
+        "save": "Save Criteria",
+        "unsavedChanges": "You have unsaved changes",
+        "success": {
+          "title": "Criteria saved",
+          "description": "Evaluation criteria have been saved successfully"
+        },
+        "error": {
+          "title": "Failed to save criteria"
+        }
+      },
+      "title": "AI Evaluation Criteria",
+      "description": "Upload JSON files defining metrics and criteria for AI-powered idea evaluation",
+      "uploading": "Uploading...",
+      "upload": {
+        "button": "Upload JSON File",
+        "hint": "Max 2MB • JSON format only",
+        "success": {
+          "title": "File uploaded"
+        },
+        "error": {
+          "title": "Upload failed"
+        }
+      },
+      "delete": {
+        "confirm": "Are you sure you want to delete",
+        "success": {
+          "title": "File deleted",
+          "description": "Evaluation criteria file has been removed"
+        },
+        "error": {
+          "title": "Delete failed"
+        }
+      },
+      "view": {
+        "title": "Evaluation Criteria File",
+        "description": "File content",
+        "uploaded": "Uploaded",
+        "by": "By",
+        "error": {
+          "title": "Failed to load file"
+        }
+      },
+      "validation": {
+        "invalidJson": {
+          "title": "Invalid JSON format",
+          "description": "Please enter valid JSON format"
+        },
+        "invalidType": {
+          "title": "Invalid file type",
+          "description": "Please select a JSON file (.json)"
+        },
+        "tooLarge": {
+          "title": "File too large",
+          "description": "File must be less than 2MB"
+        },
+        "empty": {
+          "title": "Error",
+          "description": "Please enter evaluation criteria"
+        }
+      },
+      "files": {
+        "label": "Uploaded Files",
+        "view": "View content",
+        "delete": "Delete file",
+        "hint": "💡 Click the eye icon to view file content, or trash icon to delete",
+        "empty": "No evaluation criteria files uploaded yet. Upload a JSON file to get started."
+      },
+      "legacy": {
+        "divider": "Or use legacy text input",
+        "current": "Current Criteria (Legacy)",
+        "label": "Evaluation Criteria (Text)",
+        "placeholder": "Enter your evaluation criteria in JSON format...",
+        "hint": "Define the metrics that AI will use to evaluate ideas. Each metric should have a weight (totaling 1.0) and a description.",
+        "button": "Update Criteria (Legacy)",
+        "success": {
+          "title": "Success",
+          "description": "Evaluation criteria have been updated successfully"
+        },
+        "error": {
+          "title": "Error"
+        }
+      }
+    },
+    "mode": "Admin Panel",
+    "sidebar": {
+      "header": {
+        "title": "Admin Panel",
+        "subtitle": "Workspace Management"
+      },
+      "dashboard": {
+        "title": "Dashboard",
+        "description": "Admin dashboard"
+      },
+      "ideas": {
+        "title": "Ideas",
+        "description": "Manage ideas & projects"
+      },
+      "workspace": {
+        "title": "Workspace",
+        "description": "Workspace configuration"
+      },
+      "branding": {
+        "title": "Branding",
+        "description": "Customize appearance"
+      },
+      "members": {
+        "title": "Members",
+        "description": "Manage team members"
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "General settings"
+      },
+      "exit": "Exit Admin"
+    },
+
+    "guard": {
+      "verifying": "Verifying admin access...",
+      "workspaceNotFound": {
+        "title": "Workspace Not Found",
+        "invalidSlug": "Invalid workspace identifier",
+        "notAccessible": "The workspace \"{{slug}}\" does not exist or is not accessible"
+      },
+      "accessDenied": {
+        "title": "Access Denied",
+        "notMember": "You are not a member of the workspace \"{{workspace}}\".",
+        "contactAdmin": "Please contact the workspace administrator for access."
+      },
+      "adminRequired": {
+        "title": "Admin Access Required",
+        "needsPrivileges": "You need administrator privileges to access this page.",
+        "currentRole": "Current role: {{role}}"
+      },
+      "goToHome": "Go to Home",
+      "goToMyWorkspaces": "Go to My Workspaces",
+      "goToWorkspace": "Go to Workspace"
+    },
+    "analytics": {
+      "overview": {
+        "title": "Workspace Overview",
+        "description": "Key metrics and analytics for your workspace"
+      },
+      "stats": {
+        "totalIdeas": {
+          "title": "Total Ideas",
+          "description": "Ideas submitted to workspace"
+        },
+        "activeConversations": {
+          "title": "Active Conversations",
+          "description": "Ongoing chat sessions"
+        },
+        "businessAssets": {
+          "title": "Business Assets",
+          "description": "Generated business documents"
+        },
+        "teamMembers": {
+          "title": "Team Members",
+          "description": "Active workspace members"
+        }
+      },
+      "recentActivity": {
+        "title": "Recent Activity",
+        "description": "Latest workspace engagement",
+        "ideasSubmitted": "Ideas Submitted",
+        "conversationsStarted": "Conversations Started",
+        "assetsGenerated": "Assets Generated",
+        "thisMonth": "This month"
+      },
+      "workspaceHealth": {
+        "title": "Workspace Health",
+        "description": "Overall workspace performance indicators",
+        "memberEngagement": "Member Engagement",
+        "ideaActivity": "Idea Activity",
+        "assetCreation": "Asset Creation"
+      },
+      "engagement": {
+        "active": "Active",
+        "low": "Low"
+      },
+      "activity": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      }
+    },
+    "workspace": {
+      "defaultPage": {
+        "title": "Default page after login",
+        "description": "Choose which page users land on after signing in.",
+        "label": "Default page"
+      },
+      "routes": {
+        "title": "Route names",
+        "description": "Customize page names and descriptions (EN / AR). Changes show a Save button per card.",
+        "path": "Path",
+        "save": "Save",
+        "nameEn": "Name (EN)",
+        "nameAr": "Name (AR)",
+        "descEn": "Description (EN)",
+        "descAr": "Description (AR)",
+        "titleEn": "Title (EN)",
+        "titleAr": "Title (AR)"
+      },
+      "routeSavedTitle": "Saved",
+      "routeSavedDesc": "Route label updated",
+      "routeSaveErrorTitle": "Error",
+      "routeSaveErrorDesc": "Failed to save route label",
+      "header": {
+        "title": "Workspace Configuration",
+        "subtitle": "Manage your workspace settings and features"
+      },
+      "basic": {
+        "title": "Basic Information",
+        "description": "Update your workspace name and basic details",
+        "name": "Workspace Name",
+        "namePlaceholder": "My Workspace"
+      },
+      "features": {
+        "title": "Features",
+        "description": "Enable or disable features for your workspace",
+        "dashboard": {
+          "label": "Dashboard",
+          "description": "Enable dashboard analytics and overview"
+        },
+        "challenges": {
+          "label": "Challenges",
+          "description": "Enable challenge creation and management"
+        },
+        "experts": {
+          "label": "Expert Consultations",
+          "description": "Allow users to consult with AI experts"
+        },
+        "radar": {
+          "label": "Radar (News Feed)",
+          "description": "Show news and industry updates"
+        },
+        "aiBuilder": {
+          "label": "AI Builder",
+          "description": "Enable AI-powered project building on challenges"
+        },
+        "formSubmission": {
+          "label": "Form Submission",
+          "description": "Enable manual form submission on challenges"
+        },
+        "manualBuild": {
+          "label": "Manual Build",
+          "description": "Enable manual idea building with structured 4-step form"
+        }
+      },
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "success": {
+        "title": "Workspace updated",
+        "description": "Your workspace settings have been saved successfully."
+      },
+      "error": {
+        "title": "Error",
+        "description": "Failed to update workspace settings."
+      }
+    },
+    "ideas": {
+      "move": {
+        "title": "Move idea status",
+        "confirm": "Are you sure you want to move the idea to \"{{status}}\"?",
+        "instruction": "Add a comment explaining why this idea is being moved to this status.",
+        "commentLabel": "Comment",
+        "commentPlaceholder": "Explain the reason for this status change...",
+        "validation": {
+          "title": "Comment required",
+          "description": "Please add a comment explaining the status change."
+        },
+        "saving": "Saving...",
+        "confirmButton": "Confirm and Comment",
+        "success": {
+          "title": "Status updated",
+          "description": "Idea status and comment saved."
+        },
+        "error": {
+          "title": "Update failed",
+          "description": "Failed to change status"
+        }
+      },
+      "header": {
+        "title": "Ideas Management",
+        "subtitle": "Manage and track all ideas and projects"
+      },
+      "challengeBoard": {
+        "subtitle": "Manage and review ideas submitted to this challenge"
+      },
+      "newIdea": "New Idea",
+      "statuses": {
+        "backlog": "Backlog",
+        "underReview": "Under Review",
+        "shortlisted": "Shortlisted",
+        "inIncubation": "In Incubation",
+        "archived": "Archived"
+      },
+      "dropHere": "Drop ideas here",
+      "opening": "Opening chat...",
+      "create": {
+        "title": "Create New Idea",
+        "description": "Add a new idea to your workspace. It will start in the Backlog.",
+        "fields": {
+          "title": "Title",
+          "titlePlaceholder": "Enter idea title",
+          "summary": "Summary",
+          "summaryPlaceholder": "Describe your idea",
+          "tags": "Tags (comma-separated)",
+          "tagsPlaceholder": "ai, marketplace, saas"
+        },
+        "cancel": "Cancel",
+        "submit": "Create Idea",
+        "creating": "Creating...",
+        "success": {
+          "title": "Success",
+          "description": "Idea created successfully"
+        },
+        "error": {
+          "title": "Error",
+          "description": "Failed to create idea"
+        },
+        "validation": {
+          "title": "Validation Error",
+          "description": "Title and summary are required"
+        }
+      },
+      "update": {
+        "error": {
+          "title": "Error",
+          "description": "Failed to update status"
+        }
+      },
+      "navigate": {
+        "error": {
+          "title": "Error",
+          "description": "Failed to open idea chat"
+        }
+      }
+    },
+    "userManagement": {
+      "title": "User Management",
+      "description": "Manage workspace members and their roles",
+      "inviteUser": "Invite User",
+      "unknownUser": "Unknown User",
+      "status": {
+        "pending": "Pending Invitation"
+      },
+      "invite": {
+        "title": "Invite New User",
+        "fields": {
+          "existing": "Choose existing user",
+          "selectPlaceholder": "Select user...",
+          "email": "Email Address",
+          "emailPlaceholder": "user@example.com",
+          "role": "Role",
+          "rolePlaceholder": "Select a role"
+        },
+        "sendInvite": "Send Invite",
+        "inviting": "Inviting...",
+        "cancel": "Cancel",
+        "success": {
+          "title": "User invited",
+          "description": "The user has been successfully added to the workspace."
+        },
+        "error": {
+          "title": "Error inviting user",
+          "description": "Failed to invite user. Please try again."
+        }
+      },
+      "roles": {
+        "owner": "Owner",
+        "admin": "Admin",
+        "mentor": "Mentor",
+        "member": "Member"
+      },
+      "members": {
+        "title": "Current Members ({{count}})"
+      },
+      "table": {
+        "user": "User",
+        "email": "Email",
+        "role": "Role",
+        "joined": "Joined",
+        "actions": "Actions"
+      },
+      "actions": {
+        "makeMember": "Make Member",
+        "makeMentor": "Make Mentor",
+        "makeAdmin": "Make Admin",
+        "removeFromWorkspace": "Remove from workspace",
+        "ownerCannotModify": "Owner (cannot be modified)"
+      },
+      "role": {
+        "success": {
+          "title": "Role updated",
+          "description": "Member role has been successfully updated."
+        },
+        "error": {
+          "title": "Error updating role",
+          "description": "Failed to update role. Please try again."
+        }
+      },
+      "remove": {
+        "success": {
+          "title": "Member removed",
+          "description": "The member has been successfully removed from the workspace."
+        },
+        "error": {
+          "title": "Error removing member",
+          "description": "Failed to remove member. Please try again."
+        },
+        "dialog": {
+          "title": "Remove Member",
+          "description": "Are you sure you want to remove {{username}} from this workspace? This action cannot be undone.",
+          "cancel": "Cancel",
+          "confirm": "Remove Member"
+        }
+      }
+    },
+    "settings": {
+      "header": {
+        "title": "Settings",
+        "subtitle": "Configure workspace settings, preferences, and integrations."
+      },
+      "accessDenied": {
+        "title": "Access Denied",
+        "description": "You don't have permission to access the admin panel."
+      }
+    },
+    
+    "branding": {
+      "header": {
+        "title": "Branding",
+        "subtitle": "Customize your workspace appearance"
+      },
+      "logo": {
+        "title": "Light Logo",
+        "description": "Upload your workspace logo",
+        "urlLabel": "Logo URL",
+        "urlPlaceholder": "https://example.com/logo.png",
+        "upload": "Upload",
+        "uploading": "Uploading...",
+        "preview": "Light Logo Preview",
+        "previewAlt": "Logo preview",
+        "darkLabel": "Dark Logo",
+        "darkPreview": "Dark Logo Preview"
+      },
+      "colors": {
+        "title": "Colors",
+        "description": "Choose your brand colors",
+        "primaryLabel": "Primary Color",
+        "preview": "Preview",
+        "variants": {
+          "primary": "Primary",
+          "hover": "Hover",
+          "outline": "Outline",
+          "button": "Button"
+        }
+      },
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "success": {
+        "title": "Branding updated",
+        "description": "Your branding settings have been saved successfully."
+      },
+      "error": {
+        "title": "Error",
+        "description": "Failed to update branding settings."
+      },
+      "upload": {
+        "success": {
+          "title": "Logo uploaded",
+          "description": "Your logo has been uploaded successfully."
+        },
+        "error": {
+          "title": "Upload failed",
+          "description": "Failed to upload logo. Please try again."
+        }
+      },
+      "validation": {
+        "fileSize": {
+          "title": "File too large",
+          "description": "Logo must be less than 5MB"
+        },
+        "fileType": {
+          "title": "Invalid file type",
+          "description": "Please upload an image file (JPEG, PNG, GIF, SVG, or WebP)"
+        }
+      }
+    }
+  },
+  "workspace": {
+    "welcomeToFikrahub": "Welcome to FikraHub",
+    "enterWorkspace": "Enter your workspace to continue",
+    "workspaceNameLabel": "Workspace Name",
+    "yourWorkspacePlaceholder": "your-workspace",
+    "workspaceSlugDesc": "Use lowercase letters, numbers, and hyphens only",
+    "continueToWorkspace": "Continue to Workspace",
+    "or": "Or",
+    "createNewWorkspaceBtn": "Create New Workspace",
+    "dontKnowWorkspace": "Don't know your workspace name?",
+    "contactWorkspaceAdmin": "Contact your workspace administrator",
+    "invalidWorkspaceName": "Workspace name invalid — use lowercase letters, numbers, and hyphens only",
+    "verifyingAccess": "Verifying workspace access...",
+    "notFound": "Workspace Not Found",
+    "invalidIdentifier": "Invalid workspace identifier",
+    "doesNotExist": "The workspace \"{{slug}}\" does not exist or is not accessible",
+    "createNew": "Create a New Workspace",
+    "goHome": "Go to Home",
+    "accessDenied": "Access Denied",
+    "notMember": "You are not a member of the workspace \"{{name}}\".",
+    "contactAdmin": "Please contact the workspace administrator for access.",
+    "goToMyWorkspaces": "Go to My Workspaces",
+    "createNewWorkspace": "Create New Workspace",
+    "createYourWorkspace": "Create Your Workspace",
+    "step1": "Step 1: Set up your workspace",
+    "step2": "Step 2: Create your admin account",
+    "workspaceName": "Workspace Name",
+    "workspaceNamePlaceholder": "Acme Inc",
+    "workspaceNameDesc": "This is the name of your organization or team",
+    "workspaceUrl": "Workspace URL",
+    "workspaceSlugPlaceholder": "acme-inc",
+    "continue": "Continue →",
+    "checking": "Checking...",
+    "firstName": "First Name",
+    "firstNamePlaceholder": "John",
+    "lastName": "Last Name",
+    "lastNamePlaceholder": "Doe",
+    "emailAddress": "Email Address",
+    "emailPlaceholder": "john@example.com",
+    "password": "Password",
+    "passwordPlaceholder": "••••••••",
+    "passwordDesc": "Must be at least 8 characters",
+    "back": "← Back",
+    "createWorkspace": "Create Workspace",
+    "creating": "Creating...",
+    "welcomeMessage": "Welcome to {{name}}! 🎉",
+    "provideWorkspaceName": "Please provide a workspace name",
+    "nameNotAvailable": "Workspace name is not available",
+    "failedToCheck": "Failed to check workspace name",
+    "provideEmailPassword": "Please provide your email and password",
+    "passwordTooShort": "Password must be at least 8 characters"
+  },
+  "workspaceLanding": {
+    "resetTitle": "Reset your password",
+    "resetDescription": "Set a new password for your account.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "passwordPlaceholder": "Enter password",
+    "confirmPasswordPlaceholder": "Confirm password",
+    "resetSave": "Save new password",
+    "resetMissingParams": "Missing reset token or user id.",
+    "resetFailed": "Failed to reset password.",
+    "resetSuccess": "Password changed — signing you in...",
+    "saving": "Saving...",
+    "passwordsNotMatch": "Passwords do not match",
+    "forgotPassword": "Forgot password?",
+    "forgotSent": "Password reset email sent!",
+    "forgotFailed": "Failed to send reset email.",
+    "sendReset": "Send reset link",
+    "sending": "Sending...",
+    "backToLogin": "Back to login",
+    "emailRequired": "Please enter your email address.",
+    "loadingWorkspace": "Loading workspace...",
+    "workspaceNotFound": "Workspace Not Found",
+    "workspaceDoesNotExist": "The workspace \"{{slug}}\" does not exist",
+    "createNewWorkspace": "Create a New Workspace",
+    "signInOrCreate": "Sign in to your account or create a new one",
+    "login": "Login",
+    "signUp": "Sign Up",
+    "email": "Email",
+    "emailPlaceholder": "you@example.com",
+    "password": "Password",
+    "firstName": "First Name",
+    "firstNamePlaceholder": "John",
+    "lastName": "Last Name",
+    "lastNamePlaceholder": "Doe",
+    "passwordRequirement": "Must be at least 8 characters",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "createAccount": "Create Account",
+    "creatingAccount": "Creating account...",
+    "welcomeBack": "Welcome back, {{email}}! 👋",
+    "welcomeTo": "Welcome to {{name}}! 🎉",
+    "loginFailed": "Login failed",
+    "signupFailed": "Signup failed",
+    "passwordTooShort": "Password must be at least 8 characters"
+  },
+  "language": {
+    "english": "English",
+    "arabic": "Arabic"
+  },
+  "evaluation": {
+    "criteriaUsed": "Evaluation Criteria Used",
+    "organizationCriteria": "Organization-level criteria"
+  }
+}
