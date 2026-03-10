@@ -1,7 +1,9 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 
 interface SuperAdminSidebarProps {
   isCollapsed: boolean;
@@ -18,6 +20,17 @@ const navItems = [
 
 export function SuperAdminSidebar({ isCollapsed, onToggle }: SuperAdminSidebarProps) {
   const [location, setLocation] = useLocation();
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/logout", { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error("Logout failed");
+    },
+    onSuccess: () => {
+      queryClient.clear();
+      setLocation("/admin/login");
+    },
+  });
 
   return (
     <div
@@ -68,11 +81,14 @@ export function SuperAdminSidebar({ isCollapsed, onToggle }: SuperAdminSidebarPr
       <div className="p-4 border-t border-border">
         <Button
           variant="outline"
-          className="w-full"
+          className={cn("w-full text-muted-foreground hover:text-destructive hover:border-destructive", isCollapsed && "px-0")}
           size={isCollapsed ? "icon" : "default"}
-          onClick={() => setLocation("/")}
+          onClick={() => logoutMutation.mutate()}
+          disabled={logoutMutation.isPending}
+          title="Logout"
         >
-          {isCollapsed ? <ChevronLeft className="w-4 h-4" /> : <>Exit</>}
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && <span className="ml-2">Logout</span>}
         </Button>
       </div>
     </div>
