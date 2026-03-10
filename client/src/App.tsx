@@ -45,6 +45,7 @@ import { WorkspaceGuard } from "@/components/WorkspaceGuard";
 import { AdminGuard } from "@/components/AdminGuard";
 import { SuperAdminGuard } from "@/components/SuperAdminGuard";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
+import SuperAdminLogin from "@/pages/SuperAdminLogin";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -88,6 +89,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={() => <PageTransition><WorkspaceEntry /></PageTransition>} />
+        <Route path="/admin/login" component={() => <PageTransition><SuperAdminLogin /></PageTransition>} />
         <Route path="/w/:slug/register" component={() => <PageTransition><WorkspaceLanding /></PageTransition>} />
         <Route path="/w/:slug/reset-password" component={() => <PageTransition><WorkspaceLanding /></PageTransition>} />
         <Route path="/create-workspace" component={() => <PageTransition><WorkspaceCreate /></PageTransition>} />
@@ -250,6 +252,12 @@ function Router() {
       )} />
 
       {/* Super admin platform dashboard */}
+      <Route path="/admin/login" component={() => (
+        <PageTransition>
+          <SuperAdminLogin />
+        </PageTransition>
+      )} />
+
       <Route path="/admin" component={() => (
         <PageTransition>
           <SuperAdminGuard><SuperAdminDashboard /></SuperAdminGuard>

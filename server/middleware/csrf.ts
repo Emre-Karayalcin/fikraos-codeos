@@ -54,7 +54,8 @@ export const csrfProtection: RequestHandler = (req, res, next) => {
     '/api/register',
     '/api/complete-invite',
     '/api/reset-password',
-    '/api/forgot-password'
+    '/api/forgot-password',
+    '/api/super-admin/login'
   ];
 
   // Check for exact match or workspace login/signup pattern

@@ -1,5 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { isAuthenticated } from "./auth";
+import { isAuthenticated, comparePasswords } from "./auth";
+import { authRateLimiter } from "./middleware/security";
+import { storage } from "./storage";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 
@@ -15,6 +17,61 @@ function isSuperAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 export function registerSuperAdminRoutes(app: Express) {
+  // POST /api/super-admin/login — login without workspace membership
+  app.post("/api/super-admin/login", authRateLimiter, async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      // Check if email is in SUPER_ADMIN_EMAILS before doing anything else
+      const envEmails = process.env.SUPER_ADMIN_EMAILS || "";
+      const allowedEmails = envEmails.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+      if (!allowedEmails.includes(email.toLowerCase())) {
+        return res.status(403).json({ message: "Not authorized as super admin" });
+      }
+
+      // Look up user by email (no workspace requirement)
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.password) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Verify password
+      const isValid = await comparePasswords(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Regenerate session to prevent fixation attacks
+      req.session.regenerate((regenerateErr) => {
+        if (regenerateErr) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        (req as any).login(user, (err: any) => {
+          if (err) {
+            return res.status(500).json({ message: "Login failed" });
+          }
+          res.json({
+            isSuperAdmin: true,
+            user: {
+              id: user.id,
+              email: user.email,
+              username: user.username,
+              firstName: user.firstName,
+              lastName: user.lastName,
+            },
+          });
+        });
+      });
+    } catch (error) {
+      console.error("Super admin login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
   // GET /api/super-admin/check — frontend guard probe
   app.get("/api/super-admin/check", isAuthenticated, isSuperAdmin, (_req: Request, res: Response) => {
     res.json({ isSuperAdmin: true });
