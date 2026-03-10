@@ -279,7 +279,7 @@ export function UnifiedSidebar() {
   const challengesLabel = (lang === 'ar' ? challengesNameAr : challengesNameEn) || t('navigation.challenges');
   const radarLabel = (lang === 'ar' ? radarNameAr : radarNameEn) || t('navigation.radar');
   const expertsLabel = (lang === 'ar' ? expertsNameAr : expertsNameEn) || t('navigation.experts');
-  const defaultLogo = 'https://cdn.prod.website-files.com/67549ad521b56d4557b61591/67549b63f93b975b38388be4_Group.png';
+  const defaultLogo = '/logo-code.jpeg';
 
   // Get workspace slug from URL or context
   const currentWorkspaceSlug = slug || workspaceSlug;
@@ -611,16 +611,17 @@ export function UnifiedSidebar() {
         <div className="p-3 sm:p-4 flex items-center justify-between">
           {!isCollapsed && (
             <div className="flex-1">
-              <img 
-                src={darkLogo || logo || defaultLogo}
-                alt={'FikraHub'}
-                className={`h-6 sm:h-8 object-contain hidden dark:block`}
-              />
-              <img 
-                src={logo || darkLogo || defaultLogo}
-                alt={'FikraHub'}
-                className={`h-6 sm:h-8 object-contain block dark:hidden`}
-              />
+              {(logo || darkLogo) ? (
+                <>
+                  <img src={darkLogo || logo} alt="Logo" className="h-6 sm:h-8 object-contain hidden dark:block" />
+                  <img src={logo || darkLogo} alt="Logo" className="h-6 sm:h-8 object-contain block dark:hidden" />
+                </>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <img src={defaultLogo} alt="Logo" className="h-6 sm:h-8 w-auto object-contain" />
+                  <span className="text-lg sm:text-xl font-bold text-foreground">OS</span>
+                </div>
+              )}
             </div>
           )}
           

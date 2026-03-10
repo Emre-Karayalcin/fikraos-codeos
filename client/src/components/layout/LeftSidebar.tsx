@@ -21,7 +21,7 @@ export function LeftSidebar() {
   const { logo, darkLogo, isLoading: brandingLoading } = useBranding(); // ✅ Get logo from branding
   
   // ✅ Fallback logo if branding is not loaded or no custom logo
-  const defaultLogo = 'https://cdn.prod.website-files.com/67549ad521b56d4557b61591/67549b63f93b975b38388be4_Group.png';
+  const defaultLogo = '/logo-code.jpeg';
   
   const { data: organizations = [] } = useQuery({
     queryKey: ["/api/organizations"],
@@ -41,21 +41,25 @@ export function LeftSidebar() {
           {brandingLoading ? (
             // Loading skeleton
             <div className="h-6 w-6 bg-muted animate-pulse rounded" />
-          ) : (
+          ) : (logo || darkLogo) ? (
             <>
               <img 
-                src={darkLogo || logo || defaultLogo} // ✅ Use branding logo or fallback
+                src={darkLogo || logo}
                 alt="Logo" 
                 className="w-6 h-6 hidden dark:block"
               />
               <img 
-                src={logo || darkLogo || defaultLogo} // ✅ Use branding logo or fallback
+                src={logo || darkLogo}
                 alt="Logo" 
                 className="w-6 h-6 block dark:hidden"
               />
             </>
+          ) : (
+            <div className="flex items-center gap-1">
+              <img src={defaultLogo} alt="Logo" className="h-6 w-auto object-contain" />
+              <span className="text-base font-bold text-foreground">OS</span>
+            </div>
           )}
-          <span className="text-lg font-semibold tracking-tight text-text-primary">fikrahub</span>
         </div>
         <Button 
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg px-4 py-2.5 font-medium transition-all"

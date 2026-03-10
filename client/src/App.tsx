@@ -284,7 +284,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-      <ThemeProvider defaultTheme="dark" storageKey="fikrahub-theme">
+      <ThemeProvider defaultTheme="light" storageKey="fikrahub-theme">
         <TooltipProvider>
           <SidebarProvider>
             <WorkspaceProvider>

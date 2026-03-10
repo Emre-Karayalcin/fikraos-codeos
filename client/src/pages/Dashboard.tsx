@@ -29,7 +29,7 @@ export default function Dashboard() {
   const { slug } = useParams<{ slug?: string }>();
   const { logo, darkLogo, isLoading: brandingLoading } = useBranding();
   
-  const defaultLogo = 'https://cdn.prod.website-files.com/67549ad521b56d4557b61591/67549b63f93b975b38388be4_Group.png';
+  const defaultLogo = '/logo-code.jpeg';
 
   // Fetch workspace info based on URL slug
   const { data: workspace } = useQuery({
@@ -208,19 +208,18 @@ export default function Dashboard() {
         {/* FikraHub Logo */}
         {isCollapsed && (
           <>
-            <div className="absolute top-4 sm:top-6 left-1/2 transform -translate-x-1/2 z-10 hidden dark:block">
-              <img 
-                src={darkLogo || logo || defaultLogo}
-                alt={'FikraHub'}
-                className={`h-7 sm:h-10 object-contain}`}
-              />
-            </div>
-            <div className="absolute top-4 sm:top-6 left-1/2 transform -translate-x-1/2 z-10 block dark:hidden">
-              <img 
-                src={logo || darkLogo || defaultLogo}
-                alt={'FikraHub'}
-                className={`h-7 sm:h-10 object-contain}`}
-              />
+            <div className="absolute top-4 sm:top-6 left-1/2 transform -translate-x-1/2 z-10">
+              {(logo || darkLogo) ? (
+                <>
+                  <img src={darkLogo || logo} alt="Logo" className="h-7 sm:h-10 object-contain hidden dark:block" />
+                  <img src={logo || darkLogo} alt="Logo" className="h-7 sm:h-10 object-contain block dark:hidden" />
+                </>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <img src={defaultLogo} alt="Logo" className="h-7 sm:h-10 object-contain" />
+                  <span className="text-xl sm:text-2xl font-bold text-foreground">OS</span>
+                </div>
+              )}
             </div>
           </>
         )}

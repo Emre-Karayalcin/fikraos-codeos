@@ -41,7 +41,7 @@ export default function Auth() {
   const { login, register: registerUser, isLoggingIn, isRegistering, isAuthenticated } = useAuth();
   const { logo, darkLogo,isLoading: brandingLoading } = useBranding();
   
-  const defaultLogo = 'https://cdn.prod.website-files.com/67549ad521b56d4557b61591/67549b63f93b975b38388be4_Group.png';
+  const defaultLogo = '/logo-code.jpeg';
 
   // Check if user is already logged in and redirect
   useEffect(() => {
@@ -200,17 +200,25 @@ export default function Auth() {
               <div className="h-12 w-48 bg-muted animate-pulse rounded" />
             ) : (
               <>
-                <img 
-                  src={ darkLogo || logo || defaultLogo} // ✅ Use branding logo or fallback
-                  alt="Logo" 
-                  className="h-12 w-auto object-contain hidden dark:block"
-                />
-                <img 
-                  src={logo || darkLogo || defaultLogo} // ✅ Use branding logo or fallback
-                  alt="Logo" 
-                  className="h-12 w-auto object-contain block dark:hidden"
-                />
-              </>
+              {(logo || darkLogo) ? (
+                <>
+                  <img 
+                    src={darkLogo || logo}
+                    alt="Logo" 
+                    className="h-12 w-auto object-contain hidden dark:block"
+                  />
+                  <img 
+                    src={logo || darkLogo}
+                    alt="Logo" 
+                    className="h-12 w-auto object-contain block dark:hidden"
+                  />
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <img src={defaultLogo} alt="Logo" className="h-12 w-auto object-contain" />
+                  <span className="text-3xl font-bold text-foreground">OS</span>
+                </div>
+              )}
             )}
           </motion.div>
         </div>

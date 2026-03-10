@@ -35,12 +35,13 @@ export default function WorkspaceEntry() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="w-24 h-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="flex items-center gap-2 px-2">
                 <img
-                  src="https://cdn.prod.website-files.com/67549ad521b56d4557b61591/67549b63f93b975b38388be4_Group.png"
-                  alt="Fikrahub Logo"
-                  className="w-20 h-auto"
+                  src="/logo-code.jpeg"
+                  alt="CodeOS Logo"
+                  className="h-12 w-auto object-contain"
                 />
+                <span className="text-3xl font-bold text-foreground">OS</span>
               </div>
             </div>
 
