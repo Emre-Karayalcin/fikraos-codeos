@@ -383,7 +383,7 @@ export default function SuperAdminDashboard() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: "workspaces", label: "Workspaces" },
-    { key: "users", label: "Users" },
+    // { key: "users", label: "Users" },
     { key: "ideas", label: "Ideas" },
   ];
 
