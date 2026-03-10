@@ -1,5 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { isAuthenticated, comparePasswords } from "./auth";
+import { isAuthenticated, comparePasswords, hashPassword } from "./auth";
 import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -271,6 +271,40 @@ export function registerSuperAdminRoutes(app: Express) {
   });
 
   // ── User CRUD ─────────────────────────────────────────────────────────────
+
+  // POST /api/super-admin/users — create a new user
+  app.post("/api/super-admin/users", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { email, password, firstName, lastName, username } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ message: "email and password are required" });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      // Check email uniqueness
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(409).json({ message: "A user with that email already exists" });
+      }
+
+      const hashed = await hashPassword(password);
+      const newUser = await storage.createUser({
+        email,
+        password: hashed,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        username: username || null,
+      });
+
+      const { password: _pw, ...safeUser } = newUser as any;
+      res.status(201).json(safeUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
 
   // PATCH /api/super-admin/users/:id — update user profile
   app.patch("/api/super-admin/users/:id", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {

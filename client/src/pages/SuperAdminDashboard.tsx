@@ -281,6 +281,23 @@ export default function SuperAdminDashboard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+
+  const createUser = useMutation({
+    mutationFn: (data: { email: string; password: string; firstName: string; lastName: string; username: string }) =>
+      apiFetch("/api/super-admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/users"] });
+      toast.success("User created");
+      setCreateUserOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const selectedWorkspace = useMemo(
     () => (filterOrgId !== "all" ? workspaces?.find((w) => w.id === filterOrgId) : null) ?? null,
     [filterOrgId, workspaces]
@@ -531,10 +548,13 @@ export default function SuperAdminDashboard() {
           {/* ── Users table ─────────────────────────────────────────────── */}
           {activeTab === "users" && (
             <Card className="border border-border/50">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
                 <CardTitle className="text-base font-semibold">
                   Users {selectedWorkspace ? `— ${selectedWorkspace.name}` : ""}
                 </CardTitle>
+                <Button size="sm" onClick={() => setCreateUserOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1" /> New User
+                </Button>
               </CardHeader>
               <CardContent className="p-0">
                 {usersLoading ? (
@@ -699,6 +719,15 @@ export default function SuperAdminDashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ── Create User Modal ────────────────────────────────────────────── */}
+      {createUserOpen && (
+        <CreateUserModal
+          onClose={() => setCreateUserOpen(false)}
+          onSubmit={(data) => createUser.mutate(data)}
+          isPending={createUser.isPending}
+        />
+      )}
+
       {/* ── Edit User Modal ───────────────────────────────────────────────── */}
       {userForModal && (
         <UserModal
@@ -820,6 +849,61 @@ function TypeBadge({ type }: { type: string }) {
     <span className={`inline-flex items-center text-xs rounded-full px-2.5 py-0.5 font-medium ${style}`}>
       {label}
     </span>
+  );
+}
+
+// ─── CreateUserModal ──────────────────────────────────────────────────────────
+
+interface CreateUserModalProps {
+  onClose: () => void;
+  onSubmit: (data: { email: string; password: string; firstName: string; lastName: string; username: string }) => void;
+  isPending: boolean;
+}
+
+function CreateUserModal({ onClose, onSubmit, isPending }: CreateUserModalProps) {
+  const [form, setForm] = useState({ email: "", password: "", firstName: "", lastName: "", username: "" });
+  const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const isValid = form.email.trim() !== "" && form.password.length >= 8;
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>New User</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>First Name</Label>
+              <Input value={form.firstName} onChange={(e) => set("firstName", e.target.value)} placeholder="Jane" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Last Name</Label>
+              <Input value={form.lastName} onChange={(e) => set("lastName", e.target.value)} placeholder="Doe" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Username</Label>
+            <Input value={form.username} onChange={(e) => set("username", e.target.value)} placeholder="janedoe" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Email <span className="text-destructive">*</span></Label>
+            <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="jane@example.com" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Password <span className="text-destructive">*</span></Label>
+            <Input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} placeholder="Min 8 characters" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
+          <Button onClick={() => onSubmit(form)} disabled={!isValid || isPending}>
+            {isPending ? "Creating…" : "Create User"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
