@@ -22,6 +22,7 @@ export function LeftSidebar() {
   
   // ✅ Fallback logo if branding is not loaded or no custom logo
   const defaultLogo = '/logo-code.jpeg';
+  const defaultDarkLogo = '/logo-code-light.jpeg';
   
   const { data: organizations = [] } = useQuery({
     queryKey: ["/api/organizations"],
@@ -55,10 +56,16 @@ export function LeftSidebar() {
               />
             </>
           ) : (
-            <div className="flex items-center gap-1">
-              <img src={defaultLogo} alt="Logo" className="h-6 w-auto object-contain" />
-              <span className="text-base font-bold text-foreground">OS</span>
-            </div>
+            <>
+              <div className="flex items-center gap-1 hidden dark:flex">
+                <img src={defaultDarkLogo} alt="Logo" className="h-6 w-auto object-contain" />
+                <span className="text-base font-bold text-foreground">OS</span>
+              </div>
+              <div className="flex items-center gap-1 dark:hidden">
+                <img src={defaultLogo} alt="Logo" className="h-6 w-auto object-contain" />
+                <span className="text-base font-bold text-foreground">OS</span>
+              </div>
+            </>
           )}
         </div>
         <Button 

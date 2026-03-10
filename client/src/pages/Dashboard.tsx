@@ -30,6 +30,7 @@ export default function Dashboard() {
   const { logo, darkLogo, isLoading: brandingLoading } = useBranding();
   
   const defaultLogo = '/logo-code.jpeg';
+  const defaultDarkLogo = '/logo-code-light.jpeg';
 
   // Fetch workspace info based on URL slug
   const { data: workspace } = useQuery({
@@ -215,10 +216,16 @@ export default function Dashboard() {
                   <img src={logo || darkLogo} alt="Logo" className="h-7 sm:h-10 object-contain block dark:hidden" />
                 </>
               ) : (
-                <div className="flex items-center gap-1.5">
-                  <img src={defaultLogo} alt="Logo" className="h-7 sm:h-10 object-contain" />
-                  <span className="text-xl sm:text-2xl font-bold text-foreground">OS</span>
-                </div>
+                <>
+                  <div className="flex items-center gap-1.5 hidden dark:flex">
+                    <img src={defaultDarkLogo} alt="Logo" className="h-7 sm:h-10 object-contain" />
+                    <span className="text-xl sm:text-2xl font-bold text-foreground">OS</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 dark:hidden">
+                    <img src={defaultLogo} alt="Logo" className="h-7 sm:h-10 object-contain" />
+                    <span className="text-xl sm:text-2xl font-bold text-foreground">OS</span>
+                  </div>
+                </>
               )}
             </div>
           </>

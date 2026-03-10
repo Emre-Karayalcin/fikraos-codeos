@@ -37,9 +37,14 @@ export default function WorkspaceEntry() {
             <div className="flex justify-center">
               <div className="flex items-center gap-2 px-2">
                 <img
+                  src="/logo-code-light.jpeg"
+                  alt="CodeOS Logo"
+                  className="h-12 w-auto object-contain hidden dark:block"
+                />
+                <img
                   src="/logo-code.jpeg"
                   alt="CodeOS Logo"
-                  className="h-12 w-auto object-contain"
+                  className="h-12 w-auto object-contain dark:hidden"
                 />
                 <span className="text-3xl font-bold text-foreground">OS</span>
               </div>

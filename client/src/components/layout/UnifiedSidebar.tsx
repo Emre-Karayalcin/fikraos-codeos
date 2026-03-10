@@ -280,6 +280,7 @@ export function UnifiedSidebar() {
   const radarLabel = (lang === 'ar' ? radarNameAr : radarNameEn) || t('navigation.radar');
   const expertsLabel = (lang === 'ar' ? expertsNameAr : expertsNameEn) || t('navigation.experts');
   const defaultLogo = '/logo-code.jpeg';
+  const defaultDarkLogo = '/logo-code-light.jpeg';
 
   // Get workspace slug from URL or context
   const currentWorkspaceSlug = slug || workspaceSlug;
@@ -617,10 +618,16 @@ export function UnifiedSidebar() {
                   <img src={logo || darkLogo} alt="Logo" className="h-6 sm:h-8 object-contain block dark:hidden" />
                 </>
               ) : (
-                <div className="flex items-center gap-1">
-                  <img src={defaultLogo} alt="Logo" className="h-6 sm:h-8 w-auto object-contain" />
-                  <span className="text-lg sm:text-xl font-bold text-foreground">OS</span>
-                </div>
+                <>
+                  <div className="flex items-center gap-1 hidden dark:flex">
+                    <img src={defaultDarkLogo} alt="Logo" className="h-6 sm:h-8 w-auto object-contain" />
+                    <span className="text-lg sm:text-xl font-bold text-foreground">OS</span>
+                  </div>
+                  <div className="flex items-center gap-1 dark:hidden">
+                    <img src={defaultLogo} alt="Logo" className="h-6 sm:h-8 w-auto object-contain" />
+                    <span className="text-lg sm:text-xl font-bold text-foreground">OS</span>
+                  </div>
+                </>
               )}
             </div>
           )}

@@ -42,6 +42,7 @@ export default function Auth() {
   const { logo, darkLogo,isLoading: brandingLoading } = useBranding();
   
   const defaultLogo = '/logo-code.jpeg';
+  const defaultDarkLogo = '/logo-code-light.jpeg';
 
   // Check if user is already logged in and redirect
   useEffect(() => {
@@ -214,10 +215,16 @@ export default function Auth() {
                   />
                 </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <img src={defaultLogo} alt="Logo" className="h-12 w-auto object-contain" />
-                  <span className="text-3xl font-bold text-foreground">OS</span>
-                </div>
+                <>
+                  <div className="flex items-center gap-2 hidden dark:flex">
+                    <img src={defaultDarkLogo} alt="Logo" className="h-12 w-auto object-contain" />
+                    <span className="text-3xl font-bold text-foreground">OS</span>
+                  </div>
+                  <div className="flex items-center gap-2 dark:hidden">
+                    <img src={defaultLogo} alt="Logo" className="h-12 w-auto object-contain" />
+                    <span className="text-3xl font-bold text-foreground">OS</span>
+                  </div>
+                </>
               )}
             )}
           </motion.div>
