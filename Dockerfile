@@ -6,6 +6,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
+# Upgrade npm to avoid E400 registry errors with older npm versions
+RUN npm install -g npm@latest
+
 # Install dependencies
 RUN npm ci
 
@@ -29,6 +32,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy package files
 COPY package.json package-lock.json* ./
+
+# Upgrade npm to avoid E400 registry errors with older npm versions
+RUN npm install -g npm@latest
 
 # Install all dependencies (needed because bundled code references dev dependencies)
 RUN npm ci
