@@ -1,5 +1,6 @@
 import { useLocation, useParams } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import {
   FiZap,
   FiUsers,
@@ -135,6 +136,18 @@ export default function Dashboard() {
           </button>
         </div>
       </header>
+
+      {/* 3D Orb - Fixed to Bottom of Viewport */}
+      <div className="absolute left-1/2 pointer-events-none" style={{
+        bottom: '-450px',
+        transform: 'translateX(-50%)',
+        zIndex: 1,
+        opacity: 0.85,
+        width: '1000px',
+        height: '1000px',
+      }}>
+        <OrbVisualization state="idle" size={1000} />
+      </div>
 
       {/* Background Gradient Blobs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
