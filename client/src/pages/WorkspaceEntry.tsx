@@ -42,7 +42,7 @@ export default function WorkspaceEntry() {
                   className="h-12 w-auto object-contain hidden dark:block"
                 />
                 <img
-                  src="/code-logo.png"
+                  src="/logo-code.jpeg"
                   alt="CodeOS Logo"
                   className="h-12 w-auto object-contain dark:hidden"
                 />

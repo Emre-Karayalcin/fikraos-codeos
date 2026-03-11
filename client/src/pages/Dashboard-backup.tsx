@@ -29,7 +29,7 @@ export default function Dashboard() {
   const { slug } = useParams<{ slug?: string }>();
   const { logo, darkLogo, isLoading: brandingLoading } = useBranding();
   
-  const defaultLogo = '/code-logo.png';
+  const defaultLogo = '/logo-code.jpeg';
   const defaultDarkLogo = '/logo-code-light.jpeg';
 
   // Fetch workspace info based on URL slug

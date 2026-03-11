@@ -279,7 +279,7 @@ export function UnifiedSidebar() {
   const challengesLabel = (lang === 'ar' ? challengesNameAr : challengesNameEn) || t('navigation.challenges');
   const radarLabel = (lang === 'ar' ? radarNameAr : radarNameEn) || t('navigation.radar');
   const expertsLabel = (lang === 'ar' ? expertsNameAr : expertsNameEn) || t('navigation.experts');
-  const defaultLogo = '/code-logo.png';
+  const defaultLogo = '/logo-code.jpeg';
   const defaultDarkLogo = '/logo-code-light.jpeg';
 
   // Get workspace slug from URL or context
