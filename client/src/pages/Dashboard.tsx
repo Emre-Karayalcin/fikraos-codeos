@@ -101,7 +101,7 @@ export default function Dashboard() {
       <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 1px 12px rgba(0,0,0,0.06)' }}>
         {/* Logo */}
         <div className="flex items-center gap-1.5">
-          <img src="/logo-code.jpeg" alt="Logo" className="h-7 object-contain dark:hidden" style={{ display: 'block', marginTop: '-2px' }} loading="eager" />
+          <img src="/code-logo.png" alt="Logo" className="h-7 object-contain dark:hidden" style={{ display: 'block', marginTop: '-2px' }} loading="eager" />
           <img src="/logo-code-light.jpeg" alt="Logo" className="h-7 object-contain hidden dark:block" style={{ display: 'none', marginTop: '-2px' }} loading="eager" />
           <span className="text-2xl font-bold text-gray-900">OS</span>
         </div>
@@ -155,7 +155,7 @@ export default function Dashboard() {
             <div className="relative z-10">
               <h1 className="text-5xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-3 flex-wrap">
                 <span>Welcome to</span>
-                <img src="/logo-code.jpeg" alt="Logo" className="h-12 object-contain dark:hidden" style={{ display: 'inline-block', marginTop: '-6px' }} loading="eager" />
+                <img src="/code-logo.png" alt="Logo" className="h-12 object-contain dark:hidden" style={{ display: 'inline-block', marginTop: '-6px' }} loading="eager" />
                 <img src="/logo-code-light.jpeg" alt="Logo" className="h-12 object-contain hidden dark:inline-block" style={{ marginTop: '-6px' }} loading="eager" />
                 <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">OS</span>
               </h1>
