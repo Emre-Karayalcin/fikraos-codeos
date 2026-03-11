@@ -1,393 +1,213 @@
-import { useState, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Send, Sparkles, LogOut, Search, Lightbulb, Settings, Users, BarChart3, Code, Zap, Target, Crown } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import toast from 'react-hot-toast';
-import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
-import { BottomNavigation } from "@/components/layout/BottomNavigation";
-import ThemeSelector from "@/components/theme/ThemeSelector";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useBranding } from "@/contexts/BrandingContext";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  FiZap,
+  FiUsers,
+  FiBookOpen,
+  FiBarChart2,
+  FiBell,
+  FiLogOut,
+  FiSearch,
+  FiStar,
+} from "react-icons/fi";
 
-export type InputMode = 'develop' | 'research' | 'launch';
-import { useSidebar } from "@/contexts/SidebarContext";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+interface DashboardCard {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  color: string;
+  path: string;
+}
 
 export default function Dashboard() {
-  const { t, i18n } = useTranslation();
-  const [idea, setIdea] = useState("");
-  const [inputMode, setInputMode] = useState<InputMode>('develop');
-  const [generationMode, setGenerationMode] = useState<'lite' | 'pro' | 'max'>('pro');
-  const { user, logout, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
-  const { isCollapsed } = useSidebar();
+  const { user, logout } = useAuth();
   const { slug } = useParams<{ slug?: string }>();
-  const { logo, darkLogo, isLoading: brandingLoading } = useBranding();
-  
-  const defaultLogo = '/logo-code.jpeg';
-  const defaultDarkLogo = '/logo-code-light.jpeg';
 
-  // Fetch workspace info based on URL slug
-  const { data: workspace } = useQuery({
-    queryKey: [`/api/workspaces/${slug}`],
-    queryFn: async () => {
-      if (!slug) return null;
-      const response = await fetch(`/api/workspaces/${slug}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: isAuthenticated && !!slug,
-    staleTime: 0,
-    refetchOnMount: true,
-  });
-
-  // Get current organization ID from workspace
-  const currentOrg = workspace ? { id: workspace.id, slug: workspace.slug } : null;
-
-  // Check user role for admin access
-  const { data: userRole, isLoading: roleLoading } = useQuery({
-    queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'check-role'],
-    queryFn: async () => {
-      if (!currentOrg?.id) return null;
-      try {
-        const response = await fetch(`/api/organizations/${currentOrg.id}/admin/check-role`, {
-          credentials: 'include'
-        });
-        if (!response.ok) return null;
-        return response.json();
-      } catch (error) {
-        console.warn('Failed to check admin role:', error);
-        return null;
-      }
-    },
-    enabled: isAuthenticated && !!currentOrg?.id,
-    retry: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const isAdmin = !roleLoading && userRole && (userRole.role === 'OWNER' || userRole.role === 'ADMIN');
-
-  // Fetch admin stats if user is admin
-  const { data: adminStats } = useQuery({
-    queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'stats'],
-    queryFn: async () => {
-      if (!currentOrg?.id) return null;
-      const response = await fetch(`/api/organizations/${currentOrg.id}/admin/stats`, {
-        credentials: 'include'
-      });
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: isAuthenticated && !!currentOrg?.id && !!isAdmin,
-    retry: false
-  });
-
-  // Random greeting messages with translation
-  const getRandomGreeting = () => {
-    const name = user?.firstName || user?.username || t('common.you') || "there";
-    const greetings = [
-      t('dashboard.greetings.backAtIt', { name }),
-      t('dashboard.greetings.salam', { name }),
-      t('dashboard.greetings.welcome', { name }),
-      t('dashboard.greetings.feelingCreative'),
-      t('dashboard.greetings.readyTo')
-    ];
-
-    return greetings[Math.floor(Math.random() * greetings.length)];
+  const handleSignOut = () => {
+    logout();
+    localStorage.removeItem('user');
+    window.location.href = '/';
   };
 
-  const [greeting, setGreeting] = useState(() => getRandomGreeting());
+  const getUserInitials = () => {
+    if (!user) return "";
+    const name = (user as any).fullName || `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() || (user as any).username || '';
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .map((n: string) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || '?';
+  };
 
-  useEffect(() => {
-    setGreeting(getRandomGreeting());
-  }, [user?.firstName, user?.username, t]);
+  const getUserDisplayName = () => {
+    if (!user) return '';
+    return (user as any).fullName || (user as any).firstName || (user as any).username || '';
+  };
 
-  const createProjectMutation = useMutation({
-    mutationFn: async (ideaText: string) => {
-      const projectResponse = await apiRequest(
-        "POST",
-        "/api/projects",
-        {
-          orgId: currentOrg?.id || "046c0661-1ce9-4b73-9268-80e92f4e6be1",
-          title: ideaText.substring(0, 50) + (ideaText.length > 50 ? "..." : ""),
-          description: `Business idea: ${ideaText}`
-        }
-      );
-      const project = await projectResponse.json();
-
-      const chatResponse = await apiRequest(
-        "POST",
-        "/api/chats",
-        {
-          projectId: project.id,
-          title: t('projects.initialConversation')
-        }
-      );
-      const chat = await chatResponse.json();
-
-      await apiRequest(
-        "POST",
-        "/api/messages",
-        {
-          chatId: chat.id,
-          role: "user",
-          text: ideaText
-        }
-      );
-
-      await apiRequest(
-        "POST",
-        "/api/agent/chat",
-        {
-          message: "__AGENT_START__",
-          chatId: chat.id,
-          language: i18n.language || 'en',
-        }
-      );
-
-      return { project, chat };
+  const cards: DashboardCard[] = [
+    {
+      id: 'my-ideas',
+      title: 'My Ideas',
+      description: 'View and develop your ideas',
+      icon: FiStar,
+      color: 'text-gray-600',
+      path: `/w/${slug}/my-ideas`,
     },
-    onSuccess: ({ project, chat }) => {
-      setLocation(`/w/${slug}/chat/${chat.id}`);
+    {
+      id: 'challenges',
+      title: 'Challenges',
+      description: 'Compete in active challenges',
+      icon: FiZap,
+      color: 'text-blue-600',
+      path: `/w/${slug}/challenges`,
     },
-    onError: (error: any) => {
-      toast.error(error.message || t('errors.failedToCreate'));
+    {
+      id: 'research',
+      title: 'Research',
+      description: 'Explore market insights',
+      icon: FiSearch,
+      color: 'text-purple-600',
+      path: `/w/${slug}/research`,
     },
-  });
+    {
+      id: 'experts',
+      title: 'Experts',
+      description: 'Connect with expert mentors',
+      icon: FiUsers,
+      color: 'text-green-600',
+      path: `/w/${slug}/experts`,
+    },
+    {
+      id: 'academy',
+      title: 'Academy',
+      description: 'Learn essential business skills',
+      icon: FiBookOpen,
+      color: 'text-orange-600',
+      path: `/w/${slug}/academy`,
+    },
+  ];
 
-  const handleSubmit = () => {
-    if (idea.trim()) {
-      if (inputMode === 'research') {
-        setLocation(`/w/${slug}/research?q=${encodeURIComponent(idea.trim())}`);
-      } else if (inputMode === 'launch') {
-        toast.error(t('dashboard.modes.launch.disabled'));
-        return;
-      } else {
-        createProjectMutation.mutate(idea.trim());
-      }
-    }
-  };
-  
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
-
-  // Get mode-specific greeting
-  const getModeGreeting = () => {
-    if (inputMode === 'research') return t('dashboard.modes.research.greeting');
-    if (inputMode === 'launch') return t('dashboard.modes.launch.greeting');
-    return greeting;
-  };
-
-  // Get mode-specific placeholder
-  const getModePlaceholder = () => {
-    if (inputMode === 'research') return t('dashboard.modes.research.placeholder');
-    if (inputMode === 'launch') return t('dashboard.modes.launch.placeholder');
-    return t('dashboard.modes.develop.placeholder');
-  };
+  if (!user) {
+    return null;
+  }
 
   return (
-    <div className="h-screen bg-background text-foreground flex overflow-hidden">
-      {/* Left Sidebar */}
-      <div className="hidden sm:block">
-        <UnifiedSidebar />
+    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #e8eeff 40%, #ede8ff 100%)' }}>
+      {/* Header */}
+      <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 1px 12px rgba(0,0,0,0.06)' }}>
+        {/* Logo */}
+        <div className="flex items-center gap-1.5">
+          <img src="/logo-code.jpeg" alt="Logo" className="h-7 object-contain dark:hidden" style={{ display: 'block', marginTop: '-2px' }} loading="eager" />
+          <img src="/logo-code-light.jpeg" alt="Logo" className="h-7 object-contain hidden dark:block" style={{ display: 'none', marginTop: '-2px' }} loading="eager" />
+          <span className="text-2xl font-bold text-gray-900">OS</span>
+        </div>
+
+        {/* Right Side */}
+        <div className="flex items-center gap-4">
+          {/* Notification Icon */}
+          <button className="relative p-2 rounded-xl hover:bg-white/80 hover:shadow-sm transition-all duration-200">
+            <FiBell size={20} className="text-gray-600" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+          </button>
+
+          {/* User Profile */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-sm font-medium shadow-sm">
+              {getUserInitials()}
+            </div>
+            <div className="text-sm hidden sm:block">
+              <p className="font-medium text-gray-900">{getUserDisplayName()}</p>
+              <p className="text-xs text-gray-500 capitalize">{(user as any).role || 'Member'}</p>
+            </div>
+          </div>
+
+          {/* Sign Out */}
+          <button
+            onClick={handleSignOut}
+            className="p-2 rounded-xl hover:bg-white/80 hover:shadow-sm transition-all duration-200"
+            title="Sign Out"
+          >
+            <FiLogOut size={20} className="text-gray-600" />
+          </button>
+        </div>
+      </header>
+
+      {/* Background Gradient Blobs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+        <div className="absolute top-20 left-10 w-96 h-96 rounded-full blur-3xl" style={{ background: 'rgba(24, 80, 238, 0.10)' }}></div>
+        <div className="absolute top-40 right-20 w-80 h-80 rounded-full blur-3xl" style={{ background: 'rgba(99, 74, 219, 0.12)' }}></div>
+        <div className="absolute bottom-20 left-1/4 w-72 h-72 rounded-full blur-3xl" style={{ background: 'rgba(24, 80, 238, 0.08)' }}></div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 relative min-w-0 pb-20 sm:pb-0">
-        {/* FikraHub Logo */}
-        {isCollapsed && (
-          <>
-            <div className="absolute top-4 sm:top-6 left-1/2 transform -translate-x-1/2 z-10">
-              {(logo || darkLogo) ? (
-                <>
-                  <img src={darkLogo || logo} alt="Logo" className="h-7 sm:h-10 object-contain hidden dark:block" />
-                  <img src={logo || darkLogo} alt="Logo" className="h-7 sm:h-10 object-contain block dark:hidden" />
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1.5 hidden dark:flex">
-                    <img src={defaultDarkLogo} alt="Logo" className="h-7 sm:h-10 object-contain" />
-                    <span className="text-xl sm:text-2xl font-bold text-foreground">OS</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 dark:hidden">
-                    <img src={defaultLogo} alt="Logo" className="h-7 sm:h-10 object-contain" />
-                    <span className="text-xl sm:text-2xl font-bold text-foreground">OS</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
-        
-        {/* Top Right Controls */}
-        <div className="absolute top-4 sm:top-6 ltr:right-4 ltr:sm:right-6 rtl:left-4 rtl:sm:left-6 flex items-center gap-2 sm:gap-3 z-10">
-          {isAuthenticated ? (
-            <LanguageSwitcher />
-          ) : (
-            <span className="px-2 sm:px-3 py-1 bg-muted/30 text-text-secondary text-xs font-medium rounded-full border border-border">
-              {t('dashboard.admin.betaMode')}
-            </span>
-          )}
-        </div>
+      <main className="flex-1 overflow-auto relative">
+        <div className="max-w-7xl mx-auto px-6 space-y-6 py-6 pb-4 relative z-10">
 
-        {/* Main Content */}
-        <div className={`w-full mx-auto text-center ${isAdmin ? 'max-w-6xl' : 'max-w-xl sm:max-w-2xl'}`}>
-          {/* Main Heading */}
-          <div className="mb-8 sm:mb-12">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold mb-4 sm:mb-6 text-text-primary leading-tight px-4 transition-all duration-500 ease-in-out">
-              {getModeGreeting()}
-            </h1>
+          {/* Welcome Section */}
+          <div className="text-center py-12 relative min-h-[180px]">
+            <div className="absolute inset-0 flex items-center justify-center opacity-30">
+              <div className="w-96 h-96 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(24,80,238,0.25) 0%, rgba(139,92,246,0.15) 100%)' }}></div>
+            </div>
+            <div className="relative z-10">
+              <h1 className="text-5xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-3 flex-wrap">
+                <span>Welcome to</span>
+                <img src="/logo-code.jpeg" alt="Logo" className="h-12 object-contain dark:hidden" style={{ display: 'inline-block', marginTop: '-6px' }} loading="eager" />
+                <img src="/logo-code-light.jpeg" alt="Logo" className="h-12 object-contain hidden dark:inline-block" style={{ marginTop: '-6px' }} loading="eager" />
+                <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">OS</span>
+              </h1>
+              <p className="text-gray-500 text-lg font-medium">Choose a module to accelerate your entrepreneurial journey</p>
+            </div>
           </div>
 
-          {/* Generation Mode Selector - Only for Launch mode */}
-          {inputMode === 'launch' && (
-            <div className="w-full max-w-2xl mx-auto px-4 mb-6">
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-sm text-muted-foreground mr-2">{t('dashboard.generationModes.speed')}</span>
-                <div className="bg-background border border-border rounded-lg p-1 flex gap-1 shadow-sm">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setGenerationMode('lite')}
-                    className={`px-3 py-2 h-auto rounded text-xs font-medium ${generationMode === 'lite' ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
-                    title={t('dashboard.generationModes.lite.description')}
-                  >
-                    <Zap className="w-3 h-3 mr-1" />
-                    {t('dashboard.generationModes.lite.label')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setGenerationMode('pro')}
-                    className={`px-3 py-2 h-auto rounded text-xs font-medium ${generationMode === 'pro' ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
-                    title={t('dashboard.generationModes.pro.description')}
-                  >
-                    <Target className="w-3 h-3 mr-1" />
-                    {t('dashboard.generationModes.pro.label')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setGenerationMode('max')}
-                    className={`px-3 py-2 h-auto rounded text-xs font-medium ${generationMode === 'max' ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
-                    title={t('dashboard.generationModes.max.description')}
-                  >
-                    <Crown className="w-3 h-3 mr-1" />
-                    {t('dashboard.generationModes.max.label')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Input Area */}
-          <div className="space-y-3">
-            <div className="relative">
-              <Textarea
-                value={idea}
-                onChange={(e) => setIdea(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={getModePlaceholder()}
-                className="w-full bg-input-bg border border-input-border rounded-xl pl-4 pr-12 sm:pr-16 py-4 sm:py-6 text-base sm:text-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 min-h-[120px] sm:min-h-[140px] text-text-primary placeholder-text-muted"
-                rows={3}
-                data-testid="input-idea"
-              />
-              
-              {/* Mode Switcher */}
-              <div className="absolute bottom-3 left-3 flex gap-1 sm:gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setInputMode('develop')}
-                  className={`p-1.5 h-auto touch-manipulation sm:p-1 rounded-lg ${
-                    inputMode === 'develop' 
-                      ? 'bg-primary/10 text-primary border border-primary/20' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  data-testid="mode-develop"
-                  title={t('dashboard.modes.develop.title')}
-                >
-                  <Lightbulb className="w-4 h-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setInputMode('research')}
-                  className={`p-1.5 h-auto touch-manipulation sm:p-1 rounded-lg ${
-                    inputMode === 'research' 
-                      ? 'bg-primary/10 text-primary border border-primary/20' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  data-testid="mode-research"
-                  title={t('dashboard.modes.research.title')}
-                >
-                  <Search className="w-4 h-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    toast.error(t('dashboard.modes.launch.disabled'));
+          {/* Cards Grid */}
+          <div className="flex justify-center px-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-7xl w-full min-h-[180px]">
+              {cards.map((card) => (
+                <div
+                  key={card.id}
+                  className="group relative overflow-hidden cursor-pointer rounded-3xl p-6 aspect-square min-h-[160px] flex flex-col justify-between transition-all duration-300 hover:scale-105"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.5)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03)',
+                    willChange: 'transform',
                   }}
-                  className="p-1.5 h-auto touch-manipulation sm:p-1 rounded-lg text-muted-foreground/50 cursor-not-allowed opacity-50"
-                  data-testid="mode-launch"
-                  title={t('dashboard.modes.launch.comingSoon')}
-                  disabled
+                  onClick={() => setLocation(card.path)}
                 >
-                  <Code className="w-4 h-4" />
-                </Button>
-              </div>
-              
-              {/* Submit Button/Help Text */}
-              <div className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4">
-                {idea.trim() ? (
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={createProjectMutation.isPending}
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg px-3 py-2 text-sm font-medium transition-all disabled:opacity-50 touch-manipulation min-h-[44px]"
-                    data-testid="button-submit-idea"
-                  >
-                    {createProjectMutation.isPending ? (
-                      <Sparkles className="w-4 h-4 mr-1.5 animate-pulse" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-1.5" />
-                    )}
-                    {createProjectMutation.isPending ? t('dashboard.starting') : t('dashboard.enter')}
-                  </Button>
-                ) : (
-                  <div className="text-xs text-text-muted flex items-center gap-1 hidden sm:flex">
-                    <span>{t('dashboard.helpText.pressEnter')}</span>
-                    <span className="bg-muted/20 px-1 py-0.5 rounded text-xs">Enter</span>
-                    <span>{t('dashboard.helpText.toSubmit')}</span>
+                  {/* Hover Gradient */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-3xl" style={{ background: 'linear-gradient(135deg, rgba(24,80,238,0.04) 0%, rgba(139,92,246,0.04) 100%)' }}></div>
+
+                  {/* Top Light Reflection */}
+                  <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent)' }}></div>
+
+                  {/* Icon */}
+                  <div className="relative z-10 flex items-center justify-start">
+                    <div
+                      className="p-3 rounded-2xl transition-all duration-300 group-hover:scale-110"
+                      style={{ background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(10px)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                    >
+                      <card.icon size={36} className={`${card.color} transition-transform duration-300 group-hover:scale-110`} />
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Content */}
+                  <div className="relative z-10 space-y-2">
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight group-hover:text-primary transition-colors">{card.title}</h3>
+                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 opacity-80">{card.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+
         </div>
-      </div>
-      
-      {/* Bottom Navigation */}
-      <BottomNavigation />
+      </main>
     </div>
   );
 }
