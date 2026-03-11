@@ -1009,6 +1009,13 @@ const ROLE_COLORS: Record<string, string> = {
   MEMBER: "bg-slate-500/15 text-slate-400 border border-slate-500/20",
 };
 
+const ROLE_DISPLAY: Record<string, string> = {
+  OWNER: "OWNER",
+  ADMIN: "PMO",
+  MENTOR: "MENTOR",
+  MEMBER: "MEMBER",
+};
+
 function WorkspacePills({ workspaces }: { workspaces: UserWorkspace[] }) {
   if (!workspaces || workspaces.length === 0) {
     return <span className="text-muted-foreground text-xs">None</span>;
@@ -1021,7 +1028,7 @@ function WorkspacePills({ workspaces }: { workspaces: UserWorkspace[] }) {
           className={`inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 ${ROLE_COLORS[ws.role] || ROLE_COLORS.MEMBER}`}
         >
           {ws.name}
-          <span className="opacity-60">· {ws.role}</span>
+          <span className="opacity-60">· {ROLE_DISPLAY[ws.role] ?? ws.role}</span>
         </span>
       ))}
     </div>
@@ -1568,7 +1575,7 @@ function UserModal({
                       </SelectTrigger>
                       <SelectContent>
                         {VALID_ROLES.map((r) => (
-                          <SelectItem key={r} value={r} className="text-xs">{r}</SelectItem>
+                          <SelectItem key={r} value={r} className="text-xs">{ROLE_DISPLAY[r] ?? r}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1611,7 +1618,7 @@ function UserModal({
                 </SelectTrigger>
                 <SelectContent>
                   {VALID_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                    <SelectItem key={r} value={r}>{ROLE_DISPLAY[r] ?? r}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
