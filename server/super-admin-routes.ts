@@ -409,4 +409,108 @@ export function registerSuperAdminRoutes(app: Express) {
       res.status(500).json({ message: "Failed to fetch members" });
     }
   });
+
+  // ── Challenge CRUD ──────────────────────────────────────────────────────────
+
+  // GET /api/super-admin/challenges — list all challenges across all workspaces
+  app.get("/api/super-admin/challenges", isAuthenticated, isSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const rows = await db
+        .select({
+          id: challenges.id,
+          title: challenges.title,
+          slug: challenges.slug,
+          description: challenges.description,
+          shortDescription: challenges.shortDescription,
+          status: challenges.status,
+          deadline: challenges.deadline,
+          prize: challenges.prize,
+          emoji: challenges.emoji,
+          tags: challenges.tags,
+          maxSubmissions: challenges.maxSubmissions,
+          submissionCount: challenges.submissionCount,
+          evaluationCriteria: challenges.evaluationCriteria,
+          createdAt: challenges.createdAt,
+          orgId: challenges.orgId,
+          workspaceName: organizations.name,
+          workspaceSlug: organizations.slug,
+        })
+        .from(challenges)
+        .leftJoin(organizations, eq(challenges.orgId, organizations.id))
+        .orderBy(sql`${challenges.createdAt} DESC`);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching challenges:", error);
+      res.status(500).json({ message: "Failed to fetch challenges" });
+    }
+  });
+
+  // POST /api/super-admin/challenges — create a challenge for a workspace
+  app.post("/api/super-admin/challenges", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { orgId, title, description, shortDescription, slug, deadline, tags, maxSubmissions, emoji, status, prize, evaluationCriteria } = req.body;
+      if (!orgId || !title || !description || !slug || !deadline) {
+        return res.status(400).json({ message: "orgId, title, description, slug, and deadline are required" });
+      }
+      const [created] = await db
+        .insert(challenges)
+        .values({
+          orgId,
+          title,
+          description,
+          shortDescription: shortDescription || null,
+          slug,
+          deadline: new Date(deadline),
+          tags: tags || [],
+          maxSubmissions: maxSubmissions || 100,
+          emoji: emoji || "🎯",
+          status: status || "draft",
+          prize: prize || null,
+          evaluationCriteria: evaluationCriteria || null,
+          createdBy: (req as any).user?.id,
+        })
+        .returning();
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating challenge:", error);
+      res.status(500).json({ message: "Failed to create challenge" });
+    }
+  });
+
+  // PATCH /api/super-admin/challenges/:id — update a challenge
+  app.patch("/api/super-admin/challenges/:id", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const allowed = ["title", "description", "shortDescription", "slug", "deadline", "tags", "maxSubmissions", "emoji", "status", "prize", "evaluationCriteria"];
+      const update: Record<string, any> = {};
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) update[key] = req.body[key];
+      }
+      if (update.deadline) update.deadline = new Date(update.deadline);
+      update.updatedAt = new Date();
+
+      const [updated] = await db
+        .update(challenges)
+        .set(update)
+        .where(eq(challenges.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Challenge not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating challenge:", error);
+      res.status(500).json({ message: "Failed to update challenge" });
+    }
+  });
+
+  // DELETE /api/super-admin/challenges/:id — delete a challenge (cascade to submissions)
+  app.delete("/api/super-admin/challenges/:id", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await db.delete(challenges).where(eq(challenges.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting challenge:", error);
+      res.status(500).json({ message: "Failed to delete challenge" });
+    }
+  });
 }

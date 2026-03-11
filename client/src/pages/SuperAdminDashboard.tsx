@@ -38,8 +38,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, Pencil, Trash2, Plus, X, UserPlus } from "lucide-react";
+import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, Pencil, Trash2, Plus, X, UserPlus, Trophy } from "lucide-react";
 import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
+import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -99,7 +100,27 @@ interface SuperAdminIdea {
   creatorEmail: string | null;
 }
 
-type Tab = "workspaces" | "users" | "ideas";
+interface SuperAdminChallenge {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  shortDescription: string | null;
+  status: string;
+  deadline: string;
+  prize: string | null;
+  emoji: string | null;
+  tags: string[];
+  maxSubmissions: number;
+  submissionCount: number;
+  evaluationCriteria: string | null;
+  createdAt: string;
+  orgId: string;
+  workspaceName: string | null;
+  workspaceSlug: string | null;
+}
+
+type Tab = "workspaces" | "users" | "ideas" | "challenges";
 
 interface WorkspaceFormData {
   name: string;
@@ -158,6 +179,8 @@ export default function SuperAdminDashboard() {
   const [wsModal, setWsModal] = useState<{ mode: "create" | "edit"; workspace?: Workspace } | null>(null);
   const [deleteWs, setDeleteWs] = useState<Workspace | null>(null);
   const [userModalId, setUserModalId] = useState<string | null>(null);
+  const [challengeModal, setChallengeModal] = useState<{ mode: "create" | "edit"; challenge?: SuperAdminChallenge } | null>(null);
+  const [deleteChallenge, setDeleteChallenge] = useState<SuperAdminChallenge | null>(null);
 
   const { data: workspaces = [], isLoading: workspacesLoading } = useQuery<Workspace[]>({
     queryKey: ["/api/super-admin/workspaces"],
@@ -172,6 +195,11 @@ export default function SuperAdminDashboard() {
   const { data: ideas = [], isLoading: ideasLoading } = useQuery<SuperAdminIdea[]>({
     queryKey: ["/api/super-admin/ideas"],
     queryFn: () => apiFetch("/api/super-admin/ideas"),
+  });
+
+  const { data: adminChallenges = [], isLoading: challengesAdminLoading } = useQuery<SuperAdminChallenge[]>({
+    queryKey: ["/api/super-admin/challenges"],
+    queryFn: () => apiFetch("/api/super-admin/challenges"),
   });
 
   // ── Workspace mutations ───────────────────────────────────────────────
@@ -298,6 +326,50 @@ export default function SuperAdminDashboard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // ── Challenge mutations ──────────────────────────────────────────────
+  const createChallenge = useMutation({
+    mutationFn: (data: Record<string, any>) =>
+      apiFetch("/api/super-admin/challenges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/challenges"] });
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/workspaces"] });
+      toast.success("Challenge created");
+      setChallengeModal(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateChallenge = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, any> }) =>
+      apiFetch(`/api/super-admin/challenges/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/challenges"] });
+      toast.success("Challenge updated");
+      setChallengeModal(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteChallengeMut = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/super-admin/challenges/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/challenges"] });
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/workspaces"] });
+      toast.success("Challenge deleted");
+      setDeleteChallenge(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const selectedWorkspace = useMemo(
     () => (filterOrgId !== "all" ? workspaces?.find((w) => w.id === filterOrgId) : null) ?? null,
     [filterOrgId, workspaces]
@@ -376,6 +448,12 @@ export default function SuperAdminDashboard() {
 
   const isLoading = workspacesLoading || usersLoading || ideasLoading;
 
+  const filteredChallenges = useMemo(() => {
+    const sorted = [...adminChallenges].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (!selectedWorkspace) return sorted;
+    return sorted.filter((c) => c.orgId === selectedWorkspace.id);
+  }, [adminChallenges, selectedWorkspace]);
+
   const userForModal = userModalId ? (users.find((u) => u.id === userModalId) ?? null) : null;
   const isMutating = createWs.isPending || updateWs.isPending || deleteWsMut.isPending ||
     updateUser.isPending || deleteUser.isPending || assignToWs.isPending ||
@@ -385,6 +463,7 @@ export default function SuperAdminDashboard() {
     { key: "workspaces", label: "Workspaces" },
     { key: "users", label: "Users" },
     { key: "ideas", label: "Ideas" },
+    { key: "challenges", label: "Challenges" },
   ];
 
   return (
@@ -679,9 +758,142 @@ export default function SuperAdminDashboard() {
               </CardContent>
             </Card>
           )}
+
+          {/* ── Challenges table ─────────────────────────────────────────── */}
+          {activeTab === "challenges" && (
+            <Card className="border border-border/50">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <CardTitle className="text-base font-semibold">
+                  Challenges {selectedWorkspace ? `— ${selectedWorkspace.name}` : ""}
+                </CardTitle>
+                <Button size="sm" onClick={() => setChallengeModal({ mode: "create" })}>
+                  <Plus className="w-4 h-4 mr-1" /> New Challenge
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {challengesAdminLoading ? (
+                  <Spinner />
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Workspace</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Deadline</TableHead>
+                        <TableHead>Submissions</TableHead>
+                        <TableHead>Criteria</TableHead>
+                        <TableHead className="w-24 text-right pr-4">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredChallenges.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                            No challenges found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredChallenges.map((c) => (
+                          <TableRow key={c.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span>{c.emoji || "🎯"}</span>
+                                <div>
+                                  <div className="font-medium">{c.title}</div>
+                                  <div className="text-xs text-muted-foreground">{c.slug}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-sm">{c.workspaceName || "—"}</div>
+                              <div className="text-xs text-muted-foreground">{c.workspaceSlug}</div>
+                            </TableCell>
+                            <TableCell>
+                              <ChallengeStatusBadge status={c.status} />
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {new Date(c.deadline).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {c.submissionCount} / {c.maxSubmissions}
+                            </TableCell>
+                            <TableCell>
+                              {c.evaluationCriteria ? (
+                                <span className="inline-flex items-center text-xs rounded-full px-2 py-0.5 bg-green-500/15 text-green-400">Set</span>
+                              ) : (
+                                <span className="inline-flex items-center text-xs rounded-full px-2 py-0.5 bg-slate-500/15 text-slate-400">None</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost" size="icon" className="h-8 w-8"
+                                  onClick={() => setChallengeModal({ mode: "edit", challenge: c })}
+                                  title="Edit challenge"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost" size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => setDeleteChallenge(c)}
+                                  title="Delete challenge"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
-      {/* ── Workspace Create/Edit Modal ──────────────────────────────────── */}
+
+      {/* ── Challenge Create/Edit Modal ────────────────────────────────── */}
+      {challengeModal && (
+        <ChallengeModal
+          mode={challengeModal.mode}
+          challenge={challengeModal.challenge}
+          workspaces={workspaces}
+          onClose={() => setChallengeModal(null)}
+          onSubmit={(data) =>
+            challengeModal.mode === "create"
+              ? createChallenge.mutate(data)
+              : updateChallenge.mutate({ id: challengeModal.challenge!.id, data })
+          }
+          isPending={createChallenge.isPending || updateChallenge.isPending}
+        />
+      )}
+
+      {/* ── Delete Challenge Confirm ───────────────────────────────────── */}
+      <AlertDialog open={!!deleteChallenge} onOpenChange={(open) => !open && setDeleteChallenge(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete challenge "{deleteChallenge?.title}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the challenge and all its submissions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteChallenge && deleteChallengeMut.mutate(deleteChallenge.id)}
+              disabled={deleteChallengeMut.isPending}
+            >
+              {deleteChallengeMut.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {wsModal && (
         <WorkspaceModal
           mode={wsModal.mode}
@@ -849,6 +1061,230 @@ function TypeBadge({ type }: { type: string }) {
     <span className={`inline-flex items-center text-xs rounded-full px-2.5 py-0.5 font-medium ${style}`}>
       {label}
     </span>
+  );
+}
+
+// ─── Challenge status badge ───────────────────────────────────────────────────
+
+const CHALLENGE_STATUS_STYLES: Record<string, string> = {
+  draft:    "bg-slate-500/15 text-slate-400",
+  active:   "bg-green-500/15 text-green-400",
+  upcoming: "bg-blue-500/15  text-blue-400",
+  ended:    "bg-red-500/15   text-red-400",
+};
+
+function ChallengeStatusBadge({ status }: { status: string }) {
+  const style = CHALLENGE_STATUS_STYLES[status] ?? "bg-slate-500/15 text-slate-400";
+  return (
+    <span className={`inline-flex items-center text-xs rounded-full px-2.5 py-0.5 font-medium capitalize ${style}`}>
+      {status}
+    </span>
+  );
+}
+
+// ─── ChallengeModal ───────────────────────────────────────────────────────────
+
+interface ChallengeFormData {
+  orgId: string;
+  title: string;
+  slug: string;
+  description: string;
+  shortDescription: string;
+  deadline: string;
+  status: string;
+  prize: string;
+  emoji: string;
+  maxSubmissions: string;
+  evaluationCriteria: string;
+}
+
+const DEFAULT_CHALLENGE_FORM: ChallengeFormData = {
+  orgId: "",
+  title: "",
+  slug: "",
+  description: "",
+  shortDescription: "",
+  deadline: "",
+  status: "draft",
+  prize: "",
+  emoji: "🎯",
+  maxSubmissions: "100",
+  evaluationCriteria: "",
+};
+
+interface ChallengeModalProps {
+  mode: "create" | "edit";
+  challenge?: SuperAdminChallenge;
+  workspaces: Workspace[];
+  onClose: () => void;
+  onSubmit: (data: Record<string, any>) => void;
+  isPending: boolean;
+}
+
+function ChallengeModal({ mode, challenge, workspaces, onClose, onSubmit, isPending }: ChallengeModalProps) {
+  const [form, setForm] = useState<ChallengeFormData>(() =>
+    challenge
+      ? {
+          orgId: challenge.orgId,
+          title: challenge.title,
+          slug: challenge.slug,
+          description: challenge.description,
+          shortDescription: challenge.shortDescription ?? "",
+          deadline: challenge.deadline ? challenge.deadline.slice(0, 10) : "",
+          status: challenge.status,
+          prize: challenge.prize ?? "",
+          emoji: challenge.emoji ?? "🎯",
+          maxSubmissions: String(challenge.maxSubmissions),
+          evaluationCriteria: challenge.evaluationCriteria ?? "",
+        }
+      : DEFAULT_CHALLENGE_FORM
+  );
+
+  const [criteriaError, setCriteriaError] = useState("");
+
+  const set = (k: keyof ChallengeFormData, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleTitleChange = (title: string) => {
+    set("title", title);
+    if (mode === "create") {
+      set("slug", title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""));
+    }
+  };
+
+  const validateCriteria = (val: string) => {
+    if (!val.trim()) { setCriteriaError(""); return true; }
+    if (val.trim().startsWith("[") || val.trim().startsWith("{")) {
+      try { JSON.parse(val); setCriteriaError(""); return true; }
+      catch { setCriteriaError("Invalid JSON — fix the format or use plain text instead."); return false; }
+    }
+    setCriteriaError("");
+    return true;
+  };
+
+  const handleSubmit = () => {
+    if (!validateCriteria(form.evaluationCriteria)) return;
+    onSubmit({
+      ...form,
+      maxSubmissions: parseInt(form.maxSubmissions) || 100,
+      evaluationCriteria: form.evaluationCriteria.trim() || null,
+    });
+  };
+
+  const isValid = form.title.trim() && form.slug.trim() && form.description.trim() && form.deadline && form.orgId;
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "create" ? "New Challenge" : `Edit — ${challenge?.title}`}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          {/* Workspace selector (create only) */}
+          {mode === "create" && (
+            <div className="space-y-1.5">
+              <Label>Workspace <span className="text-destructive">*</span></Label>
+              <Select value={form.orgId} onValueChange={(v) => set("orgId", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select workspace…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workspaces.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Emoji</Label>
+              <Input value={form.emoji} onChange={(e) => set("emoji", e.target.value)} placeholder="🎯" className="w-24" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["draft", "upcoming", "active", "ended"].map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Title <span className="text-destructive">*</span></Label>
+            <Input value={form.title} onChange={(e) => handleTitleChange(e.target.value)} placeholder="Challenge title" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Slug <span className="text-destructive">*</span></Label>
+            <Input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="challenge-slug" className="font-mono" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Short Description</Label>
+            <Input value={form.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} placeholder="One-line summary" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Description <span className="text-destructive">*</span></Label>
+            <Textarea
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+              placeholder="Full description of the challenge…"
+              rows={4}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Deadline <span className="text-destructive">*</span></Label>
+              <Input type="date" value={form.deadline} onChange={(e) => set("deadline", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Max Submissions</Label>
+              <Input type="number" min="1" value={form.maxSubmissions} onChange={(e) => set("maxSubmissions", e.target.value)} />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Prize</Label>
+            <Input value={form.prize} onChange={(e) => set("prize", e.target.value)} placeholder="e.g. $5,000 or Trophy" />
+          </div>
+
+          {/* Evaluation Criteria */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2">
+              Evaluation Criteria
+              <span className="text-xs text-muted-foreground font-normal">(plain text or JSON array)</span>
+            </Label>
+            <Textarea
+              value={form.evaluationCriteria}
+              onChange={(e) => { set("evaluationCriteria", e.target.value); validateCriteria(e.target.value); }}
+              placeholder={`Plain text:\nInnovation, Feasibility, Impact\n\nOr JSON:\n[\n  {"name":"Innovation","weight":30},\n  {"name":"Feasibility","weight":40},\n  {"name":"Impact","weight":30}\n]`}
+              rows={6}
+              className="font-mono text-sm"
+            />
+            {criteriaError && <p className="text-xs text-destructive">{criteriaError}</p>}
+            <p className="text-xs text-muted-foreground">
+              Store as plain text for simple criteria, or as a JSON array of objects for weighted scoring (e.g. name, weight, description fields).
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!isValid || isPending || !!criteriaError}>
+            {isPending ? "Saving…" : mode === "create" ? "Create Challenge" : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
