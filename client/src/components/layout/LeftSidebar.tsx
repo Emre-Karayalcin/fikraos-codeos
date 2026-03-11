@@ -21,7 +21,7 @@ export function LeftSidebar() {
   const { logo, darkLogo, isLoading: brandingLoading } = useBranding(); // ✅ Get logo from branding
   
   // ✅ Fallback logo if branding is not loaded or no custom logo
-  const defaultLogo = '/logo-code.jpeg';
+  const defaultLogo = '/codelogo.png';
   const defaultDarkLogo = '/logo-code-light.jpeg';
   
   const { data: organizations = [] } = useQuery({

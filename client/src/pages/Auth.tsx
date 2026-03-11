@@ -41,7 +41,7 @@ export default function Auth() {
   const { login, register: registerUser, isLoggingIn, isRegistering, isAuthenticated } = useAuth();
   const { logo, darkLogo,isLoading: brandingLoading } = useBranding();
   
-  const defaultLogo = '/logo-code.jpeg';
+  const defaultLogo = '/codelogo.png';
   const defaultDarkLogo = '/logo-code-light.jpeg';
 
   // Check if user is already logged in and redirect
