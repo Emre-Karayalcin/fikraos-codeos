@@ -212,8 +212,8 @@ export function registerWorkspaceRoutes(app: Express) {
         return res.status(404).json({ error: 'Workspace not found' });
       }
 
-      // Get user by email
-      const user = await storage.getUserByEmailOrganization(email, workspace.id);
+      // Get user by email (regardless of workspace membership)
+      const user = await storage.getUserByEmail(email);
 
       if (!user || !user.password) {
         return res.status(401).json({ error: 'Invalid credentials' });
