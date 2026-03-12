@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { List, LayoutGrid, Lightbulb, Calendar, User, ExternalLink, GripVertical } from "lucide-react";
+import { List, LayoutGrid, Lightbulb, Calendar, User, ExternalLink, GripVertical, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
@@ -73,6 +73,33 @@ export default function IdeasOverview({ orgId }: IdeasOverviewProps) {
       toast({
         title: "Error updating status",
         description: "Failed to update idea status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete idea mutation
+  const deleteIdeaMutation = useMutation({
+    mutationFn: async (ideaId: string) => {
+      const response = await fetch(`/api/organizations/${orgId}/admin/ideas/${ideaId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to delete idea');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['/api/organizations', orgId, 'admin', 'ideas']
+      });
+      toast({
+        title: "Idea deleted",
+        description: "The idea has been permanently deleted."
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error deleting idea",
+        description: "Failed to delete idea. Please try again.",
         variant: "destructive"
       });
     }
@@ -179,14 +206,30 @@ export default function IdeasOverview({ orgId }: IdeasOverviewProps) {
                 {idea.createdById.slice(0, 8)}...
               </TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setLocation(`/chat/${idea.id}`)}
-                  data-testid={`button-view-idea-${idea.id}`}
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setLocation(`/chat/${idea.id}`)}
+                    data-testid={`button-view-idea-${idea.id}`}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      if (confirm('Delete this idea? This cannot be undone.')) {
+                        deleteIdeaMutation.mutate(idea.id);
+                      }
+                    }}
+                    disabled={deleteIdeaMutation.isPending}
+                    data-testid={`button-delete-idea-${idea.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
@@ -244,15 +287,31 @@ export default function IdeasOverview({ orgId }: IdeasOverviewProps) {
                       <Calendar className="w-3 h-3" />
                       {formatDate(idea.createdAt)}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => setLocation(`/chat/${idea.id}`)}
-                      data-testid={`button-kanban-view-idea-${idea.id}`}
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => setLocation(`/chat/${idea.id}`)}
+                        data-testid={`button-kanban-view-idea-${idea.id}`}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          if (confirm('Delete this idea? This cannot be undone.')) {
+                            deleteIdeaMutation.mutate(idea.id);
+                          }
+                        }}
+                        disabled={deleteIdeaMutation.isPending}
+                        data-testid={`button-kanban-delete-idea-${idea.id}`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}

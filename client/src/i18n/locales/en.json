@@ -1437,15 +1437,15 @@
         }
       }
     },
-    "mode": "Admin Panel",
+    "mode": "PMO Panel",
     "sidebar": {
       "header": {
-        "title": "Admin Panel",
+        "title": "PMO Panel",
         "subtitle": "Workspace Management"
       },
       "dashboard": {
         "title": "Dashboard",
-        "description": "Admin dashboard"
+        "description": "PMO dashboard"
       },
       "ideas": {
         "title": "Ideas",
@@ -1467,7 +1467,7 @@
         "title": "Settings",
         "description": "General settings"
       },
-      "exit": "Exit Admin"
+      "exit": "Exit PMO"
     },
 
     "guard": {

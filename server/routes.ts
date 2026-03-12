@@ -765,6 +765,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.delete('/api/organizations/:orgId/admin/ideas/:ideaId', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { ideaId } = req.params;
+      await storage.deleteProject(ideaId);
+      res.json({ message: "Idea deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting idea:", error);
+      res.status(500).json({ message: "Failed to delete idea" });
+    }
+  });
+
   // Project routes
   app.get('/api/organizations/:orgId/projects', isAuthenticated, async (req, res) => {
     try {
