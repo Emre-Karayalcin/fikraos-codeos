@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Kanban, Plus, MoreVertical, User } from 'lucide-react';
+import { Kanban, Plus, MoreVertical, User, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -61,7 +61,7 @@ function DroppableColumn({ status, children }: { status: { id: string; label: st
 }
 
 // Draggable Card Component
-function DraggableIdeaCard({ item, onClick }: { item: Idea; onClick: () => void }) {
+function DraggableIdeaCard({ item, onClick, onDelete }: { item: Idea; onClick: () => void; onDelete: () => void }) {
   const {
     attributes,
     listeners,
@@ -96,6 +96,15 @@ function DraggableIdeaCard({ item, onClick }: { item: Idea; onClick: () => void 
             <CardTitle className="text-sm font-medium line-clamp-2 flex-1 ltr:text-left rtl:text-right">
               {item.idea.title}
             </CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
           </div>
           {item.idea.tags && item.idea.tags.length > 0 && (
             <div className="flex gap-1 mt-2 flex-wrap">
@@ -138,6 +147,9 @@ export default function AdminIdeasKanban() {
   const [confirmIdea, setConfirmIdea] = useState<Idea | null>(null);
   const [confirmTargetStatus, setConfirmTargetStatus] = useState<string | null>(null);
   const [statusComment, setStatusComment] = useState('');
+  // delete confirmation state
+  const [deleteIdeaId, setDeleteIdeaId] = useState<string | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const sensors = useSensors(
@@ -198,6 +210,27 @@ export default function AdminIdeasKanban() {
     },
     onError: () => {
       toast.error(`${t('admin.ideas.create.error.title')} — ${t('admin.ideas.create.error.description')}`);
+    }
+  });
+
+  // Delete idea mutation
+  const deleteIdea = useMutation({
+    mutationFn: async (ideaId: string) => {
+      const response = await fetch(`/api/organizations/${workspace!.id}/admin/ideas/${ideaId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to delete idea');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ideas/management', workspace?.id] });
+      setIsDeleteOpen(false);
+      setDeleteIdeaId(null);
+      toast.success('Idea deleted successfully');
+    },
+    onError: () => {
+      toast.error('Failed to delete idea');
     }
   });
 
@@ -478,6 +511,7 @@ export default function AdminIdeasKanban() {
                               key={item.idea.id}
                               item={item}
                               onClick={() => handleIdeaClick(item.idea.id)}
+                              onDelete={() => { setDeleteIdeaId(item.idea.id); setIsDeleteOpen(true); }}
                             />
                           ))
                         )}
@@ -501,6 +535,26 @@ export default function AdminIdeasKanban() {
             </div>
           </div>
         )}
+
+        {/* Delete confirmation dialog */}
+        <Dialog open={isDeleteOpen} onOpenChange={(v) => { setIsDeleteOpen(v); if (!v) setDeleteIdeaId(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Idea</DialogTitle>
+              <DialogDescription>Are you sure you want to delete this idea? This action cannot be undone.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsDeleteOpen(false); setDeleteIdeaId(null); }}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteIdeaId && deleteIdea.mutate(deleteIdeaId)}
+                disabled={deleteIdea.isPending}
+              >
+                {deleteIdea.isPending ? 'Deleting...' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Confirmation dialog for status change */}
         <Dialog open={confirmOpen} onOpenChange={(v) => { setConfirmOpen(v); if (!v) { setConfirmIdea(null); setConfirmTargetStatus(null); setStatusComment(''); } }}>
