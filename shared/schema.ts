@@ -660,6 +660,50 @@ export const challengeSubmissionsRelations = relations(challengeSubmissions, ({ 
   }),
 }));
 
+export const bookingStatusEnum = pgEnum("booking_status", ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"]);
+
+export const mentorProfiles = pgTable("mentor_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 200 }),
+  bio: text("bio"),
+  location: varchar("location", { length: 200 }),
+  website: varchar("website", { length: 500 }),
+  expertise: jsonb("expertise").$type<string[]>().default(sql`'[]'::jsonb`),
+  industries: jsonb("industries").$type<string[]>().default(sql`'[]'::jsonb`),
+  sessionDurationMinutes: integer("session_duration_minutes").default(60),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const mentorAvailability = pgTable("mentor_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mentorProfileId: varchar("mentor_profile_id").notNull().references(() => mentorProfiles.id, { onDelete: 'cascade' }),
+  dayOfWeek: integer("day_of_week").notNull(),
+  startTime: varchar("start_time", { length: 5 }).notNull(),
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const mentorBookings = pgTable("mentor_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mentorProfileId: varchar("mentor_profile_id").notNull().references(() => mentorProfiles.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  ideaId: varchar("idea_id").references(() => ideas.id),
+  bookedDate: varchar("booked_date", { length: 10 }).notNull(),
+  bookedTime: varchar("booked_time", { length: 5 }).notNull(),
+  durationMinutes: integer("duration_minutes").default(60),
+  status: bookingStatusEnum("status").default("PENDING"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
+export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,

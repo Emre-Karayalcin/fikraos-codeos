@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LogOut, Mic, MessageSquare, Phone, PhoneOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useBranding } from '@/contexts/BrandingContext';
+import MentorsTab from '@/components/mentors/MentorsTab';
 
 type Expert = 'gtm' | 'finance' | 'product';
 type Mode = 'audio' | 'text';
@@ -671,6 +673,18 @@ export default function Experts() {
               </p>
             </div>
           </div>
+
+          <Tabs defaultValue="ai-agent" className="flex-1 flex flex-col">
+            <TabsList className="mb-6 self-center">
+              <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
+              <TabsTrigger value="mentors">Mentors</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="mentors" className="flex-1">
+              <MentorsTab />
+            </TabsContent>
+
+            <TabsContent value="ai-agent" className="flex-1 flex flex-col">
           {/* Controls */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             {/* Expert Selection */}
@@ -975,9 +989,11 @@ export default function Experts() {
               )}
             </AnimatePresence>
           )}
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
-      
+
       {/* Bottom Navigation */}
       <BottomNavigation />
     </div>

@@ -8,6 +8,7 @@ import { getRealtimeConnection, endRealtimeConversation } from "./gpt-realtime";
 import { ResearchAgent } from "./research";
 import OpenAI from 'openai';
 import vercelRoutes from "./vercel-routes";
+import mentorRoutes from "./mentor-routes";
 import { registerIdeaRoutes } from "./idea-routes";
 import { registerWorkspaceRoutes } from "./workspace-routes";
 import { registerChallengeRoutes } from "./challenge-routes";
@@ -3302,6 +3303,7 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
 
   // Vercel deployment routes
   app.use('/api/vercel', vercelRoutes);
+  app.use('/api', mentorRoutes);
 
     // Add this interface near the top of the file, after imports
   interface AssetUpdateIntent {
