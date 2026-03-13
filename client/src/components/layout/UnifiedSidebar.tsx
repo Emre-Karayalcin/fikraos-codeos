@@ -314,6 +314,7 @@ export function UnifiedSidebar() {
   });
 
   const isAdmin = userRole && (userRole.role === 'OWNER' || userRole.role === 'ADMIN');
+  const isMentor = userRole?.role === 'MENTOR';
 
   const createProjectAndChat = async (payload?: { title?: string; description?: string }) => {
     if (!isAuthenticated) {
@@ -681,6 +682,7 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
+                  {!isMentor && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -697,7 +699,9 @@ export function UnifiedSidebar() {
                       <p>{myIdeasLabel}</p>
                     </TooltipContent>
                   </Tooltip>
+                  )}
 
+                  {!isMentor && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -714,6 +718,7 @@ export function UnifiedSidebar() {
                       <p>Pitch</p>
                     </TooltipContent>
                   </Tooltip>
+                  )}
 
                   {/* Challenges - Only show if enabled */}
                   {challengesEnabled && (
@@ -736,7 +741,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Radar - Only show if enabled */}
-                  {radarEnabled && (
+                  {radarEnabled && !isMentor && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -828,6 +833,7 @@ export function UnifiedSidebar() {
                     </div>
                   )}
 
+                  {!isMentor && (
                   <div
                     className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                       location.includes("/my-ideas") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -838,7 +844,9 @@ export function UnifiedSidebar() {
                     <MessageCircle className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
                     <span className="text-sm font-medium">{myIdeasLabel}</span>
                   </div>
+                  )}
 
+                  {!isMentor && (
                   <div
                     className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                       location.includes("/pitch") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -849,6 +857,7 @@ export function UnifiedSidebar() {
                     <Presentation className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
                     <span className="text-sm font-medium">Pitch</span>
                   </div>
+                  )}
 
                   {/* Challenges - Only show if enabled */}
                   {challengesEnabled && (
@@ -865,7 +874,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Radar - Only show if enabled */}
-                  {radarEnabled && (
+                  {radarEnabled && !isMentor && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/radar") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"

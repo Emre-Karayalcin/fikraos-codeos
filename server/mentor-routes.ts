@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "./db";
-import { mentorProfiles, mentorAvailability, mentorBookings, users } from "../shared/schema";
+import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas } from "../shared/schema";
 import { eq, and } from "drizzle-orm";
 
 const router = Router();
@@ -219,6 +219,88 @@ router.put("/mentor-profile/me", async (req: any, res) => {
   } catch (error) {
     console.error("Error updating mentor profile:", error);
     res.status(500).json({ message: "Failed to update mentor profile" });
+  }
+});
+
+// GET /api/mentor-profile/my-bookings - Get all bookings received by the logged-in mentor
+router.get("/mentor-profile/my-bookings", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Find the mentor's own profile
+    const [profile] = await db
+      .select({ id: mentorProfiles.id })
+      .from(mentorProfiles)
+      .where(eq(mentorProfiles.userId, req.user.id));
+
+    if (!profile) return res.json([]);
+
+    const bookings = await db
+      .select({
+        id: mentorBookings.id,
+        userId: mentorBookings.userId,
+        bookerFirstName: users.firstName,
+        bookerLastName: users.lastName,
+        ideaTitle: ideas.title,
+        bookedDate: mentorBookings.bookedDate,
+        bookedTime: mentorBookings.bookedTime,
+        durationMinutes: mentorBookings.durationMinutes,
+        notes: mentorBookings.notes,
+        status: mentorBookings.status,
+        createdAt: mentorBookings.createdAt,
+      })
+      .from(mentorBookings)
+      .innerJoin(users, eq(mentorBookings.userId, users.id))
+      .leftJoin(ideas, eq(mentorBookings.ideaId, ideas.id))
+      .where(eq(mentorBookings.mentorProfileId, profile.id));
+
+    res.json(bookings);
+  } catch (error) {
+    console.error("Error fetching mentor bookings:", error);
+    res.status(500).json({ message: "Failed to fetch bookings" });
+  }
+});
+
+// PATCH /api/mentor-bookings/:id/status - Confirm or decline a booking
+router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { status } = req.body;
+    if (!["CONFIRMED", "CANCELLED"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status. Must be CONFIRMED or CANCELLED" });
+    }
+
+    // Find the mentor's profile to verify ownership
+    const [profile] = await db
+      .select({ id: mentorProfiles.id })
+      .from(mentorProfiles)
+      .where(eq(mentorProfiles.userId, req.user.id));
+
+    if (!profile) return res.status(403).json({ message: "No mentor profile found" });
+
+    const [booking] = await db
+      .select()
+      .from(mentorBookings)
+      .where(
+        and(
+          eq(mentorBookings.id, req.params.id),
+          eq(mentorBookings.mentorProfileId, profile.id)
+        )
+      );
+
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    const [updated] = await db
+      .update(mentorBookings)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(mentorBookings.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating booking status:", error);
+    res.status(500).json({ message: "Failed to update booking" });
   }
 });
 

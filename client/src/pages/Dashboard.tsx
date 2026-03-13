@@ -1,6 +1,8 @@
 import { useLocation, useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
+import MentorDashboard from "./MentorDashboard";
 import {
   FiZap,
   FiUsers,
@@ -25,6 +27,32 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { slug } = useParams<{ slug?: string }>();
+
+  const { data: organizations } = useQuery<any[]>({
+    queryKey: ['/api/organizations'],
+    queryFn: async () => {
+      const res = await fetch('/api/organizations', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
+  const currentOrg = Array.isArray(organizations) ? organizations[0] : undefined;
+
+  const { data: userRole } = useQuery<{ role: string } | null>({
+    queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'check-role'],
+    queryFn: async () => {
+      if (!currentOrg?.id) return null;
+      const res = await fetch(`/api/organizations/${currentOrg.id}/admin/check-role`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user && !!currentOrg?.id,
+    retry: false,
+  });
+
+  const isMentor = userRole?.role === 'MENTOR';
 
   const handleSignOut = () => {
     logout();
@@ -94,6 +122,10 @@ export default function Dashboard() {
 
   if (!user) {
     return null;
+  }
+
+  if (isMentor) {
+    return <MentorDashboard />;
   }
 
   return (
