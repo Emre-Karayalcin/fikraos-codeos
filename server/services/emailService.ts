@@ -156,6 +156,103 @@ This is an automated notification from FikraOS Idea Management System.
     });
   }
 
+  async sendMentorBookingNotification(
+    mentorEmail: string,
+    mentorName: string,
+    bookerName: string,
+    bookedDate: string,
+    bookedTime: string,
+    durationMinutes: number,
+    ideaTitle?: string,
+    hasPitchDeck?: boolean,
+    dashboardUrl?: string
+  ): Promise<boolean> {
+    const subject = `New Booking Request from ${bookerName}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; }
+            .content { background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; }
+            .detail-row { display: flex; align-items: center; margin: 12px 0; padding: 12px; background: #f9fafb; border-radius: 8px; }
+            .detail-label { font-weight: 600; color: #6b7280; font-size: 13px; min-width: 120px; }
+            .detail-value { color: #111827; font-size: 14px; }
+            .button { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; font-weight: 600; }
+            .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; font-size: 24px;">📅 New Session Request</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${mentorName},</p>
+              <p><strong>${bookerName}</strong> has requested a mentoring session with you.</p>
+
+              <div style="margin: 24px 0;">
+                <div class="detail-row">
+                  <span class="detail-label">📅 Date</span>
+                  <span class="detail-value">${bookedDate}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">🕐 Time</span>
+                  <span class="detail-value">${bookedTime}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">⏱ Duration</span>
+                  <span class="detail-value">${durationMinutes} minutes</span>
+                </div>
+                ${ideaTitle ? `
+                <div class="detail-row">
+                  <span class="detail-label">💡 Topic</span>
+                  <span class="detail-value">${ideaTitle}</span>
+                </div>` : ''}
+                ${hasPitchDeck ? `
+                <div class="detail-row">
+                  <span class="detail-label">📊 Pitch Deck</span>
+                  <span class="detail-value">Attached (view in dashboard)</span>
+                </div>` : ''}
+              </div>
+
+              <p>Please confirm or decline this request from your mentor dashboard.</p>
+
+              ${dashboardUrl ? `<a href="${dashboardUrl}" class="button">View Booking Request</a>` : ''}
+
+              <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
+                This is an automated notification from FikraOS.
+              </p>
+            </div>
+            <div class="footer">
+              <p>FikraOS - Innovation Management Platform</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const text = `
+Hi ${mentorName},
+
+${bookerName} has requested a mentoring session with you.
+
+Date: ${bookedDate}
+Time: ${bookedTime}
+Duration: ${durationMinutes} minutes${ideaTitle ? `\nTopic: ${ideaTitle}` : ''}${hasPitchDeck ? '\nPitch Deck: Attached' : ''}
+
+Please log in to your mentor dashboard to confirm or decline this request.
+${dashboardUrl ? `\nDashboard: ${dashboardUrl}` : ''}
+
+This is an automated notification from FikraOS.
+    `.trim();
+
+    return this.sendEmail({ to: mentorEmail, subject, html, text });
+  }
+
   private formatStatus(status: string): string {
     return status
       .split('_')

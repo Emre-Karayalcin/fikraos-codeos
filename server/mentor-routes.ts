@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "./db";
 import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, organizationMembers, pitchDeckGenerations } from "../shared/schema";
 import { eq, and } from "drizzle-orm";
+import { emailService } from "./services/emailService";
 
 const router = Router();
 
@@ -136,6 +137,42 @@ router.post("/mentor-bookings", async (req: any, res) => {
         status: "PENDING",
       })
       .returning();
+
+    // Send email notification to mentor (fire-and-forget)
+    try {
+      const [mentorUser] = await db
+        .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+        .from(mentorProfiles)
+        .innerJoin(users, eq(mentorProfiles.userId, users.id))
+        .where(eq(mentorProfiles.id, mentorProfileId));
+
+      const booker = req.user;
+      const bookerName = `${booker.firstName || ""} ${booker.lastName || ""}`.trim() || booker.email;
+
+      let ideaTitle: string | undefined;
+      if (ideaId) {
+        const [idea] = await db.select({ title: ideas.title }).from(ideas).where(eq(ideas.id, ideaId));
+        ideaTitle = idea?.title;
+      }
+
+      if (mentorUser?.email) {
+        const mentorName = `${mentorUser.firstName || ""} ${mentorUser.lastName || ""}`.trim() || mentorUser.email;
+        const appUrl = process.env.APP_URL || "";
+        emailService.sendMentorBookingNotification(
+          mentorUser.email,
+          mentorName,
+          bookerName,
+          bookedDate,
+          bookedTime,
+          durationMinutes || 60,
+          ideaTitle,
+          !!pitchDeckId,
+          appUrl ? `${appUrl}/dashboard` : undefined
+        ).catch((err) => console.error("Failed to send mentor booking email:", err));
+      }
+    } catch (emailErr) {
+      console.error("Error preparing mentor booking email:", emailErr);
+    }
 
     res.status(201).json(booking);
   } catch (error) {

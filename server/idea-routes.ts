@@ -256,6 +256,21 @@ export function registerIdeaRoutes(app: Express) {
     }
   });
 
+  // GET /api/my-ideas - Flat list of ideas owned by the current user (for dropdowns)
+  app.get('/api/my-ideas', isAuthenticated, async (req: any, res) => {
+    try {
+      const myIdeas = await db
+        .select({ id: ideas.id, title: ideas.title })
+        .from(ideas)
+        .where(eq(ideas.ownerId, req.user.id))
+        .orderBy(ideas.title);
+      res.json(myIdeas);
+    } catch (error) {
+      console.error('Error fetching user ideas:', error);
+      res.status(500).json({ error: 'Failed to fetch ideas' });
+    }
+  });
+
   // GET /api/ideas - List ideas with filters and pagination
   app.get('/api/ideas', isAuthenticated, async (req: any, res) => {
     try {

@@ -111,7 +111,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
   });
 
   const { data: ideas = [] } = useQuery<Idea[]>({
-    queryKey: ["/api/ideas"],
+    queryKey: ["/api/my-ideas"],
     enabled: open,
   });
 
@@ -308,49 +308,48 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
             </div>
 
             {/* Idea selector */}
-            {ideas.length > 0 && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Meeting Topic (optional)
-                </label>
-                <Select value={selectedIdeaId} onValueChange={setSelectedIdeaId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select one of your ideas…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ideas.map((idea) => (
-                      <SelectItem key={idea.id} value={idea.id}>
-                        {idea.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Meeting Topic (optional)
+              </label>
+              <Select value={selectedIdeaId} onValueChange={setSelectedIdeaId} disabled={ideas.length === 0}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={ideas.length === 0 ? "No ideas yet" : "Select one of your ideas…"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {ideas.map((idea) => (
+                    <SelectItem key={idea.id} value={idea.id}>
+                      {idea.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Pitch Deck selector (optional) */}
-            {pitchDecks.filter((d) => d.status === "COMPLETED").length > 0 && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Attach Pitch Deck (optional)
-                </label>
-                <Select value={selectedPitchDeckId} onValueChange={setSelectedPitchDeckId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a pitch deck…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {pitchDecks
-                      .filter((d) => d.status === "COMPLETED")
-                      .map((deck) => (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Attach Pitch Deck (optional)
+              </label>
+              {(() => {
+                const completedDecks = pitchDecks.filter((d) => d.status === "COMPLETED");
+                return (
+                  <Select value={selectedPitchDeckId} onValueChange={setSelectedPitchDeckId} disabled={completedDecks.length === 0}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={completedDecks.length === 0 ? "No pitch decks available" : "Select a pitch deck…"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {completedDecks.map((deck) => (
                         <SelectItem key={deck.id} value={deck.id}>
                           {deck.template || "Pitch Deck"} — {deck.id.slice(0, 8)}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
+            </div>
 
             {/* Calendar */}
             <div className="space-y-2">
