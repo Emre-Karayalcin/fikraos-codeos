@@ -122,7 +122,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
     },
   });
 
-  const availability = mentorDetail?.availability ?? mentor && (mentor as any).availability ?? [];
+  const availability = mentorDetail?.availability ?? (mentor && (mentor as any).availability) ?? [];
 
   const availableDaySet = useMemo(
     () => new Set((availability as Availability[]).map((a) => a.dayOfWeek)),
