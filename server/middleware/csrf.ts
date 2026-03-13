@@ -58,9 +58,9 @@ export const csrfProtection: RequestHandler = (req, res, next) => {
     '/api/super-admin/login'
   ];
 
-  // Check for exact match or workspace login/signup pattern
+  // Check for exact match or workspace login/signup/complete-invite pattern
   const isAuthEndpoint = authEndpoints.some(endpoint => req.path === endpoint) ||
-                         /^\/api\/workspaces\/[^/]+\/(login|signup)$/.test(req.path);
+                         /^\/api\/workspaces\/[^/]+\/(login|signup|complete-invite)$/.test(req.path);
 
   if (isAuthEndpoint) {
     return next();
