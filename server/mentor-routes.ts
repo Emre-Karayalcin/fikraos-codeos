@@ -1,14 +1,27 @@
 import { Router } from "express";
 import { db } from "./db";
-import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas } from "../shared/schema";
+import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, organizationMembers } from "../shared/schema";
 import { eq, and } from "drizzle-orm";
 
 const router = Router();
+
+// Helper: get the user's primary orgId from organizationMembers
+async function getUserOrgId(userId: string): Promise<string | null> {
+  const [membership] = await db
+    .select({ orgId: organizationMembers.orgId })
+    .from(organizationMembers)
+    .where(eq(organizationMembers.userId, userId))
+    .limit(1);
+  return membership?.orgId ?? null;
+}
 
 // GET /api/mentors - List active mentors in current org
 router.get("/mentors", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const orgId = await getUserOrgId(req.user.id);
+    if (!orgId) return res.json([]);
 
     const mentors = await db
       .select({
@@ -29,7 +42,7 @@ router.get("/mentors", async (req: any, res) => {
       .innerJoin(users, eq(mentorProfiles.userId, users.id))
       .where(
         and(
-          eq(mentorProfiles.orgId, req.user.orgId),
+          eq(mentorProfiles.orgId, orgId),
           eq(mentorProfiles.isActive, true)
         )
       );
@@ -185,11 +198,14 @@ router.put("/mentor-profile/me", async (req: any, res) => {
         .where(eq(mentorProfiles.userId, req.user.id))
         .returning();
     } else {
+      const orgId = await getUserOrgId(req.user.id);
+      if (!orgId) return res.status(400).json({ message: "No organization found for this user" });
+
       [profile] = await db
         .insert(mentorProfiles)
         .values({
           userId: req.user.id,
-          orgId: req.user.orgId,
+          orgId,
           title, bio, location, website, expertise, industries, sessionDurationMinutes, isActive,
         })
         .returning();
