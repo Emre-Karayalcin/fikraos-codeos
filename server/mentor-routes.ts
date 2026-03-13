@@ -40,6 +40,13 @@ router.get("/mentors", async (req: any, res) => {
       })
       .from(mentorProfiles)
       .innerJoin(users, eq(mentorProfiles.userId, users.id))
+      .innerJoin(
+        organizationMembers,
+        and(
+          eq(organizationMembers.userId, mentorProfiles.userId),
+          eq(organizationMembers.orgId, orgId)
+        )
+      )
       .where(
         and(
           eq(mentorProfiles.orgId, orgId),
