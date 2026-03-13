@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "./db";
-import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, organizationMembers } from "../shared/schema";
+import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, organizationMembers, pitchDeckGenerations } from "../shared/schema";
 import { eq, and } from "drizzle-orm";
 
 const router = Router();
@@ -97,7 +97,7 @@ router.post("/mentor-bookings", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const { mentorProfileId, ideaId, bookedDate, bookedTime, durationMinutes, notes } = req.body;
+    const { mentorProfileId, ideaId, pitchDeckId, bookedDate, bookedTime, durationMinutes, notes } = req.body;
 
     // Check for conflicts
     const [existing] = await db
@@ -121,6 +121,7 @@ router.post("/mentor-bookings", async (req: any, res) => {
         mentorProfileId,
         userId: req.user.id,
         ideaId: ideaId || null,
+        pitchDeckId: pitchDeckId || null,
         bookedDate,
         bookedTime,
         durationMinutes: durationMinutes || 60,
@@ -257,7 +258,14 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
         userId: mentorBookings.userId,
         bookerFirstName: users.firstName,
         bookerLastName: users.lastName,
+        ideaId: mentorBookings.ideaId,
         ideaTitle: ideas.title,
+        ideaSummary: ideas.summary,
+        ideaTags: ideas.tags,
+        ideaStatus: ideas.status,
+        pitchDeckId: mentorBookings.pitchDeckId,
+        pitchDeckDownloadUrl: pitchDeckGenerations.downloadUrl,
+        pitchDeckStatus: pitchDeckGenerations.status,
         bookedDate: mentorBookings.bookedDate,
         bookedTime: mentorBookings.bookedTime,
         durationMinutes: mentorBookings.durationMinutes,
@@ -268,6 +276,7 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
       .from(mentorBookings)
       .innerJoin(users, eq(mentorBookings.userId, users.id))
       .leftJoin(ideas, eq(mentorBookings.ideaId, ideas.id))
+      .leftJoin(pitchDeckGenerations, eq(mentorBookings.pitchDeckId, pitchDeckGenerations.id))
       .where(eq(mentorBookings.mentorProfileId, profile.id));
 
     res.json(bookings);

@@ -58,6 +58,14 @@ interface Idea {
   title: string;
 }
 
+interface PitchDeck {
+  id: string;
+  status: string;
+  template?: string;
+  downloadUrl?: string;
+  projectId: string;
+}
+
 interface Props {
   mentor: { id: string; firstName: string; lastName: string; profileImageUrl?: string; title?: string };
   open: boolean;
@@ -95,6 +103,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [selectedIdeaId, setSelectedIdeaId] = useState<string>("");
+  const [selectedPitchDeckId, setSelectedPitchDeckId] = useState<string>("");
 
   const { data: mentorDetail } = useQuery<MentorDetail>({
     queryKey: [`/api/mentors/${mentor.id}`],
@@ -103,6 +112,11 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
 
   const { data: ideas = [] } = useQuery<Idea[]>({
     queryKey: ["/api/ideas"],
+    enabled: open,
+  });
+
+  const { data: pitchDecks = [] } = useQuery<PitchDeck[]>({
+    queryKey: ["/api/my-pitch-decks"],
     enabled: open,
   });
 
@@ -116,6 +130,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
       setSelectedDate(null);
       setSelectedTime("");
       setSelectedIdeaId("");
+      setSelectedPitchDeckId("");
     },
     onError: (err: any) => {
       toast({ title: "Booking failed", description: err.message || "Please try again.", variant: "destructive" });
@@ -164,6 +179,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
     bookMutation.mutate({
       mentorProfileId: mentor.id,
       ideaId: selectedIdeaId || undefined,
+      pitchDeckId: (selectedPitchDeckId && selectedPitchDeckId !== "none") ? selectedPitchDeckId : undefined,
       bookedDate: selectedDate,
       bookedTime: selectedTime,
       durationMinutes: mentorDetail?.sessionDurationMinutes ?? 60,
@@ -307,6 +323,30 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
                         {idea.title}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Pitch Deck selector (optional) */}
+            {pitchDecks.filter((d) => d.status === "COMPLETED").length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Attach Pitch Deck (optional)
+                </label>
+                <Select value={selectedPitchDeckId} onValueChange={setSelectedPitchDeckId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a pitch deck…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {pitchDecks
+                      .filter((d) => d.status === "COMPLETED")
+                      .map((deck) => (
+                        <SelectItem key={deck.id} value={deck.id}>
+                          {deck.template || "Pitch Deck"} — {deck.id.slice(0, 8)}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
