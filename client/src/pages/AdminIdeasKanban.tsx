@@ -6,6 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { Kanban, Plus, MoreVertical, User, Trash2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -142,6 +149,7 @@ export default function AdminIdeasKanban() {
   const [newIdea, setNewIdea] = useState({ title: '', summary: '', tags: '' });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string>('all');
   // status-change confirmation modal state
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmIdea, setConfirmIdea] = useState<Idea | null>(null);
@@ -175,10 +183,32 @@ export default function AdminIdeasKanban() {
     enabled: !!slug
   });
 
-  // Fetch ideas
-  const { data: ideasData, isLoading } = useQuery({
-    queryKey: ['/api/ideas/management', workspace?.id],
+  // Fetch challenges for filter dropdown
+  const { data: challengesData } = useQuery({
+    queryKey: ['/api/challenges', workspace?.id],
     queryFn: async () => {
+      const response = await fetch(`/api/challenges?orgId=${workspace?.id}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) return { data: [] };
+      return response.json();
+    },
+    enabled: !!workspace?.id
+  });
+
+  const challengesList: { challenge: { id: string; title: string } }[] = Array.isArray(challengesData) ? challengesData : [];
+
+  // Fetch ideas (all or filtered by challenge)
+  const { data: ideasData, isLoading } = useQuery({
+    queryKey: ['/api/ideas/management', workspace?.id, selectedChallengeId] as const,
+    queryFn: async () => {
+      if (selectedChallengeId !== 'all') {
+        const response = await fetch(`/api/challenges/${selectedChallengeId}/ideas`, {
+          credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Failed to fetch challenge ideas');
+        return response.json();
+      }
       const response = await fetch(`/api/ideas/management?orgId=${workspace?.id}`, {
         credentials: 'include'
       });
@@ -395,6 +425,22 @@ export default function AdminIdeasKanban() {
                 </p>
               </div>
             </div>
+            <div className="flex items-center gap-3">
+              {challengesList.length > 0 && (
+                <Select value={selectedChallengeId} onValueChange={setSelectedChallengeId}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Filter by challenge" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Ideas</SelectItem>
+                    {challengesList.map((c) => (
+                      <SelectItem key={c.challenge.id} value={c.challenge.id}>
+                        {c.challenge.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
                 <Button>

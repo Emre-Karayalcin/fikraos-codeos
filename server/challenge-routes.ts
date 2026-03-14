@@ -425,7 +425,7 @@ export function registerChallengeRoutes(app: Express) {
           )
         );
 
-      if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
+      if (!membership || !['OWNER', 'ADMIN', 'MENTOR'].includes(membership.role)) {
         return res.status(403).json({ error: 'Admin access required' });
       }
 

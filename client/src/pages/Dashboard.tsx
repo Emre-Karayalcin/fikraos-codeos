@@ -53,8 +53,10 @@ export default function Dashboard() {
   });
 
   const isMentor = userRole?.role === 'MENTOR';
-  // Wait for role to resolve before rendering to avoid flash of member dashboard
-  const isResolvingRole = orgLoading || (!!currentOrg?.id && roleLoading);
+  // If user is already known to be admin (from /api/user response), skip spinner
+  const userIsAdmin = !!(user as any)?.isAdmin;
+  // Wait for role to resolve only for non-admin users (to avoid flash of member dashboard for mentors)
+  const isResolvingRole = !userIsAdmin && (orgLoading || (!!currentOrg?.id && roleLoading));
 
   const handleSignOut = () => {
     logout();
