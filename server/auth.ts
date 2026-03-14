@@ -212,14 +212,20 @@ export function setupAuth(app: Express) {
       req.session.regenerate((regenerateErr) => {
         if (regenerateErr) return next(regenerateErr);
 
-        req.login(user, (err) => {
-          if (err) return next(err);
-          res.json({
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
+        req.login(user, (loginErr) => {
+          if (loginErr) return next(loginErr);
+          // Explicitly save the regenerated session so it's persisted before
+          // the response is sent (express-session's auto-save is bound to the
+          // old session reference and won't save the new one).
+          req.session.save((saveErr) => {
+            if (saveErr) return next(saveErr);
+            res.json({
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+            });
           });
         });
       });
