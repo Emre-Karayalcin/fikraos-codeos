@@ -28,7 +28,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const { slug } = useParams<{ slug?: string }>();
 
-  const { data: organizations } = useQuery<any[]>({
+  const { data: organizations, isLoading: orgLoading } = useQuery<any[]>({
     queryKey: ['/api/organizations'],
     queryFn: async () => {
       const res = await fetch('/api/organizations', { credentials: 'include' });
@@ -40,7 +40,7 @@ export default function Dashboard() {
 
   const currentOrg = Array.isArray(organizations) ? organizations[0] : undefined;
 
-  const { data: userRole } = useQuery<{ role: string } | null>({
+  const { data: userRole, isLoading: roleLoading } = useQuery<{ role: string } | null>({
     queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'check-role'],
     queryFn: async () => {
       if (!currentOrg?.id) return null;
@@ -53,6 +53,8 @@ export default function Dashboard() {
   });
 
   const isMentor = userRole?.role === 'MENTOR';
+  // Wait for role to resolve before rendering to avoid flash of member dashboard
+  const isResolvingRole = orgLoading || (!!currentOrg?.id && roleLoading);
 
   const handleSignOut = () => {
     logout();
@@ -121,6 +123,10 @@ export default function Dashboard() {
   ];
 
   if (!user) {
+    return null;
+  }
+
+  if (isResolvingRole) {
     return null;
   }
 

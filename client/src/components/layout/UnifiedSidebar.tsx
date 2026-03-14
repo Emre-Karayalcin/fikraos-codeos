@@ -800,7 +800,7 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
-                  {handleNewConversation && (
+                  {handleNewConversation && !isMentor && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button

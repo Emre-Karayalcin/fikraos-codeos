@@ -167,6 +167,18 @@ export default function ChallengeDetail() {
   const challenge = challengeData?.challenge;
   const projects = challenge?.projects || [];
 
+  const { data: userRole } = useQuery<{ role: string } | null>({
+    queryKey: ['/api/organizations', challenge?.orgId, 'admin', 'check-role'],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${challenge!.orgId}/admin/check-role`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!challenge?.orgId,
+    retry: false,
+  });
+  const isMentor = userRole?.role === 'MENTOR';
+
   const { data: submissions = [], isLoading: submissionsLoading } = useQuery<Submission[]>({
     queryKey: ['submissions', challenge?.id],
     queryFn: async () => {
@@ -760,7 +772,7 @@ export default function ChallengeDetail() {
                         <Lightbulb className="w-5 h-5 text-primary" />
                         {t('challenge.myIdeas', { count: projects.length })}
                       </h2>
-                      <Dialog open={showCreationDialog} onOpenChange={setShowCreationDialog}>
+                      {!isMentor && <Dialog open={showCreationDialog} onOpenChange={setShowCreationDialog}>
                         <DialogTrigger asChild>
                           <Button size="lg" className="gap-2">
                             <Lightbulb className="w-4 h-4" />
@@ -847,7 +859,7 @@ export default function ChallengeDetail() {
                             )}
                           </div>
                         </DialogContent>
-                      </Dialog>
+                      </Dialog>}
                     </div>
 
                     {/* 3-Step Quick Submit Form Dialog */}
