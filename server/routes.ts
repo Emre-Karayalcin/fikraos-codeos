@@ -755,9 +755,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get('/api/organizations/:orgId/admin/ideas', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+  app.get('/api/organizations/:orgId/admin/ideas', isAuthenticated, async (req: any, res) => {
     try {
       const { orgId } = req.params;
+      const userId = req.user.id;
+      const userRole = await storage.getUserRole(userId, orgId);
+      if (!userRole || (userRole !== 'ADMIN' && userRole !== 'OWNER' && userRole !== 'MENTOR')) {
+        return res.status(403).json({ message: "Access required" });
+      }
       const projects = await storage.getProjectsByOrg(orgId);
       res.json(projects);
     } catch (error) {

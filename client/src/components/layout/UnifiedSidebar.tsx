@@ -1005,20 +1005,20 @@ export function UnifiedSidebar() {
                   </Tooltip>
                 )}
 
-                {/* Admin Mode Button - Only for admins (collapsed) */}
-                {user?.isAdmin && (
+                {/* Admin Mode Button - For admins and mentors (collapsed) */}
+                {(user?.isAdmin || isMentor) && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
                         className="flex items-center justify-center p-3 text-primary hover:text-white hover:bg-blue-500/20 rounded-md cursor-pointer transition-all duration-200 mb-1"
-                        onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/admin`)}
+                        onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/admin${isMentor ? '/ideas' : ''}`)}
                         data-testid="button-admin-mode-collapsed"
                       >
                         <Shield className="w-5 h-5" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      <p>{t('admin.mode')}</p>
+                      <p>{isMentor ? 'Ideas Overview' : t('admin.mode')}</p>
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -1071,15 +1071,15 @@ export function UnifiedSidebar() {
             ) : (
               // Expanded Bottom Navigation
               <>
-                {/* Admin Mode Button - Only for admins */}
-                {user?.isAdmin && (
+                {/* Admin Mode Button - For admins and mentors */}
+                {(user?.isAdmin || isMentor) && (
                   <div
                     className="flex items-center px-3 py-2 text-primary hover:text-white hover:bg-blue-500/20 rounded-md cursor-pointer transition-all duration-200 mb-1"
-                    onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/admin`)}
+                    onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/admin${isMentor ? '/ideas' : ''}`)}
                     data-testid="button-admin-mode"
                   >
                     <Shield className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
-                    <span className="text-sm font-semibold">{t('admin.mode')}</span>
+                    <span className="text-sm font-semibold">{isMentor ? 'Ideas Overview' : t('admin.mode')}</span>
                   </div>
                 )}
 

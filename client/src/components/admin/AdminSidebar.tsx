@@ -33,7 +33,14 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
     enabled: !!workspaceSlug
   });
 
-  const navItems = [
+  // Check if current user is a mentor (not admin/owner) to restrict nav
+  const { data: roleData } = useQuery({
+    queryKey: [`/api/organizations/${workspace?.id}/admin/check-role`],
+    enabled: !!workspace?.id,
+  });
+  const isMentorOnly = roleData?.role === 'MENTOR' && !roleData?.isAdmin && roleData?.role !== 'OWNER' && roleData?.role !== 'ADMIN';
+
+  const allNavItems = [
     {
       titleKey: 'admin.sidebar.dashboard.title',
       descKey: 'admin.sidebar.dashboard.description',
@@ -71,6 +78,11 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
       icon: Settings,
     }
   ];
+
+  // Mentors only see the Ideas section
+  const navItems = isMentorOnly
+    ? allNavItems.filter(item => item.href === `/w/${workspaceSlug}/admin/ideas`)
+    : allNavItems;
 
   return (
     <div

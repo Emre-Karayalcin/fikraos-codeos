@@ -14,7 +14,7 @@ interface AdminGuardProps {
 export function AdminGuard({ children }: AdminGuardProps) {
   const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
 
   // Validate workspace exists
@@ -49,6 +49,18 @@ export function AdminGuard({ children }: AdminGuardProps) {
     slug === "" ||
     slug.trim() === "";
 
+  // Check if user is a member of this workspace
+  const isMember = userInfo?.memberships?.some(
+    (m: any) => m.orgSlug === slug
+  );
+
+  // Check if user is admin (OWNER or ADMIN role) or mentor
+  const isAdmin = roleData?.isAdmin === true || roleData?.role === 'OWNER' || roleData?.role === 'ADMIN';
+  const isMentorRole = roleData?.role === 'MENTOR';
+  const hasAccess = isAdmin || isMentorRole;
+
+  const isLoading = workspaceLoading || userLoading || roleLoading;
+
   useEffect(() => {
     // If slug is invalid or reserved, redirect to home immediately
     if (isInvalidSlug) {
@@ -56,15 +68,15 @@ export function AdminGuard({ children }: AdminGuardProps) {
     }
   }, [isInvalidSlug, setLocation]);
 
-  // Check if user is a member of this workspace
-  const isMember = userInfo?.memberships?.some(
-    (m: any) => m.orgSlug === slug
-  );
-
-  // Check if user is admin (OWNER or ADMIN role)
-  const isAdmin = roleData?.isAdmin === true || roleData?.role === 'OWNER' || roleData?.role === 'ADMIN';
-
-  const isLoading = workspaceLoading || userLoading || roleLoading;
+  // Redirect mentors away from non-ideas admin pages to the ideas page
+  useEffect(() => {
+    if (!isLoading && isMentorRole && !isAdmin) {
+      const ideasPath = `/w/${slug}/admin/ideas`;
+      if (!location.startsWith(ideasPath)) {
+        setLocation(ideasPath);
+      }
+    }
+  }, [isLoading, isMentorRole, isAdmin, location, slug, setLocation]);
 
   // Show loading state while checking workspace and admin access
   if (isLoading) {
@@ -145,8 +157,8 @@ export function AdminGuard({ children }: AdminGuardProps) {
     );
   }
 
-  // Check if user is not an admin
-  if (!isAdmin) {
+  // Check if user has neither admin nor mentor access
+  if (!hasAccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-destructive/5 via-background to-destructive/5 flex items-center justify-center p-4">
         <Card className="w-full max-w-md border-destructive/20">
@@ -185,6 +197,6 @@ export function AdminGuard({ children }: AdminGuardProps) {
     );
   }
 
-  // Workspace exists, user is a member and an admin, render children
+  // Workspace exists, user is a member and has access (admin or mentor), render children
   return <>{children}</>;
 }
