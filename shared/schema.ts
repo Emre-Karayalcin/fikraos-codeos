@@ -691,7 +691,7 @@ export const mentorBookings = pgTable("mentor_bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   mentorProfileId: varchar("mentor_profile_id").notNull().references(() => mentorProfiles.id),
   userId: varchar("user_id").notNull().references(() => users.id),
-  ideaId: varchar("idea_id").references(() => ideas.id),
+  ideaId: varchar("idea_id").references(() => projects.id),
   pitchDeckId: varchar("pitch_deck_id").references(() => pitchDeckGenerations.id),
   bookedDate: varchar("booked_date", { length: 10 }).notNull(),
   bookedTime: varchar("booked_time", { length: 5 }).notNull(),
