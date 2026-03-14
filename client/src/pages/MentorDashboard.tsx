@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AllAIOutputsView } from "@/components/idea/AllAIOutputsView";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import MentorProfileSetup from "@/components/mentors/MentorProfileSetup";
@@ -81,41 +82,26 @@ function StatusPill({ status }: { status: string }) {
 function IdeaViewDialog({ booking, open, onClose }: { booking: Booking; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-text-primary">{booking.ideaTitle || "Idea"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          {booking.ideaStatus && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-text-secondary">Status:</span>
+      <DialogContent className="max-w-5xl w-full max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+          <DialogTitle className="text-text-primary text-lg">{booking.ideaTitle || "Idea"}</DialogTitle>
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            {booking.ideaStatus && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium capitalize">
-                {booking.ideaStatus.toLowerCase().replace("_", " ")}
+                {booking.ideaStatus.toLowerCase().replace(/_/g, " ")}
               </span>
-            </div>
-          )}
-          {booking.ideaSummary && (
-            <div>
-              <p className="text-xs font-medium text-text-secondary mb-1">Summary</p>
-              <p className="text-sm text-text-primary leading-relaxed">{booking.ideaSummary}</p>
-            </div>
-          )}
-          {booking.ideaTags && booking.ideaTags.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-text-secondary mb-2">Tags</p>
-              <div className="flex flex-wrap gap-1.5">
-                {booking.ideaTags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-          {booking.notes && (
-            <div className="p-3 rounded-lg bg-muted/50 border border-border">
-              <p className="text-xs font-medium text-text-secondary mb-1">Member's Notes</p>
-              <p className="text-sm text-text-primary">{booking.notes}</p>
+            )}
+            {booking.ideaSummary && (
+              <span className="text-xs text-text-secondary line-clamp-1 flex-1">{booking.ideaSummary}</span>
+            )}
+          </div>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto">
+          {booking.ideaId ? (
+            <AllAIOutputsView ideaId={booking.ideaId} />
+          ) : (
+            <div className="flex items-center justify-center h-40 text-text-secondary text-sm">
+              No idea linked to this booking.
             </div>
           )}
         </div>
