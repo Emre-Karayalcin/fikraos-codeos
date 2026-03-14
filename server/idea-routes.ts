@@ -256,14 +256,14 @@ export function registerIdeaRoutes(app: Express) {
     }
   });
 
-  // GET /api/my-ideas - Flat list of ideas owned by the current user (for dropdowns)
+  // GET /api/my-ideas - Flat list of projects (ideas) owned by the current user (for dropdowns)
   app.get('/api/my-ideas', isAuthenticated, async (req: any, res) => {
     try {
       const myIdeas = await db
-        .select({ id: ideas.id, title: ideas.title })
-        .from(ideas)
-        .where(eq(ideas.ownerId, req.user.id))
-        .orderBy(ideas.title);
+        .select({ id: projects.id, title: projects.title })
+        .from(projects)
+        .where(eq(projects.createdById, req.user.id))
+        .orderBy(projects.title);
       res.json(myIdeas);
     } catch (error) {
       console.error('Error fetching user ideas:', error);

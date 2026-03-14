@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "./db";
-import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, organizationMembers, pitchDeckGenerations } from "../shared/schema";
+import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, projects, organizationMembers, pitchDeckGenerations } from "../shared/schema";
 import { eq, and } from "drizzle-orm";
 import { emailService } from "./services/emailService";
 
@@ -151,8 +151,8 @@ router.post("/mentor-bookings", async (req: any, res) => {
 
       let ideaTitle: string | undefined;
       if (ideaId) {
-        const [idea] = await db.select({ title: ideas.title }).from(ideas).where(eq(ideas.id, ideaId));
-        ideaTitle = idea?.title;
+        const [project] = await db.select({ title: projects.title }).from(projects).where(eq(projects.id, ideaId));
+        ideaTitle = project?.title;
       }
 
       if (mentorUser?.email) {
@@ -303,10 +303,10 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
         bookerFirstName: users.firstName,
         bookerLastName: users.lastName,
         ideaId: mentorBookings.ideaId,
-        ideaTitle: ideas.title,
-        ideaSummary: ideas.summary,
-        ideaTags: ideas.tags,
-        ideaStatus: ideas.status,
+        ideaTitle: projects.title,
+        ideaSummary: projects.description,
+        ideaTags: projects.tags,
+        ideaStatus: projects.status,
         pitchDeckId: mentorBookings.pitchDeckId,
         pitchDeckDownloadUrl: pitchDeckGenerations.downloadUrl,
         pitchDeckStatus: pitchDeckGenerations.status,
@@ -319,7 +319,7 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
       })
       .from(mentorBookings)
       .innerJoin(users, eq(mentorBookings.userId, users.id))
-      .leftJoin(ideas, eq(mentorBookings.ideaId, ideas.id))
+      .leftJoin(projects, eq(mentorBookings.ideaId, projects.id))
       .leftJoin(pitchDeckGenerations, eq(mentorBookings.pitchDeckId, pitchDeckGenerations.id))
       .where(eq(mentorBookings.mentorProfileId, profile.id));
 
