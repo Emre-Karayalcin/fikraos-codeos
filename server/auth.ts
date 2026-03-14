@@ -7,7 +7,9 @@ import { promisify } from "util";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
-import { users } from "@shared/schema";
+import { db } from "./db";
+import { users, organizations, organizationMembers } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { authRateLimiter, passwordResetLimiter } from "./middleware/security";
 import {
   registrationValidation,
@@ -212,8 +214,27 @@ export function setupAuth(app: Express) {
       req.session.regenerate((regenerateErr) => {
         if (regenerateErr) return next(regenerateErr);
 
-        req.login(user, (loginErr) => {
+        req.login(user, async (loginErr) => {
           if (loginErr) return next(loginErr);
+
+          // Fetch memberships so the client cache is fully populated on login
+          let memberships: any[] = [];
+          try {
+            memberships = await db
+              .select({
+                orgId: organizationMembers.orgId,
+                role: organizationMembers.role,
+                orgName: organizations.name,
+                orgSlug: organizations.slug,
+              })
+              .from(organizationMembers)
+              .innerJoin(organizations, eq(organizationMembers.orgId, organizations.id))
+              .where(eq(organizationMembers.userId, user.id));
+          } catch (_e) {
+            // non-fatal: client will refetch /api/user on its own
+          }
+          const isAdmin = memberships.some((m: any) => m.role === 'OWNER' || m.role === 'ADMIN');
+
           // Explicitly save the regenerated session so it's persisted before
           // the response is sent (express-session's auto-save is bound to the
           // old session reference and won't save the new one).
@@ -225,6 +246,9 @@ export function setupAuth(app: Express) {
               email: user.email,
               firstName: user.firstName,
               lastName: user.lastName,
+              memberships,
+              isAdmin,
+              primaryOrgId: memberships[0]?.orgId,
             });
           });
         });

@@ -240,27 +240,58 @@ export function registerWorkspaceRoutes(app: Express) {
       }
 
       // Log the user in
-      (req as any).login(user, (err: any) => {
+      (req as any).login(user, async (err: any) => {
         if (err) {
           console.error('Error logging in:', err);
           return res.status(500).json({ error: 'Login failed' });
         }
 
-        res.json({
-          success: true,
-          user: {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            firstName: user.firstName,
-            lastName: user.lastName
-          },
-          workspace: {
-            id: workspace.id,
-            name: workspace.name,
-            slug: workspace.slug
-          },
-          role: membership.role
+        // Fetch full memberships so the client cache is complete on login
+        // (avoids WorkspaceGuard spinner from waiting on a /api/user refetch)
+        let memberships: any[] = [];
+        try {
+          memberships = await db
+            .select({
+              orgId: organizationMembers.orgId,
+              role: organizationMembers.role,
+              orgName: organizations.name,
+              orgSlug: organizations.slug,
+            })
+            .from(organizationMembers)
+            .innerJoin(organizations, eq(organizationMembers.orgId, organizations.id))
+            .where(eq(organizationMembers.userId, user.id));
+        } catch (_e) {
+          // non-fatal: client will refetch /api/user on its own
+        }
+        const isAdmin = memberships.some((m: any) => m.role === 'OWNER' || m.role === 'ADMIN');
+
+        // Explicitly save session before responding (defensive: ensures session
+        // is persisted even if express-session's auto-save races with this callback)
+        (req as any).session.save((saveErr: any) => {
+          if (saveErr) {
+            console.error('Session save error:', saveErr);
+            return res.status(500).json({ error: 'Login failed' });
+          }
+
+          res.json({
+            success: true,
+            user: {
+              id: user.id,
+              email: user.email,
+              username: user.username,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              memberships,
+              isAdmin,
+              primaryOrgId: memberships[0]?.orgId,
+            },
+            workspace: {
+              id: workspace.id,
+              name: workspace.name,
+              slug: workspace.slug
+            },
+            role: membership.role
+          });
         });
       });
     } catch (error) {
