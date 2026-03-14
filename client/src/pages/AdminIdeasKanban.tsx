@@ -511,6 +511,7 @@ export default function AdminIdeasKanban() {
             </Dialog>
           </div>
         </div>
+        </div>
 
         {/* Kanban Board */}
         <DndContext
