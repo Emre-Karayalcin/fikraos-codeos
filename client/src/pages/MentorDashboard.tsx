@@ -21,6 +21,7 @@ import {
   Users,
   Star,
   Clock,
+  Calendar,
   CheckCircle,
   XCircle,
   ChevronLeft,
@@ -393,57 +394,108 @@ export default function MentorDashboard() {
 
           {/* ── CALENDAR TAB ── */}
           {activeTab === "calendar" && (
-            <div className="bg-card border border-border rounded-lg overflow-hidden max-w-lg">
-              <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
-                <h2 className="font-semibold text-text-primary">{MONTHS[month]} {year}</h2>
-                <div className="flex gap-1">
-                  <button onClick={() => setCalendarDate(new Date(year, month - 1, 1))} className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-muted transition-colors"><ChevronLeft size={16} /></button>
-                  <button onClick={() => setCalendarDate(new Date(year, month + 1, 1))} className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-muted transition-colors"><ChevronRight size={16} /></button>
+            <div className="flex flex-col lg:flex-row gap-5 items-start">
+
+              {/* Left: Calendar */}
+              <div className="bg-card border border-border rounded-lg overflow-hidden w-full lg:w-80 xl:w-96 shrink-0">
+                <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
+                  <h2 className="font-semibold text-text-primary">{MONTHS[month]} {year}</h2>
+                  <div className="flex gap-1">
+                    <button onClick={() => setCalendarDate(new Date(year, month - 1, 1))} className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-muted transition-colors"><ChevronLeft size={16} /></button>
+                    <button onClick={() => setCalendarDate(new Date(year, month + 1, 1))} className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-muted transition-colors"><ChevronRight size={16} /></button>
+                  </div>
+                </div>
+                <div className="p-4 sm:p-5">
+                  <div className="grid grid-cols-7 mb-2">
+                    {DAYS.map((d) => <div key={d} className="text-center text-xs text-text-secondary py-1 font-medium">{d}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                      const day = i + 1;
+                      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                      const isToday = dateStr === today;
+                      const hasBooking = bookedDays.has(dateStr);
+                      const isSelected = dateStr === selectedCalendarDay;
+                      return (
+                        <button key={day} onClick={() => setSelectedCalendarDay(isSelected ? null : dateStr)}
+                          className={`aspect-square rounded-lg text-sm font-medium transition-all relative flex items-center justify-center ${isSelected ? "bg-primary text-white" : isToday ? "text-primary font-bold" : "text-text-primary hover:bg-muted"}`}>
+                          {day}
+                          {hasBooking && !isSelected && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedCalendarDay && calendarDayBookings.length > 0 && (
+                    <p className="text-xs text-text-secondary mt-4 pt-3 border-t border-border text-center">
+                      {calendarDayBookings.length} session{calendarDayBookings.length !== 1 ? "s" : ""} on {selectedCalendarDay} — see right panel
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="p-4 sm:p-5">
-                <div className="grid grid-cols-7 mb-2">
-                  {DAYS.map((d) => <div key={d} className="text-center text-xs text-text-secondary py-1 font-medium">{d}</div>)}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: firstDay }).map((_, i) => <div key={`e-${i}`} />)}
-                  {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                    const isToday = dateStr === today;
-                    const hasBooking = bookedDays.has(dateStr);
-                    const isSelected = dateStr === selectedCalendarDay;
-                    return (
-                      <button key={day} onClick={() => setSelectedCalendarDay(isSelected ? null : dateStr)}
-                        className={`aspect-square rounded-lg text-sm font-medium transition-all relative flex items-center justify-center ${isSelected ? "bg-primary text-white" : isToday ? "text-primary font-bold" : "text-text-primary hover:bg-muted"}`}>
-                        {day}
-                        {hasBooking && !isSelected && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />}
+
+              {/* Right: Bookings grid */}
+              <div className="flex-1 min-w-0 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-text-primary">
+                    {selectedCalendarDay ? `Sessions on ${selectedCalendarDay}` : "All Sessions"}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {selectedCalendarDay && (
+                      <button
+                        onClick={() => setSelectedCalendarDay(null)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Clear filter
                       </button>
-                    );
-                  })}
+                    )}
+                    <span className="text-xs text-text-secondary bg-muted px-2 py-0.5 rounded-full">
+                      {(selectedCalendarDay ? calendarDayBookings : bookings).length} booking{(selectedCalendarDay ? calendarDayBookings : bookings).length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
                 </div>
-                {selectedCalendarDay && (
-                  <div className="mt-5 space-y-2 border-t border-border pt-4">
-                    <h3 className="text-sm font-semibold text-text-primary mb-3">Sessions on {selectedCalendarDay}</h3>
-                    {calendarDayBookings.length === 0 ? (
-                      <p className="text-text-secondary text-sm text-center py-3">No sessions</p>
-                    ) : (
-                      calendarDayBookings.map((b) => (
-                        <div key={b.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
+
+                {(selectedCalendarDay ? calendarDayBookings : bookings).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-text-secondary">
+                    <Calendar size={36} className="mb-3 opacity-30" />
+                    <p className="text-sm">{selectedCalendarDay ? "No sessions on this day" : "No bookings yet"}</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {(selectedCalendarDay ? calendarDayBookings : bookings).map((b) => (
+                      <div key={b.id} className="bg-card border border-border rounded-xl p-4 space-y-3 hover:border-primary/30 transition-colors">
+                        {/* Booker */}
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold shrink-0">
                             {getInitials(b.bookerFirstName, b.bookerLastName)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-text-primary">{b.bookerFirstName} {b.bookerLastName}</p>
-                            <p className="text-text-secondary text-xs">{formatTime(b.bookedTime)} · {b.durationMinutes} min</p>
+                            <p className="text-sm font-semibold text-text-primary truncate">{b.bookerFirstName} {b.bookerLastName}</p>
+                            {b.ideaTitle && <p className="text-xs text-muted-foreground truncate">💡 {b.ideaTitle}</p>}
                           </div>
                           <StatusPill status={b.status} />
                         </div>
-                      ))
-                    )}
+                        {/* Time */}
+                        <div className="flex items-center gap-3 text-xs text-text-secondary">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={11} />
+                            {b.bookedDate}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={11} />
+                            {formatTime(b.bookedTime)} · {b.durationMinutes} min
+                          </span>
+                        </div>
+                        {/* Notes */}
+                        {b.notes && (
+                          <p className="text-xs text-text-secondary bg-muted/40 rounded-md px-2.5 py-1.5 line-clamp-2">{b.notes}</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
+
             </div>
           )}
 
