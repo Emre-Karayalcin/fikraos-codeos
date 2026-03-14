@@ -181,15 +181,36 @@ router.post("/mentor-bookings", async (req: any, res) => {
   }
 });
 
-// GET /api/mentor-bookings/mine - Get user's bookings
+// GET /api/mentor-bookings/mine - Get user's bookings with mentor details
 router.get("/mentor-bookings/mine", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
+    const mentorUsers = users;
     const bookings = await db
-      .select()
+      .select({
+        id: mentorBookings.id,
+        mentorProfileId: mentorBookings.mentorProfileId,
+        mentorFirstName: mentorUsers.firstName,
+        mentorLastName: mentorUsers.lastName,
+        mentorProfileImageUrl: mentorUsers.profileImageUrl,
+        mentorTitle: mentorProfiles.title,
+        ideaId: mentorBookings.ideaId,
+        ideaTitle: projects.title,
+        pitchDeckId: mentorBookings.pitchDeckId,
+        bookedDate: mentorBookings.bookedDate,
+        bookedTime: mentorBookings.bookedTime,
+        durationMinutes: mentorBookings.durationMinutes,
+        notes: mentorBookings.notes,
+        status: mentorBookings.status,
+        createdAt: mentorBookings.createdAt,
+      })
       .from(mentorBookings)
-      .where(eq(mentorBookings.userId, req.user.id));
+      .innerJoin(mentorProfiles, eq(mentorBookings.mentorProfileId, mentorProfiles.id))
+      .innerJoin(mentorUsers, eq(mentorProfiles.userId, mentorUsers.id))
+      .leftJoin(projects, eq(mentorBookings.ideaId, projects.id))
+      .where(eq(mentorBookings.userId, req.user.id))
+      .orderBy(mentorBookings.bookedDate, mentorBookings.bookedTime);
 
     res.json(bookings);
   } catch (error) {
