@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,7 +120,13 @@ const DEFAULT_FORM: ChallengeFormData = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Use apiRequest from queryClient so CSRF token is automatically included
 async function apiFetch(url: string, options?: RequestInit) {
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (["POST", "PATCH", "DELETE"].includes(method)) {
+    const res = await apiRequest(method, url, options?.body ? JSON.parse(options.body as string) : undefined);
+    return res.json();
+  }
   const res = await fetch(url, { credentials: "include", ...options });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
@@ -195,6 +202,9 @@ function SortableChallengeRow({
           <div>
             <div className="font-medium text-sm">{c.title}</div>
             <div className="text-xs text-muted-foreground font-mono">{c.slug}</div>
+            {c.prize && (
+              <div className="text-xs text-yellow-500 mt-0.5">🏆 {c.prize}</div>
+            )}
           </div>
         </div>
       </td>
@@ -327,12 +337,28 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
 
   const handleSubmit = () => {
     if (!validateCriteria(form.evaluationCriteria)) return;
-    onSubmit({
+
+    const payload: Record<string, any> = {
       orgId,
-      ...form,
+      title: form.title,
+      slug: form.slug,
+      description: form.description,
+      status: form.status,
+      emoji: form.emoji || "🎯",
       maxSubmissions: parseInt(form.maxSubmissions) || 100,
-      evaluationCriteria: form.evaluationCriteria.trim() || null,
-    });
+    };
+
+    // Optional fields — only include when non-empty
+    if (form.shortDescription.trim()) payload.shortDescription = form.shortDescription.trim();
+    if (form.prize.trim()) payload.prize = form.prize.trim();
+    if (form.evaluationCriteria.trim()) payload.evaluationCriteria = form.evaluationCriteria.trim();
+
+    // Convert YYYY-MM-DD → full ISO datetime (required by server validation)
+    if (form.deadline) {
+      payload.deadline = form.deadline + "T00:00:00.000Z";
+    }
+
+    onSubmit(payload);
   };
 
   const isValid = form.title.trim() && form.slug.trim() && form.description.trim() && form.deadline;
@@ -559,7 +585,7 @@ export default function AdminChallenges() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [`/api/challenges`, workspace?.id] });
+      qc.invalidateQueries({ queryKey: ["/api/challenges", workspace?.id] });
       toast.success("Problem statement created");
       setModal(null);
     },
@@ -574,7 +600,7 @@ export default function AdminChallenges() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [`/api/challenges`, workspace?.id] });
+      qc.invalidateQueries({ queryKey: ["/api/challenges", workspace?.id] });
       toast.success("Challenge updated");
       setModal(null);
     },
@@ -585,7 +611,7 @@ export default function AdminChallenges() {
     mutationFn: (id: string) =>
       apiFetch(`/api/challenges/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [`/api/challenges`, workspace?.id] });
+      qc.invalidateQueries({ queryKey: ["/api/challenges", workspace?.id] });
       toast.success("Challenge deleted");
       setDeleteTarget(null);
     },

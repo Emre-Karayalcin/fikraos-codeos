@@ -175,7 +175,14 @@ export const createChallengeSchema = z.object({
   description: z.string().min(1, "Description is required").max(5000, "Description too long"),
   shortDescription: z.string().max(500, "Short description too long").optional(),
   slug: z.string().regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens").min(3).max(100),
-  deadline: z.string().datetime("Invalid deadline format").optional(),
+  deadline: z.union([
+    z.string().datetime(),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).transform(v => v + 'T00:00:00.000Z'),
+  ]).optional(),
+  status: z.enum(['draft', 'active', 'upcoming', 'ended']).optional(),
+  prize: z.string().max(500).optional(),
+  emoji: z.string().max(10).optional(),
+  maxSubmissions: z.number().int().positive().optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
   orgId: z.string().uuid("Invalid organization ID"),
   prizes: z.array(z.object({
@@ -194,9 +201,15 @@ export const updateChallengeSchema = z.object({
   title: z.string().min(1).max(200).trim().optional(),
   description: z.string().min(1).max(5000).optional(),
   shortDescription: z.string().max(500).optional(),
-  deadline: z.string().datetime().optional(),
+  deadline: z.union([
+    z.string().datetime(),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).transform(v => v + 'T00:00:00.000Z'),
+  ]).optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
-  status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED', 'ARCHIVED']).optional(),
+  status: z.enum(['draft', 'active', 'upcoming', 'ended']).optional(),
+  prize: z.string().max(500).optional(),
+  emoji: z.string().max(10).optional(),
+  maxSubmissions: z.number().int().positive().optional(),
   evaluationCriteria: z.string().max(10000, "Evaluation criteria too long").optional(),
 });
 
