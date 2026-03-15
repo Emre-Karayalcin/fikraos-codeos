@@ -255,7 +255,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                     <span className="font-medium text-foreground">
-                      {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                      {(reviews.reduce((s, r) => s + Number(r.rating), 0) / reviews.length).toFixed(1)}
                     </span>
                     <span>({reviews.length} review{reviews.length !== 1 ? "s" : ""})</span>
                   </div>

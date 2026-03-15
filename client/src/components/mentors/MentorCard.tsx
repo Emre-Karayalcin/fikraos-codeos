@@ -71,10 +71,10 @@ export default function MentorCard({ mentor, onClick }: MentorCardProps) {
             <Clock className="h-3.5 w-3.5" />
             <span>{mentor.sessionDurationMinutes ?? 60} mins</span>
           </div>
-          {mentor.averageRating != null && mentor.averageRating > 0 && (
+          {mentor.averageRating != null && Number(mentor.averageRating) > 0 && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-              <span className="font-medium text-foreground">{mentor.averageRating.toFixed(1)}</span>
+              <span className="font-medium text-foreground">{Number(mentor.averageRating).toFixed(1)}</span>
             </div>
           )}
         </div>
