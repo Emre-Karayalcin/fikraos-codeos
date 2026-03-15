@@ -276,7 +276,8 @@ export function registerChallengeRoutes(app: Express) {
 
       allowedFields.forEach(field => {
         if (field in updateData) {
-          sanitizedUpdate[field] = updateData[field];
+          // Convert deadline string to Date object (Drizzle timestamp columns require Date)
+          sanitizedUpdate[field] = field === 'deadline' ? new Date(updateData[field]) : updateData[field];
         }
       });
 
