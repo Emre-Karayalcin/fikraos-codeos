@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { X, Save, Sparkles, Loader2, Check, AlertCircle } from "lucide-react";
+import { X, Save, Sparkles, Loader2, Check, AlertCircle, History, RotateCcw, ChevronLeft } from "lucide-react";
 
 interface AssetEditModalProps {
   asset: any;
@@ -23,6 +23,8 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
   const [aiEditSection, setAiEditSection] = useState<string>("");
   const [aiInstructions, setAiInstructions] = useState<string>("");
   const [pendingAiChanges, setPendingAiChanges] = useState<any>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState<{ id: string; label: string; data: any } | null>(null);
 
   // Mutation to update asset
   const updateAssetMutation = useMutation({
@@ -92,6 +94,31 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
         variant: "destructive",
       });
     },
+  });
+
+  const { data: versions = [], refetch: refetchVersions } = useQuery<{ id: string; label: string; createdAt: string; data: any }[]>({
+    queryKey: [`/api/assets/${asset?.id}/versions`],
+    enabled: isOpen && showHistory,
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const res = await fetch(`/api/assets/${asset.id}/versions/${versionId}/restore`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to restore");
+      return res.json();
+    },
+    onSuccess: (restored) => {
+      setEditedData(restored.data);
+      setPreviewVersion(null);
+      setShowHistory(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", asset.projectId, "assets"] });
+      refetchVersions();
+      toast({ title: "Version restored", description: "The selected version has been loaded into the editor. Save to apply." });
+    },
+    onError: () => toast({ title: "Restore failed", variant: "destructive" }),
   });
 
   const handleSave = () => {
@@ -346,18 +373,36 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span>Edit {t(`assets.types.${asset?.kind}`)}</span>
-              <button
-                onClick={() => setAiEditSection("_ALL_")}
-                className={`text-xs px-3 py-1.5 rounded-md flex items-center gap-2 ${
-                  aiEditSection === "_ALL_"
-                    ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-                }`}
-              >
-                <Sparkles className="w-3 h-3" />
-                Edit All with AI
-              </button>
+              {showHistory ? (
+                <>
+                  <button onClick={() => { setShowHistory(false); setPreviewVersion(null); }} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+                    <ChevronLeft className="w-4 h-4" /> Back
+                  </button>
+                  <span className="text-gray-900">Version History</span>
+                </>
+              ) : (
+                <>
+                  <span>Edit {t(`assets.types.${asset?.kind}`)}</span>
+                  <button
+                    onClick={() => setAiEditSection("_ALL_")}
+                    className={`text-xs px-3 py-1.5 rounded-md flex items-center gap-2 ${
+                      aiEditSection === "_ALL_"
+                        ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Edit All with AI
+                  </button>
+                  <button
+                    onClick={() => setShowHistory(true)}
+                    className="text-xs px-3 py-1.5 rounded-md flex items-center gap-2 bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                  >
+                    <History className="w-3 h-3" />
+                    History
+                  </button>
+                </>
+              )}
             </div>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="w-4 h-4" />
@@ -365,7 +410,80 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-[60%_40%] gap-6 relative">
+        {/* Version History Panel */}
+        {showHistory && (
+          <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-0 border border-gray-200 rounded-lg">
+            {/* Left: version list */}
+            <div className="border-r border-gray-200 overflow-y-auto">
+              <div className="p-3 border-b border-gray-200 bg-gray-50">
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                  {versions.length} version{versions.length !== 1 ? "s" : ""} saved
+                </p>
+              </div>
+              {versions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400 px-4 text-center">
+                  <History className="w-8 h-8 mb-2 opacity-30" />
+                  <p className="text-sm">No versions yet</p>
+                  <p className="text-xs mt-1">Versions are saved automatically each time you save changes</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {versions.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setPreviewVersion(v)}
+                      className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
+                        previewVersion?.id === v.id ? "bg-blue-50 border-l-2 border-blue-500" : ""
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-gray-900">{v.label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Click to preview</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right: preview */}
+            <div className="overflow-y-auto p-4 space-y-4 bg-gray-50">
+              {previewVersion ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900">{previewVersion.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Preview of this version's content</p>
+                    </div>
+                    <Button
+                      onClick={() => restoreMutation.mutate(previewVersion.id)}
+                      disabled={restoreMutation.isPending}
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      {restoreMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4" />
+                      )}
+                      Restore this version
+                    </Button>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    {VisualizationComponent && (
+                      <VisualizationComponent data={previewVersion.data} title={asset?.title} />
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400 py-16">
+                  <History className="w-10 h-10 mb-3 opacity-20" />
+                  <p className="text-sm">Select a version to preview</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className={`flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-[60%_40%] gap-6 relative ${showHistory ? "hidden" : ""}`}>
           {/* AI Regeneration Loading Overlay */}
           {aiEditMutation.isPending && (
             <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -411,7 +529,7 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
         </div>
 
         {/* AI Edit Section */}
-        {aiEditSection && !pendingAiChanges && (
+        {!showHistory && aiEditSection && !pendingAiChanges && (
           <div className="border-t border-gray-300 pt-4 space-y-3 bg-orange-50 -mx-6 px-6 -mb-6 pb-6">
             <h4 className="font-semibold text-sm flex items-center gap-2 text-gray-900">
               <Sparkles className="w-4 h-4 text-orange-600" />
@@ -461,7 +579,7 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
         )}
 
         {/* AI Changes Review Section */}
-        {pendingAiChanges && (
+        {!showHistory && pendingAiChanges && (
           <div className="border-t border-gray-300 pt-4 space-y-4 bg-blue-50 -mx-6 px-6 pb-6">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-lg flex items-center gap-2 text-blue-900">
@@ -498,7 +616,7 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
         )}
 
         {/* Footer Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t border-gray-300">
+        {!showHistory && <div className="flex justify-end gap-2 pt-4 border-t border-gray-300">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -519,7 +637,7 @@ export function AssetEditModal({ asset, isOpen, onClose, VisualizationComponent 
               </>
             )}
           </Button>
-        </div>
+        </div>}
       </DialogContent>
     </Dialog>
   );

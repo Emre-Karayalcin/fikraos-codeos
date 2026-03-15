@@ -1025,6 +1025,34 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get version history for an asset
+  app.get('/api/assets/:id/versions', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const versions = await storage.getAssetVersions(id);
+      res.json(versions);
+    } catch (error) {
+      console.error("Error fetching asset versions:", error);
+      res.status(500).json({ message: "Failed to fetch versions" });
+    }
+  });
+
+  // Restore an asset to a specific version
+  app.post('/api/assets/:id/versions/:versionId/restore', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id, versionId } = req.params;
+      const version = await storage.getAssetVersion(versionId);
+      if (!version || version.assetId !== id) {
+        return res.status(404).json({ message: "Version not found" });
+      }
+      const updated = await storage.updateAsset(id, { data: version.data });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error restoring asset version:", error);
+      res.status(500).json({ message: "Failed to restore version" });
+    }
+  });
+
   // AI-powered section regeneration
   app.post('/api/assets/:id/ai-edit', isAuthenticated, aiRateLimiter, async (req: any, res) => {
     try {

@@ -6,6 +6,7 @@ import {
   chats,
   messages,
   assets,
+  assetVersions,
   pitchDeckGenerations,
   passwordResetTokens,
   comments,
@@ -29,7 +30,7 @@ import {
   projectEvaluations,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -90,6 +91,10 @@ export interface IStorage {
   getAsset(id: string): Promise<Asset | undefined>;
   createAsset(asset: InsertAsset): Promise<Asset>;
   updateAsset(id: string, data: Partial<InsertAsset>): Promise<Asset>;
+  // Asset version operations
+  getAssetVersions(assetId: string): Promise<{ id: string; label: string; createdAt: Date; data: any }[]>;
+  getAssetVersion(versionId: string): Promise<{ id: string; assetId: string; label: string; createdAt: Date; data: any } | undefined>;
+  createAssetVersion(assetId: string, data: any, label: string): Promise<void>;
   
   // Pitch deck generation operations
   getPitchDeckGenerationsByProject(projectId: string): Promise<PitchDeckGeneration[]>;
@@ -617,12 +622,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateAsset(id: string, data: Partial<InsertAsset>): Promise<Asset> {
+    // Snapshot current data as a version before overwriting (only when data changes)
+    if (data.data !== undefined) {
+      const current = await db.select().from(assets).where(eq(assets.id, id)).limit(1);
+      if (current[0]?.data) {
+        const now = new Date();
+        const label = now.toLocaleString("en-US", {
+          month: "short", day: "numeric", year: "numeric",
+          hour: "numeric", minute: "2-digit", hour12: true,
+        });
+        await db.insert(assetVersions).values({ assetId: id, data: current[0].data, label });
+        // Keep only the latest 50 versions per asset
+        const all = await db.select({ id: assetVersions.id })
+          .from(assetVersions).where(eq(assetVersions.assetId, id))
+          .orderBy(assetVersions.createdAt);
+        if (all.length > 50) {
+          const toDelete = all.slice(0, all.length - 50).map((v) => v.id);
+          await db.delete(assetVersions).where(inArray(assetVersions.id, toDelete));
+        }
+      }
+    }
     const [updatedAsset] = await db
       .update(assets)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(assets.id, id))
       .returning();
     return updatedAsset;
+  }
+
+  async getAssetVersions(assetId: string) {
+    return db.select({ id: assetVersions.id, label: assetVersions.label, createdAt: assetVersions.createdAt, data: assetVersions.data })
+      .from(assetVersions)
+      .where(eq(assetVersions.assetId, assetId))
+      .orderBy(desc(assetVersions.createdAt));
+  }
+
+  async getAssetVersion(versionId: string) {
+    const [v] = await db.select().from(assetVersions).where(eq(assetVersions.id, versionId)).limit(1);
+    return v;
+  }
+
+  async createAssetVersion(assetId: string, data: any, label: string): Promise<void> {
+    await db.insert(assetVersions).values({ assetId, data, label });
   }
 
   // Pitch deck generation operations

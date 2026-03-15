@@ -289,6 +289,14 @@ export const assets = pgTable("assets", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const assetVersions = pgTable("asset_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  data: jsonb("data").notNull(),
+  label: varchar("label", { length: 255 }).notNull(), // e.g. "Mar 15, 2026 · 2:34 PM"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const pitchDeckGenerations = pgTable("pitch_deck_generations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
