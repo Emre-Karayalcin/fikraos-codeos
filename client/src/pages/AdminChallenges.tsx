@@ -252,17 +252,6 @@ function SortableChallengeRow({
       {/* Actions */}
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
-          {/* Active/Inactive toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 ${c.isActive ? 'text-green-400 hover:text-destructive' : 'text-muted-foreground hover:text-green-400'}`}
-            onClick={() => onToggleActive(c)}
-            title={c.isActive ? 'Deactivate (hide from users)' : 'Activate (show to users)'}
-          >
-            {c.isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-          </Button>
-
           <Button
             variant="ghost"
             size="icon"
@@ -280,6 +269,23 @@ function SortableChallengeRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* Activate / Deactivate */}
+              <DropdownMenuItem onClick={() => onToggleActive(c)}>
+                {c.isActive ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                    Deactivate (hide from users)
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 mr-2 text-green-400" />
+                    Activate (show to users)
+                  </>
+                )}
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
               {!isActive && (
                 <DropdownMenuItem onClick={() => onPublish(c)}>
                   <Send className="w-3.5 h-3.5 mr-2 text-green-400" />
@@ -336,6 +342,9 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
         }
       : DEFAULT_FORM
   );
+  const [isActive, setIsActive] = useState<boolean>(() =>
+    mode === "edit" ? (challenge?.isActive ?? true) : true
+  );
 
   const [criteriaError, setCriteriaError] = useState("");
 
@@ -369,6 +378,7 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
       status: form.status,
       emoji: form.emoji || "🎯",
       maxSubmissions: parseInt(form.maxSubmissions) || 100,
+      isActive,
     };
 
     // Optional fields — only include when non-empty
@@ -422,6 +432,31 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Visible to users toggle */}
+          <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Visible to users</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isActive ? "Users can see and interact with this challenge" : "Hidden — only admins can see this"}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isActive}
+              onClick={() => setIsActive((v) => !v)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                isActive ? "bg-green-500" : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  isActive ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
           </div>
 
           {/* Title */}
