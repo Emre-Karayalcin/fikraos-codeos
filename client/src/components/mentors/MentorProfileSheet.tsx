@@ -28,6 +28,7 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
+  Star,
 } from "lucide-react";
 
 interface Availability {
@@ -66,6 +67,15 @@ interface PitchDeck {
   projectId: string;
 }
 
+interface Review {
+  id: string;
+  rating: number;
+  feedback?: string | null;
+  bookedDate: string;
+  bookerFirstName?: string;
+  bookerLastName?: string;
+}
+
 interface Props {
   mentor: { id: string; firstName: string; lastName: string; profileImageUrl?: string; title?: string };
   open: boolean;
@@ -98,6 +108,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
   const queryClient = useQueryClient();
 
   const today = new Date();
+  const [profileTab, setProfileTab] = useState<"about" | "reviews">("about");
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -107,6 +118,11 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
 
   const { data: mentorDetail } = useQuery<MentorDetail>({
     queryKey: [`/api/mentors/${mentor.id}`],
+    enabled: open,
+  });
+
+  const { data: reviews = [] } = useQuery<Review[]>({
+    queryKey: [`/api/mentors/${mentor.id}/reviews`],
     enabled: open,
   });
 
@@ -235,64 +251,127 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
                     <Globe className="h-3 w-3" /> {detail.website}
                   </a>
                 )}
+                {reviews.length > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    <span className="font-medium text-foreground">
+                      {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                    </span>
+                    <span>({reviews.length} review{reviews.length !== 1 ? "s" : ""})</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {detail.bio && (
-              <div>
-                <h3 className="text-sm font-semibold mb-2">About</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{detail.bio}</p>
-              </div>
-            )}
+            {/* Tab switcher */}
+            <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit">
+              {(["about", "reviews"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setProfileTab(tab)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize ${
+                    profileTab === tab
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab === "reviews" ? `Reviews${reviews.length > 0 ? ` (${reviews.length})` : ""}` : "About"}
+                </button>
+              ))}
+            </div>
 
-            {detail.expertise && detail.expertise.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold mb-2">Expertise</h3>
-                <div className="flex flex-wrap gap-2">
-                  {detail.expertise.map((tag) => (
-                    <Badge key={tag} className="bg-primary/15 text-primary border-0 text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
+            {profileTab === "about" && (
+              <>
+                {detail.bio && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">About</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{detail.bio}</p>
+                  </div>
+                )}
 
-            {detail.industries && detail.industries.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold mb-2">Industries</h3>
-                <div className="flex flex-wrap gap-2">
-                  {detail.industries.map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <Separator />
-
-            <div>
-              <h3 className="text-sm font-semibold mb-4">How It Works</h3>
-              <div className="space-y-3">
-                {[
-                  { icon: Calendar, label: "Select a Time", desc: "Choose a date and time that works for you." },
-                  { icon: Mail, label: "Receive Invite", desc: "Get a calendar invite with meeting details." },
-                  { icon: Video, label: "Hop on a Call", desc: "Connect with your mentor via video call." },
-                ].map(({ icon: Icon, label, desc }) => (
-                  <div key={label} className="flex items-start gap-3">
-                    <div className="mt-0.5 p-2 rounded-lg bg-primary/10">
-                      <Icon className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{label}</p>
-                      <p className="text-xs text-muted-foreground">{desc}</p>
+                {detail.expertise && detail.expertise.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Expertise</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {detail.expertise.map((tag) => (
+                        <Badge key={tag} className="bg-primary/15 text-primary border-0 text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {detail.industries && detail.industries.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Industries</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {detail.industries.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div>
+                  <h3 className="text-sm font-semibold mb-4">How It Works</h3>
+                  <div className="space-y-3">
+                    {[
+                      { icon: Calendar, label: "Select a Time", desc: "Choose a date and time that works for you." },
+                      { icon: Mail, label: "Receive Invite", desc: "Get a calendar invite with meeting details." },
+                      { icon: Video, label: "Hop on a Call", desc: "Connect with your mentor via video call." },
+                    ].map(({ icon: Icon, label, desc }) => (
+                      <div key={label} className="flex items-start gap-3">
+                        <div className="mt-0.5 p-2 rounded-lg bg-primary/10">
+                          <Icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{label}</p>
+                          <p className="text-xs text-muted-foreground">{desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {profileTab === "reviews" && (
+              <div className="space-y-4">
+                {reviews.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Star className="h-8 w-8 mb-2 opacity-20" />
+                    <p className="text-sm">No reviews yet</p>
+                  </div>
+                ) : (
+                  reviews.map((review) => (
+                    <div key={review.id} className="border border-border rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">
+                          {review.bookerFirstName} {review.bookerLastName}
+                        </p>
+                        <span className="text-xs text-muted-foreground">{review.bookedDate}</span>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            className={`h-4 w-4 ${s <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`}
+                          />
+                        ))}
+                      </div>
+                      {review.feedback && (
+                        <p className="text-sm text-muted-foreground italic">"{review.feedback}"</p>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
-            </div>
+            )}
           </div>
 
           {/* Right: Booking */}

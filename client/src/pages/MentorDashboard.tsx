@@ -48,7 +48,9 @@ interface Booking {
   bookedTime: string;
   durationMinutes: number;
   notes?: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  rating?: number | null;
+  feedback?: string | null;
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -114,7 +116,7 @@ function IdeaViewDialog({ booking, open, onClose }: { booking: Booking; open: bo
 export default function MentorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"overview" | "calendar" | "profile">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "calendar" | "feedback" | "profile">("overview");
   const [setupOpen, setSetupOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
@@ -161,6 +163,10 @@ export default function MentorDashboard() {
   const todayBookings = bookings.filter((b) => b.bookedDate === today);
   const pendingBookings = bookings.filter((b) => b.status === "PENDING");
   const displayedBookings = showAllBookings ? bookings : todayBookings;
+  const ratedBookings = bookings.filter((b) => b.rating != null && b.rating > 0);
+  const averageRating = ratedBookings.length > 0
+    ? ratedBookings.reduce((s, b) => s + (b.rating ?? 0), 0) / ratedBookings.length
+    : null;
 
   const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
@@ -176,13 +182,14 @@ export default function MentorDashboard() {
   const tabs = [
     { key: "overview", label: "Overview" },
     { key: "calendar", label: "Calendar" },
+    { key: "feedback", label: "Feedback" },
     { key: "profile", label: "Profile" },
   ] as const;
 
   const stats = [
     { label: "Total Sessions", value: totalSessions, icon: TrendingUp, colorClass: "text-blue-600" },
     { label: "Active Students", value: activeStudents, icon: Users, colorClass: "text-green-600" },
-    { label: "Average Rating", value: "0.0", icon: Star, colorClass: "text-yellow-500" },
+    { label: "Average Rating", value: averageRating != null ? averageRating.toFixed(1) : "—", icon: Star, colorClass: "text-yellow-500" },
     { label: "Pending Requests", value: pendingRequests, icon: Clock, colorClass: "text-orange-500" },
   ];
 
@@ -496,6 +503,76 @@ export default function MentorDashboard() {
                 )}
               </div>
 
+            </div>
+          )}
+
+          {/* ── FEEDBACK TAB ── */}
+          {activeTab === "feedback" && (
+            <div className="space-y-4 max-w-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-text-primary">Member Reviews</h2>
+                  <p className="text-text-secondary text-sm mt-0.5">
+                    {ratedBookings.length === 0
+                      ? "No reviews yet"
+                      : `${ratedBookings.length} review${ratedBookings.length !== 1 ? "s" : ""} · avg ${averageRating!.toFixed(1)} / 5`}
+                  </p>
+                </div>
+                {averageRating != null && (
+                  <div className="flex items-center gap-1.5">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        size={18}
+                        className={s <= Math.round(averageRating!) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {ratedBookings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-text-secondary bg-card border border-border rounded-xl">
+                  <Star size={32} className="mb-3 opacity-20" />
+                  <p className="text-sm">No feedback from members yet</p>
+                  <p className="text-xs mt-1 text-muted-foreground">Reviews will appear here after completed sessions</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {ratedBookings.map((b) => (
+                    <div key={b.id} className="bg-card border border-border rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
+                            {getInitials(b.bookerFirstName, b.bookerLastName)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-text-primary">
+                              {b.bookerFirstName} {b.bookerLastName}
+                            </p>
+                            {b.ideaTitle && (
+                              <p className="text-xs text-muted-foreground">💡 {b.ideaTitle}</p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs text-text-secondary">{b.bookedDate}</span>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            size={14}
+                            className={s <= (b.rating ?? 0) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}
+                          />
+                        ))}
+                      </div>
+                      {b.feedback && (
+                        <p className="text-sm text-muted-foreground italic">"{b.feedback}"</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

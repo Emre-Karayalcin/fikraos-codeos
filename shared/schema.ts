@@ -717,6 +717,8 @@ export const mentorBookings = pgTable("mentor_bookings", {
   durationMinutes: integer("duration_minutes").default(60),
   status: bookingStatusEnum("status").default("PENDING"),
   notes: text("notes"),
+  rating: integer("rating"),
+  feedback: text("feedback"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Clock } from "lucide-react";
+import { Clock, Star } from "lucide-react";
 
 interface MentorCardProps {
   mentor: {
@@ -13,6 +13,7 @@ interface MentorCardProps {
     bio?: string;
     expertise?: string[];
     sessionDurationMinutes?: number;
+    averageRating?: number | null;
   };
   onClick: () => void;
 }
@@ -65,9 +66,17 @@ export default function MentorCard({ mentor, onClick }: MentorCardProps) {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
-          <Clock className="h-3.5 w-3.5" />
-          <span>{mentor.sessionDurationMinutes ?? 60} mins</span>
+        <div className="flex items-center justify-between w-full pt-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span>{mentor.sessionDurationMinutes ?? 60} mins</span>
+          </div>
+          {mentor.averageRating != null && mentor.averageRating > 0 && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+              <span className="font-medium text-foreground">{mentor.averageRating.toFixed(1)}</span>
+            </div>
+          )}
         </div>
       </div>
     </Card>

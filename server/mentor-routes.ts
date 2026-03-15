@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "./db";
 import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, projects, organizationMembers, pitchDeckGenerations } from "../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNotNull, inArray, sql, desc } from "drizzle-orm";
 import { Resend } from "resend";
 
 const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -58,7 +58,22 @@ router.get("/mentors", async (req: any, res) => {
         )
       );
 
-    res.json(mentors);
+    // Compute average ratings for these mentor profiles
+    const mentorIds = mentors.map((m) => m.id);
+    let ratingMap: Record<string, number | null> = {};
+    if (mentorIds.length > 0) {
+      const ratings = await db
+        .select({
+          mentorProfileId: mentorBookings.mentorProfileId,
+          avgRating: sql<number>`ROUND(AVG(${mentorBookings.rating})::numeric, 1)`,
+        })
+        .from(mentorBookings)
+        .where(and(inArray(mentorBookings.mentorProfileId, mentorIds), isNotNull(mentorBookings.rating)))
+        .groupBy(mentorBookings.mentorProfileId);
+      ratingMap = Object.fromEntries(ratings.map((r) => [r.mentorProfileId, r.avgRating]));
+    }
+
+    res.json(mentors.map((m) => ({ ...m, averageRating: ratingMap[m.id] ?? null })));
   } catch (error) {
     console.error("Error fetching mentors:", error);
     res.status(500).json({ message: "Failed to fetch mentors" });
@@ -279,6 +294,8 @@ router.get("/mentor-bookings/mine", async (req: any, res) => {
         durationMinutes: mentorBookings.durationMinutes,
         notes: mentorBookings.notes,
         status: mentorBookings.status,
+        rating: mentorBookings.rating,
+        feedback: mentorBookings.feedback,
         createdAt: mentorBookings.createdAt,
       })
       .from(mentorBookings)
@@ -412,6 +429,8 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
         durationMinutes: mentorBookings.durationMinutes,
         notes: mentorBookings.notes,
         status: mentorBookings.status,
+        rating: mentorBookings.rating,
+        feedback: mentorBookings.feedback,
         createdAt: mentorBookings.createdAt,
       })
       .from(mentorBookings)
@@ -467,6 +486,68 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
   } catch (error) {
     console.error("Error updating booking status:", error);
     res.status(500).json({ message: "Failed to update booking" });
+  }
+});
+
+// PATCH /api/mentor-bookings/:id/complete - Member marks session complete + submits rating
+router.patch("/mentor-bookings/:id/complete", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { rating, feedback } = req.body;
+    if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be a number between 1 and 5" });
+    }
+
+    // Verify the user owns this booking
+    const [booking] = await db
+      .select()
+      .from(mentorBookings)
+      .where(and(eq(mentorBookings.id, req.params.id), eq(mentorBookings.userId, req.user.id)));
+
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.status === "CANCELLED") return res.status(400).json({ message: "Cannot complete a cancelled booking" });
+
+    const [updated] = await db
+      .update(mentorBookings)
+      .set({ status: "COMPLETED", rating, feedback: feedback?.trim() || null, updatedAt: new Date() })
+      .where(eq(mentorBookings.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error completing booking:", error);
+    res.status(500).json({ message: "Failed to complete booking" });
+  }
+});
+
+// GET /api/mentors/:id/reviews - Public reviews for a mentor profile
+router.get("/mentors/:id/reviews", async (req: any, res) => {
+  try {
+    const reviews = await db
+      .select({
+        id: mentorBookings.id,
+        rating: mentorBookings.rating,
+        feedback: mentorBookings.feedback,
+        bookedDate: mentorBookings.bookedDate,
+        bookerFirstName: users.firstName,
+        createdAt: mentorBookings.createdAt,
+      })
+      .from(mentorBookings)
+      .innerJoin(users, eq(mentorBookings.userId, users.id))
+      .where(
+        and(
+          eq(mentorBookings.mentorProfileId, req.params.id),
+          eq(mentorBookings.status, "COMPLETED"),
+          isNotNull(mentorBookings.rating)
+        )
+      )
+      .orderBy(desc(mentorBookings.createdAt));
+
+    res.json(reviews);
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    res.status(500).json({ message: "Failed to fetch reviews" });
   }
 });
 
