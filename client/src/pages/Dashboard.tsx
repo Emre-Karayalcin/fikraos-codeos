@@ -8,7 +8,6 @@ import {
   FiUsers,
   FiBookOpen,
   FiBarChart2,
-  FiBell,
   FiLogOut,
   FiSearch,
   FiStar,
@@ -153,11 +152,6 @@ export default function Dashboard() {
 
         {/* Right Side */}
         <div className="flex items-center gap-4 relative-z-20-2">
-          <button className="relative p-2 rounded-xl hover:bg-white/80 hover:shadow-sm transition-all duration-200">
-            <FiBell size={20} className="text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-          </button>
-
           {/* User Profile */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-sm font-medium shadow-sm">

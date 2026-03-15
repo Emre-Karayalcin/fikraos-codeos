@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, ArrowRight, Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 
@@ -78,27 +78,6 @@ export default function WorkspaceEntry() {
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </form>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-text-secondary">
-                  {t('workspace.or')}
-                </span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              className="w-full"
-              size="lg"
-              onClick={() => setLocation("/create-workspace")}
-            >
-              <Plus className="mr-2 w-4 h-4" />
-              {t('workspace.createNewWorkspaceBtn')}
-            </Button>
 
             <div className="text-center text-xs text-text-secondary">
               <p>
