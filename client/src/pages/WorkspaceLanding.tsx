@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import toast from 'react-hot-toast';
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -47,6 +48,9 @@ export default function WorkspaceLanding() {
     lastName: "",
   });
   const [invitedUserId, setInvitedUserId] = useState<string | undefined>(undefined);
+  const [invitedRole, setInvitedRole] = useState<string | undefined>(undefined);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [consentModalOpen, setConsentModalOpen] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
 
@@ -69,7 +73,9 @@ export default function WorkspaceLanding() {
         const params = new URLSearchParams(window.location.search);
         const email = params.get("email") || "";
         const userId = params.get("userId") || "";
+        const role = params.get("role") || "";
         setInvitedUserId(userId || undefined);
+        setInvitedRole(role || undefined);
         if (email) setSignupData(prev => ({ ...prev, email }));
         setActiveTab("signup");
         setIsResetFlow(false);
@@ -248,6 +254,11 @@ export default function WorkspaceLanding() {
 
     if (signupData.password.length < 8) {
       toast.error(t('workspaceLanding.passwordTooShort'));
+      return;
+    }
+
+    if (invitedRole === "MENTOR" && !consentChecked) {
+      toast.error("Please read and acknowledge the legal consent before creating your account.");
       return;
     }
 
@@ -553,11 +564,34 @@ export default function WorkspaceLanding() {
                   </p>
                 </div>
 
+                {/* Legal consent — mentor invites only */}
+                {invitedRole === "MENTOR" && (
+                  <div className="flex items-start gap-3 pt-1">
+                    <input
+                      type="checkbox"
+                      id="mentor-consent"
+                      checked={consentChecked}
+                      onChange={(e) => setConsentChecked(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border border-gray-300 accent-primary cursor-pointer"
+                    />
+                    <label htmlFor="mentor-consent" className="text-sm text-text-secondary leading-snug">
+                      I have read and agree to the{" "}
+                      <button
+                        type="button"
+                        onClick={() => setConsentModalOpen(true)}
+                        className="text-primary underline underline-offset-2 hover:opacity-80 font-medium"
+                      >
+                        legal consent
+                      </button>
+                    </label>
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full"
                   size="lg"
-                  disabled={signupMutation.isPending}
+                  disabled={signupMutation.isPending || (invitedRole === "MENTOR" && !consentChecked)}
                   style={{
                     backgroundColor: workspace.primaryColor,
                   }}
@@ -569,6 +603,78 @@ export default function WorkspaceLanding() {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Legal Consent Modal — mentor invites only */}
+      <Dialog open={consentModalOpen} onOpenChange={setConsentModalOpen}>
+        <DialogContent className="max-w-lg flex flex-col max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Legal Consent &amp; Terms for Mentors</DialogTitle>
+          </DialogHeader>
+
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto pr-1 space-y-4 text-sm text-muted-foreground leading-relaxed">
+            <p>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et
+              dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex
+              ea commodo consequat.
+            </p>
+            <p>
+              Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+              Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est
+              laborum. Curabitur pretium tincidunt lacus. Nulla gravida orci a odio.
+            </p>
+            <p>
+              Nullam varius, turpis molestie dictum semper, nulla augue gravida enim, nec porttitor tortor risus eget
+              urna. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium,
+              totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta
+              sunt explicabo.
+            </p>
+            <p>
+              Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni
+              dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor
+              sit amet, consectetur, adipisci velit.
+            </p>
+            <p>
+              Ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum
+              exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem
+              vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur.
+            </p>
+            <p>
+              Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et
+              voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente
+              delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores
+              repellat.
+            </p>
+            <p>
+              Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime
+              placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Praesent blandit laoreet
+              nibh. Fusce convallis metus id felis luctus adipiscing.
+            </p>
+            <p>
+              Pellentesque egestas neque sit amet convallis ullamcorper, felis nonummy bibendum feugiat, vitae risus
+              dui condimentum ipsum. Donec non enim in turpis pulvinar facilisis. Ut felis. Praesent dapibus, neque id
+              cursus faucibus, tortor neque egestas augue, eu vulputate magna eros eu erat.
+            </p>
+          </div>
+
+          <DialogFooter className="pt-4 border-t border-border flex gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setConsentModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setConsentChecked(true);
+                setConsentModalOpen(false);
+              }}
+            >
+              Acknowledge
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

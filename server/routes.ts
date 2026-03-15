@@ -572,7 +572,7 @@ export function registerRoutes(app: Express): Server {
       const org = await storage.getOrganization(orgId).catch(() => null);
       const hostUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
       const orgSlug = org?.slug || orgId;
-      const registerUrl = `${hostUrl}/w/${orgSlug}/register?email=${encodeURIComponent(email)}&userId=${encodeURIComponent(newUser.id)}`;
+      const registerUrl = `${hostUrl}/w/${orgSlug}/register?email=${encodeURIComponent(email)}&userId=${encodeURIComponent(newUser.id)}&role=${encodeURIComponent(role || 'MEMBER')}`;
 
       // render & send invite email (uses existing invite template; button should point to registerUrl)
       if (resendClient) {
