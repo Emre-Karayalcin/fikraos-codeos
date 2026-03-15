@@ -152,8 +152,7 @@ export default function Dashboard() {
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center gap-4">
-          {/* Notification Icon */}
+        <div className="flex items-center gap-4 relative-z-20-2">
           <button className="relative p-2 rounded-xl hover:bg-white/80 hover:shadow-sm transition-all duration-200">
             <FiBell size={20} className="text-gray-600" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
