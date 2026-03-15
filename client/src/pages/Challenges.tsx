@@ -99,8 +99,7 @@ function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Chall
   // Check if user is admin (OWNER or ADMIN role)
   const isAdminUser = isAdmin || roleData?.isAdmin === true || (roleData as any)?.role === 'OWNER' || (roleData as any)?.role === 'ADMIN';
 
-  // If challenge is inactive and user is not admin, don't render it
-  if (!challenge.isActive && !isAdminUser) return null;
+  // Inactive challenges are visible but blurred/non-clickable for all users
 
   const deleteMutation = useMutation({
     mutationFn: async (challengeId: string) => {
@@ -158,12 +157,14 @@ function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Chall
 
   return (
     <div className={`relative ${!challenge.isActive ? 'group/inactive' : ''}`}>
-      {/* Blur overlay for inactive challenges (admin preview) */}
-      {!challenge.isActive && isAdminUser && (
+      {/* Blur overlay for inactive challenges */}
+      {!challenge.isActive && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-background/60 backdrop-blur-sm border border-dashed border-border pointer-events-none">
-          <span className="text-xs font-semibold text-muted-foreground bg-background/80 px-2 py-1 rounded-md">
-            🚫 Hidden from users
-          </span>
+          {isAdminUser && (
+            <span className="text-xs font-semibold text-muted-foreground bg-background/80 px-2 py-1 rounded-md">
+              🚫 Hidden from users
+            </span>
+          )}
         </div>
       )}
       <Card
