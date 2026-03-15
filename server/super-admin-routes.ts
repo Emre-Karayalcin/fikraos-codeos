@@ -4,7 +4,8 @@ import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and } from "drizzle-orm";
-import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users } from "../shared/schema";
+import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events } from "../shared/schema";
+import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
 
 function isSuperAdmin(req: Request, res: Response, next: NextFunction) {
   const envEmails = process.env.SUPER_ADMIN_EMAILS || "";
@@ -511,6 +512,78 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error deleting challenge:", error);
       res.status(500).json({ message: "Failed to delete challenge" });
+    }
+  });
+
+  // ── Events CRUD ──────────────────────────────────────────────────────────
+
+  // GET /api/super-admin/events — list ALL events (published + unpublished)
+  app.get("/api/super-admin/events", isAuthenticated, isSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const rows = await db.select().from(events).orderBy(events.startDate);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
+  });
+
+  // POST /api/super-admin/events — create event
+  app.post("/api/super-admin/events", isAuthenticated, isSuperAdmin, validateRequest(createEventSchema), async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
+      const [created] = await db.insert(events).values({
+        title: data.title,
+        shortDescription: data.shortDescription || null,
+        description: data.description || null,
+        location: data.location || null,
+        websiteUrl: data.websiteUrl || null,
+        imageUrl: data.imageUrl || null,
+        startDate: new Date(data.startDate),
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        isPublished: data.isPublished ?? false,
+      }).returning();
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  // PATCH /api/super-admin/events/:id — update event
+  app.patch("/api/super-admin/events/:id", isAuthenticated, isSuperAdmin, validateRequest(updateEventSchema), async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      const update: Record<string, any> = { updatedAt: new Date() };
+      if (data.title !== undefined) update.title = data.title;
+      if (data.shortDescription !== undefined) update.shortDescription = data.shortDescription || null;
+      if (data.description !== undefined) update.description = data.description || null;
+      if (data.location !== undefined) update.location = data.location || null;
+      if (data.websiteUrl !== undefined) update.websiteUrl = data.websiteUrl || null;
+      if (data.imageUrl !== undefined) update.imageUrl = data.imageUrl || null;
+      if (data.startDate !== undefined) update.startDate = new Date(data.startDate);
+      if (data.endDate !== undefined) update.endDate = data.endDate ? new Date(data.endDate) : null;
+      if (data.isPublished !== undefined) update.isPublished = data.isPublished;
+
+      const [updated] = await db.update(events).set(update).where(eq(events.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Event not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating event:", error);
+      res.status(500).json({ message: "Failed to update event" });
+    }
+  });
+
+  // DELETE /api/super-admin/events/:id — delete event
+  app.delete("/api/super-admin/events/:id", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await db.delete(events).where(eq(events.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      res.status(500).json({ message: "Failed to delete event" });
     }
   });
 }

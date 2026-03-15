@@ -23,7 +23,8 @@ import {
   Trophy,
   Shield,
   GraduationCap,
-  Presentation
+  Presentation,
+  CalendarDays
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -800,6 +801,24 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
+                  {/* Events - always visible */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`flex items-center justify-center p-3 rounded-md cursor-pointer transition-all duration-200 ${
+                          location.includes("/events") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                        }`}
+                        onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/events`)}
+                        data-testid="nav-events"
+                      >
+                        <CalendarDays className="w-5 h-5" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>{t('navigation.events')}</p>
+                    </TooltipContent>
+                  </Tooltip>
+
                   {handleNewConversation && !isMentor && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -914,6 +933,18 @@ export function UnifiedSidebar() {
                       <span className="text-sm font-medium">Academy</span>
                     </div>
                   )}
+
+                  {/* Events - always visible */}
+                  <div
+                    className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
+                      location.includes("/events") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                    }`}
+                    onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/events`)}
+                    data-testid="nav-events"
+                  >
+                    <CalendarDays className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
+                    <span className="text-sm font-medium">{t('navigation.events')}</span>
+                  </div>
                 </>
               )
             ) : (

@@ -13,6 +13,7 @@ import { registerIdeaRoutes } from "./idea-routes";
 import { registerWorkspaceRoutes } from "./workspace-routes";
 import { registerChallengeRoutes } from "./challenge-routes";
 import { registerSuperAdminRoutes } from "./super-admin-routes";
+import { registerEventRoutes } from "./events-routes";
 import multer from 'multer'; // ✅ Add multer import
 import path from 'path'; // ✅ Add path import
 import fs from 'fs'; // ✅ Add fs import
@@ -102,6 +103,9 @@ export function registerRoutes(app: Express): Server {
 
   // Super admin platform routes
   registerSuperAdminRoutes(app);
+
+  // Events routes (public read + super admin CRUD)
+  registerEventRoutes(app);
 
   // ✅ Multer storage configuration for evaluation criteria JSON files
   const criteriaStorage = multer.diskStorage({

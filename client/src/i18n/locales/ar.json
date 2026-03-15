@@ -616,7 +616,21 @@
     "projects": "المشاريع",
     "assets": "الأصول",
     "profile": "الملف الشخصي",
-    "allConversations": "جميع المحادثات"
+    "allConversations": "جميع المحادثات",
+    "events": "الفعاليات"
+  },
+  "events": {
+    "title": "الفعاليات",
+    "subtitle": "تصفح الفعاليات والموارد القادمة",
+    "tabs": {
+      "browse": "تصفح",
+      "calendar": "التقويم"
+    },
+    "learnMore": "اعرف المزيد",
+    "noEvents": "لا توجد فعاليات مجدولة",
+    "location": "الموقع",
+    "published": "منشور",
+    "draft": "مسودة"
   },
   "dashboard": {
     "title": "لوحة القيادة",

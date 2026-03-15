@@ -25,6 +25,7 @@ import Chat from "@/pages/Chat";
 import Auth from "@/pages/Auth";
 import Challenges from "@/pages/Challenges";
 import ChallengeDetail from "@/pages/ChallengeDetail";
+import Events from "@/pages/Events";
 import Academy from "@/pages/Academy";
 import Admin from "@/pages/Admin";
 import AdminDashboard from "@/pages/AdminDashboard";
@@ -152,6 +153,12 @@ function Router() {
       <Route path="/w/:slug/challenges/:challengeSlug" component={() => (
         <PageTransition>
           <WorkspaceGuard><ChallengeDetail /></WorkspaceGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/events" component={() => (
+        <PageTransition>
+          <WorkspaceGuard><Events /></WorkspaceGuard>
         </PageTransition>
       )} />
 

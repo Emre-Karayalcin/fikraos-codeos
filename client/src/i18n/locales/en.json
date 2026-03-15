@@ -617,7 +617,21 @@
     "projects": "Projects",
     "assets": "Assets",
     "profile": "Profile",
-    "allConversations": "All Conversations"
+    "allConversations": "All Conversations",
+    "events": "Events"
+  },
+  "events": {
+    "title": "Events",
+    "subtitle": "Browse upcoming events and resources",
+    "tabs": {
+      "browse": "Browse",
+      "calendar": "Calendar"
+    },
+    "learnMore": "Learn More",
+    "noEvents": "No events scheduled",
+    "location": "Location",
+    "published": "Published",
+    "draft": "Draft"
   },
   "dashboard": {
     "title": "Dashboard",

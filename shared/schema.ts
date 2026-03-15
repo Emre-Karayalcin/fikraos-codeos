@@ -436,6 +436,22 @@ export const challengeSubmissions = pgTable("challenge_submissions", {
   index("idx_challenge_submissions_user_id").on(table.userId),
 ]);
 
+// Events (platform-wide, no orgId)
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 255 }).notNull(),
+  shortDescription: text("short_description"),
+  description: text("description"),
+  location: varchar("location", { length: 500 }),
+  websiteUrl: varchar("website_url", { length: 1000 }),
+  imageUrl: varchar("image_url", { length: 1000 }),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   organizationMembers: many(organizationMembers),

@@ -236,6 +236,30 @@ export const createSubmissionSchema = z.object({
 });
 
 // ============================================================================
+// EVENT ROUTES SCHEMAS
+// ============================================================================
+
+/**
+ * POST /api/super-admin/events - Create event
+ */
+export const createEventSchema = z.object({
+  title: z.string().min(1).max(255).trim(),
+  shortDescription: z.string().max(500).optional(),
+  description: z.string().optional(),
+  location: z.string().max(500).optional(),
+  websiteUrl: z.string().url().optional().or(z.literal('')),
+  imageUrl: z.string().url().optional().or(z.literal('')),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
+  isPublished: z.boolean().optional().default(false),
+});
+
+/**
+ * PATCH /api/super-admin/events/:id - Update event
+ */
+export const updateEventSchema = createEventSchema.partial();
+
+// ============================================================================
 // MAIN ROUTES SCHEMAS
 // ============================================================================
 
