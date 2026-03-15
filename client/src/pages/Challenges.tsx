@@ -52,6 +52,8 @@ interface Challenge {
   status: 'draft' | 'active' | 'upcoming' | 'ended';
   prize?: string;
   orgId: string;
+  sortOrder: number;
+  isActive: boolean;
 }
 
 interface CreateChallengeForm {
@@ -76,7 +78,7 @@ interface ChallengeWithCreator {
   };
 }
 
-function ChallengeCard({ challenge, workspaceSlug }: { challenge: Challenge; workspaceSlug?: string }) {
+function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Challenge; workspaceSlug?: string; isAdmin?: boolean }) {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
@@ -93,6 +95,12 @@ function ChallengeCard({ challenge, workspaceSlug }: { challenge: Challenge; wor
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Check if user is admin (OWNER or ADMIN role)
+  const isAdminUser = isAdmin || roleData?.isAdmin === true || (roleData as any)?.role === 'OWNER' || (roleData as any)?.role === 'ADMIN';
+
+  // If challenge is inactive and user is not admin, don't render it
+  if (!challenge.isActive && !isAdminUser) return null;
 
   const deleteMutation = useMutation({
     mutationFn: async (challengeId: string) => {
@@ -148,27 +156,34 @@ function ChallengeCard({ challenge, workspaceSlug }: { challenge: Challenge; wor
     return t('challenges.timeLeft.daysLeft', { days: daysLeft });
   };
 
-  // Check if user is admin (OWNER or ADMIN role)
-  const isAdmin = roleData?.isAdmin === true || roleData?.role === 'OWNER' || roleData?.role === 'ADMIN';
-
   return (
-    <Card
-      className="group hover:shadow-lg transition-all cursor-pointer border border-border/50 hover:border-border h-full"
-      onClick={() => {
-        if (workspaceSlug) {
-          setLocation(`/w/${workspaceSlug}/challenges/${challenge.slug}`);
-        } else {
-          setLocation(`/challenges/${challenge.slug}`);
-        }
-      }}
-      data-testid={`challenge-card-${challenge.slug}`}
-    >
+    <div className={`relative ${!challenge.isActive ? 'group/inactive' : ''}`}>
+      {/* Blur overlay for inactive challenges (admin preview) */}
+      {!challenge.isActive && isAdminUser && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-background/60 backdrop-blur-sm border border-dashed border-border pointer-events-none">
+          <span className="text-xs font-semibold text-muted-foreground bg-background/80 px-2 py-1 rounded-md">
+            🚫 Hidden from users
+          </span>
+        </div>
+      )}
+      <Card
+        className={`group hover:shadow-lg transition-all cursor-pointer border border-border/50 hover:border-border h-full ${!challenge.isActive ? 'opacity-50 pointer-events-none select-none' : ''}`}
+        onClick={() => {
+          if (!challenge.isActive) return;
+          if (workspaceSlug) {
+            setLocation(`/w/${workspaceSlug}/challenges/${challenge.slug}`);
+          } else {
+            setLocation(`/challenges/${challenge.slug}`);
+          }
+        }}
+        data-testid={`challenge-card-${challenge.slug}`}
+      >
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="text-3xl mb-2">{challenge.emoji}</div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
-              {isAdmin && (
+              {isAdminUser && (
                 <>
                   <Button
                     variant="ghost"
@@ -245,7 +260,8 @@ function ChallengeCard({ challenge, workspaceSlug }: { challenge: Challenge; wor
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -567,7 +583,13 @@ export default function Challenges() {
 
    const challenges = challengesData.map(item => item.challenge);
 
-   const filteredChallenges = challenges.filter(challenge => {
+   // Sort by sortOrder, then by createdAt
+   const sortedChallenges = [...challenges].sort((a, b) => {
+     if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+     return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+   });
+
+   const filteredChallenges = sortedChallenges.filter(challenge => {
      if (activeFilter === 'all') return true;
      return challenge.status === activeFilter;
    });
@@ -575,7 +597,13 @@ export default function Challenges() {
    const activeChallenges = challenges.filter(c => c.status === 'active').length;
    const upcomingChallenges = challenges.filter(c => c.status === 'upcoming').length;
 
-   const isAdmin = user?.isAdmin === true;
+   const { data: workspaceRoleData } = useQuery({
+     queryKey: [`/api/organizations/${user?.primaryOrgId}/admin/check-role`],
+     enabled: !!user?.primaryOrgId,
+     retry: false,
+     staleTime: 5 * 60 * 1000,
+   });
+   const isAdmin = user?.isAdmin === true || (workspaceRoleData as any)?.isAdmin === true || (workspaceRoleData as any)?.role === 'OWNER' || (workspaceRoleData as any)?.role === 'ADMIN';
 
    return (
      <div className="h-screen w-full bg-background text-foreground overflow-hidden flex relative">
@@ -662,7 +690,7 @@ export default function Challenges() {
              {!isLoading && filteredChallenges.length > 0 && (
                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="challenges-grid">
                  {filteredChallenges.map(challenge => (
-                   <ChallengeCard key={challenge.id} challenge={challenge} workspaceSlug={currentWorkspaceSlug} />
+                   <ChallengeCard key={challenge.id} challenge={challenge} workspaceSlug={currentWorkspaceSlug} isAdmin={isAdmin} />
                  ))}
                </div>
              )}

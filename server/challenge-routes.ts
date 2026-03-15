@@ -9,12 +9,13 @@ import {
   users,
   projects
 } from "@shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, asc, inArray } from "drizzle-orm";
 import { verifyWorkspaceAccess, requireOrgIdAndAccess } from "./middleware/workspace-access";
 import {
   createChallengeSchema,
   updateChallengeSchema,
   createSubmissionSchema,
+  reorderChallengesSchema,
   validateRequest,
 } from "@shared/validation-schemas";
 
@@ -51,7 +52,7 @@ export function registerChallengeRoutes(app: Express) {
         .from(challenges)
         .leftJoin(users, eq(challenges.createdBy, users.id))
         .where(whereClause)
-        .orderBy(desc(challenges.createdAt));
+        .orderBy(asc(challenges.sortOrder), desc(challenges.createdAt));
 
       res.json(result);
     } catch (error) {
@@ -271,7 +272,7 @@ export function registerChallengeRoutes(app: Express) {
       }
 
       // Update challenge with field whitelisting (prevent mass assignment)
-      const allowedFields = ['title', 'description', 'shortDescription', 'deadline', 'status', 'tags', 'emoji', 'prize', 'maxSubmissions', 'evaluationCriteria'];
+      const allowedFields = ['title', 'description', 'shortDescription', 'deadline', 'status', 'tags', 'emoji', 'prize', 'maxSubmissions', 'evaluationCriteria', 'isActive'];
       const sanitizedUpdate: any = { updatedAt: new Date() };
 
       allowedFields.forEach(field => {
@@ -343,6 +344,42 @@ export function registerChallengeRoutes(app: Express) {
     } catch (error) {
       console.error('Error deleting challenge:', error);
       res.status(500).json({ error: 'Failed to delete challenge' });
+    }
+  });
+
+  // POST /api/challenges/reorder - Bulk update sort order (admin only)
+  app.post('/api/challenges/reorder', isAuthenticated, validateRequest(reorderChallengesSchema), async (req: any, res) => {
+    try {
+      const { orgId, ids } = req.body;
+
+      // Check if user is admin
+      const [membership] = await db
+        .select()
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.orgId, orgId),
+            eq(organizationMembers.userId, req.user.id)
+          )
+        );
+
+      if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      // Update each challenge's sortOrder to match the position in the ids array
+      await Promise.all(
+        ids.map((id: string, index: number) =>
+          db.update(challenges)
+            .set({ sortOrder: index, updatedAt: new Date() })
+            .where(and(eq(challenges.id, id), eq(challenges.orgId, orgId)))
+        )
+      );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error reordering challenges:', error);
+      res.status(500).json({ error: 'Failed to reorder challenges' });
     }
   });
 

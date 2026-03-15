@@ -50,6 +50,7 @@ import {
   Send,
   GripVertical,
   Eye,
+  EyeOff,
 } from "lucide-react";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
@@ -83,6 +84,8 @@ interface Challenge {
   maxSubmissions: number;
   submissionCount: number;
   evaluationCriteria: string | null;
+  sortOrder: number;
+  isActive: boolean;
   createdAt: string;
   orgId: string;
 }
@@ -158,12 +161,14 @@ function SortableChallengeRow({
   onArchive,
   onPublish,
   onDelete,
+  onToggleActive,
 }: {
   row: ChallengeRow;
   onEdit: (c: Challenge) => void;
   onArchive: (c: Challenge) => void;
   onPublish: (c: Challenge) => void;
   onDelete: (c: Challenge) => void;
+  onToggleActive: (c: Challenge) => void;
 }) {
   const c = row.challenge;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: c.id });
@@ -181,7 +186,7 @@ function SortableChallengeRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className="border-b border-border/50 hover:bg-accent/30 transition-colors group"
+      className={`border-b border-border/50 hover:bg-accent/30 transition-colors group ${!c.isActive ? 'opacity-50' : ''}`}
     >
       {/* Drag handle */}
       <td className="pl-4 pr-2 py-3 w-8">
@@ -200,7 +205,14 @@ function SortableChallengeRow({
         <div className="flex items-center gap-2">
           <span className="text-lg">{c.emoji || "🎯"}</span>
           <div>
-            <div className="font-medium text-sm">{c.title}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">{c.title}</span>
+              {!c.isActive && (
+                <span className="inline-flex items-center text-xs rounded-full px-1.5 py-0.5 bg-destructive/15 text-destructive border border-destructive/30">
+                  Hidden
+                </span>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground font-mono">{c.slug}</div>
             {c.prize && (
               <div className="text-xs text-yellow-500 mt-0.5">🏆 {c.prize}</div>
@@ -240,6 +252,17 @@ function SortableChallengeRow({
       {/* Actions */}
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
+          {/* Active/Inactive toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 ${c.isActive ? 'text-green-400 hover:text-destructive' : 'text-muted-foreground hover:text-green-400'}`}
+            onClick={() => onToggleActive(c)}
+            title={c.isActive ? 'Deactivate (hide from users)' : 'Activate (show to users)'}
+          >
+            {c.isActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          </Button>
+
           <Button
             variant="ghost"
             size="icon"
@@ -618,12 +641,34 @@ export default function AdminChallenges() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const reorderChallenges = useMutation({
+    mutationFn: (ids: string[]) =>
+      apiFetch("/api/challenges/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: workspace!.id, ids }),
+      }),
+    onError: (e: Error) => toast.error("Failed to save order: " + e.message),
+  });
+
   // Status quick-actions
   const handleArchive = (c: Challenge) => {
     updateChallenge.mutate({ id: c.id, data: { status: "ended" } });
   };
   const handlePublish = (c: Challenge) => {
     updateChallenge.mutate({ id: c.id, data: { status: "active" } });
+  };
+  const handleToggleActive = (c: Challenge) => {
+    updateChallenge.mutate(
+      { id: c.id, data: { isActive: !c.isActive } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: ["/api/challenges", workspace?.id] });
+          toast.success(c.isActive ? "Challenge hidden from users" : "Challenge visible to users");
+          setModal(null);
+        },
+      }
+    );
   };
 
   // DnD sensors
@@ -635,7 +680,10 @@ export default function AdminChallenges() {
       setOrder((prev) => {
         const oldIndex = prev.indexOf(String(active.id));
         const newIndex = prev.indexOf(String(over.id));
-        return arrayMove(prev, oldIndex, newIndex);
+        const newOrder = arrayMove(prev, oldIndex, newIndex);
+        // Persist new order to server
+        if (workspace?.id) reorderChallenges.mutate(newOrder);
+        return newOrder;
       });
     }
   };
@@ -792,6 +840,7 @@ export default function AdminChallenges() {
                             onArchive={handleArchive}
                             onPublish={handlePublish}
                             onDelete={setDeleteTarget}
+                            onToggleActive={handleToggleActive}
                           />
                         ))}
                       </tbody>

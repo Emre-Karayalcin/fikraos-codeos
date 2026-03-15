@@ -405,6 +405,8 @@ export const challenges = pgTable("challenges", {
   status: challengeStatusEnum("status").default("draft"),
   prize: varchar("prize"),
   evaluationCriteria: text("evaluation_criteria"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -412,6 +414,7 @@ export const challenges = pgTable("challenges", {
   index("idx_challenges_org_id").on(table.orgId),
   index("idx_challenges_status").on(table.status),
   index("idx_challenges_slug").on(table.slug),
+  index("idx_challenges_sort_order").on(table.sortOrder),
 ]);
 
 export const challengeSubmissions = pgTable("challenge_submissions", {

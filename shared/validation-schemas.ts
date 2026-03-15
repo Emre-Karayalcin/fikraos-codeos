@@ -211,6 +211,15 @@ export const updateChallengeSchema = z.object({
   emoji: z.string().max(10).optional(),
   maxSubmissions: z.number().int().positive().optional(),
   evaluationCriteria: z.string().max(10000, "Evaluation criteria too long").optional(),
+  isActive: z.boolean().optional(),
+});
+
+/**
+ * PATCH /api/challenges/reorder - Bulk reorder challenges
+ */
+export const reorderChallengesSchema = z.object({
+  orgId: z.string().uuid("Invalid organization ID"),
+  ids: z.array(z.string().uuid()).min(1).max(100),
 });
 
 /**
