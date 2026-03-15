@@ -7,6 +7,7 @@ import {
   Users,
   Building2,
   Palette,
+  Target,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -52,6 +53,12 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
       descKey: 'admin.sidebar.ideas.description',
       href: `/w/${workspaceSlug}/admin/ideas`,
       icon: Kanban,
+    },
+    {
+      titleKey: 'admin.sidebar.challenges.title',
+      descKey: 'admin.sidebar.challenges.description',
+      href: `/w/${workspaceSlug}/admin/challenges`,
+      icon: Target,
     },
     {
       titleKey: 'admin.sidebar.workspace.title',

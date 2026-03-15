@@ -1463,6 +1463,10 @@
         "title": "Members",
         "description": "Manage team members"
       },
+      "challenges": {
+        "title": "Challenges",
+        "description": "Manage problem statements"
+      },
       "settings": {
         "title": "Settings",
         "description": "General settings"

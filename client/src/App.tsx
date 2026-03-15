@@ -34,6 +34,7 @@ import AdminSettings from "@/pages/AdminSettings";
 import AdminWorkspace from "@/pages/AdminWorkspace";
 import AdminIdeasKanban from "@/pages/AdminIdeasKanban";
 import AdminChallengeIdeas from "@/pages/AdminChallengeIdeas";
+import AdminChallenges from "@/pages/AdminChallenges";
 import AdminIdeaDetail from "@/pages/AdminIdeaDetail";
 import AdminBranding from "@/pages/AdminBranding";
 import WorkspaceCreate from "@/pages/WorkspaceCreate";
@@ -218,6 +219,12 @@ function Router() {
       <Route path="/w/:slug/admin/ideas/:ideaId" component={() => (
         <PageTransition>
           <AdminGuard><AdminIdeaDetail /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/challenges" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminChallenges /></AdminGuard>
         </PageTransition>
       )} />
 
