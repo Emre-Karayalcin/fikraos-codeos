@@ -24,7 +24,7 @@ export function setupSecurityMiddleware(app: Express) {
             ? ["'self'", "'unsafe-inline'"]  // Strict in production
             : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],  // Relaxed for Vite dev HMR
           imgSrc: ["'self'", "data:", "https:", "blob:"],
-          mediaSrc: ["'self'", "https://edu.fikrahub.com"],
+          mediaSrc: ["'self'", "https://edu.fikrahub.com", "https://app.fikrahub.com"],
           connectSrc: ["'self'", "https:", "wss:"],
           frameSrc: ["'self'", "blob:"],
           objectSrc: ["'none'"],
