@@ -81,6 +81,11 @@ export default function MemberOnboarding() {
 
   const { data: challengeList = [] } = useQuery<Challenge[]>({
     queryKey: [`/api/workspaces/${slug}/active-challenges`],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${slug}/active-challenges`);
+      if (!res.ok) return [];
+      return res.json();
+    },
     enabled: !!slug,
   });
 

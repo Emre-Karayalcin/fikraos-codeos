@@ -5082,8 +5082,8 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
         .from(challenges)
         .where(eq(challenges.orgId, org.id));
 
-      const active = result.filter(c => c.status === 'active');
-      res.json(active.map(c => ({ challenge: c })));
+      const visible = result.filter(c => c.status === 'active' || c.status === 'upcoming');
+      res.json(visible.map(c => ({ challenge: c })));
     } catch (error) {
       console.error('Error fetching active challenges:', error);
       res.status(500).json({ error: 'Failed to fetch challenges' });
