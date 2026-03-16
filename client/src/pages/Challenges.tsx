@@ -160,11 +160,9 @@ function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Chall
       {/* Blur overlay for inactive challenges */}
       {!challenge.isActive && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-background/60 backdrop-blur-sm border border-dashed border-border pointer-events-none">
-          {isAdminUser && (
-            <span className="text-xs font-semibold text-muted-foreground bg-background/80 px-2 py-1 rounded-md">
-              🚫 Hidden from users
-            </span>
-          )}
+          <span className="text-xs font-semibold text-muted-foreground bg-background/80 px-2 py-1 rounded-md">
+            Coming Soon
+          </span>
         </div>
       )}
       <Card
