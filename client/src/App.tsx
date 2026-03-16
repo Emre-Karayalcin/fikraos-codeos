@@ -40,6 +40,8 @@ import AdminIdeaDetail from "@/pages/AdminIdeaDetail";
 import AdminBranding from "@/pages/AdminBranding";
 import WorkspaceCreate from "@/pages/WorkspaceCreate";
 import WorkspaceLanding from "@/pages/WorkspaceLanding";
+import MemberOnboarding from "@/pages/MemberOnboarding";
+import OnboardingThankYou from "@/pages/OnboardingThankYou";
 import WorkspaceEntry from "@/pages/WorkspaceEntry";
 import WorkspaceSelector from "@/pages/WorkspaceSelector";
 import WorkspaceRedirect from "@/pages/WorkspaceRedirect";
@@ -94,6 +96,8 @@ function Router() {
         <Route path="/admin/login" component={() => <PageTransition><SuperAdminLogin /></PageTransition>} />
         <Route path="/w/:slug/register" component={() => <PageTransition><WorkspaceLanding /></PageTransition>} />
         <Route path="/w/:slug/reset-password" component={() => <PageTransition><WorkspaceLanding /></PageTransition>} />
+        <Route path="/w/:slug/onboard/thank-you" component={() => <PageTransition><OnboardingThankYou /></PageTransition>} />
+        <Route path="/w/:slug/onboard" component={() => <PageTransition><MemberOnboarding /></PageTransition>} />
         <Route path="/create-workspace" component={() => <PageTransition><WorkspaceCreate /></PageTransition>} />
         <Route path="/w/:slug" component={() => <PageTransition><WorkspaceLanding /></PageTransition>} />
         <Route path="/:rest*" component={() => <PageTransition><NotFound /></PageTransition>} />

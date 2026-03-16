@@ -58,7 +58,8 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications } from "@shared/schema";
+import { screenApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -5061,10 +5062,166 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
 
       } catch (error) {
         console.error('❌ Error deleting evaluation:', error);
-        res.status(500).json({ 
-          error: 'Failed to delete evaluation' 
+        res.status(500).json({
+          error: 'Failed to delete evaluation'
         });
       }
+  });
+
+  // ── Member Application Routes ─────────────────────────────────────────────
+
+  // GET /api/workspaces/:slug/active-challenges — public, for onboarding form
+  app.get('/api/workspaces/:slug/active-challenges', async (req: any, res) => {
+    try {
+      const { slug } = req.params;
+      const [org] = await db.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
+      if (!org) return res.status(404).json({ error: 'Workspace not found' });
+
+      const result = await db
+        .select()
+        .from(challenges)
+        .where(eq(challenges.orgId, org.id));
+
+      const active = result.filter(c => c.status === 'active');
+      res.json(active.map(c => ({ challenge: c })));
+    } catch (error) {
+      console.error('Error fetching active challenges:', error);
+      res.status(500).json({ error: 'Failed to fetch challenges' });
+    }
+  });
+
+  // POST /api/applications/submit — no auth required
+  app.post('/api/applications/submit', authRateLimiter, async (req: any, res) => {
+    try {
+      const {
+        userId, email, slug,
+        challengeId,
+        ideaName, sector, problemStatement,
+        solutionDescription, differentiator, targetUser,
+        relevantSkills, previousWinner, hasValidation, validationDetails,
+        firstName, lastName, password,
+      } = req.body;
+
+      if (!userId || !email || !slug) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      // Validate user exists and is PENDING
+      const invited = await storage.getUser(userId);
+      if (!invited || invited.status !== 'PENDING') {
+        return res.status(400).json({ error: 'Invalid or already used invite link' });
+      }
+
+      // Get org from slug
+      const [org] = await db.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
+      if (!org) return res.status(404).json({ error: 'Workspace not found' });
+
+      // Check no existing application for this user
+      const existing = await db.select().from(memberApplications).where(eq(memberApplications.userId, userId));
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Application already submitted' });
+      }
+
+      // Validate password strength
+      if (!password || password.length < 8 ||
+          !/[a-z]/.test(password) || !/[A-Z]/.test(password) ||
+          !/[0-9]/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+        return res.status(400).json({
+          error: 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'
+        });
+      }
+
+      // Hash password and update user (keep status PENDING)
+      const hashed = await hashPassword(password);
+      await storage.updateUser(userId, {
+        firstName: firstName || '',
+        lastName: lastName || '',
+        password: hashed,
+      });
+
+      // Insert application
+      const [application] = await db.insert(memberApplications).values({
+        userId,
+        orgId: org.id,
+        challengeId: challengeId || null,
+        ideaName: ideaName || null,
+        sector: sector || null,
+        problemStatement: problemStatement || null,
+        solutionDescription: solutionDescription || null,
+        differentiator: differentiator || null,
+        targetUser: targetUser || null,
+        relevantSkills: relevantSkills || null,
+        previousWinner: previousWinner || null,
+        hasValidation: hasValidation || null,
+        validationDetails: validationDetails || null,
+        status: 'PENDING_REVIEW',
+      }).returning();
+
+      // Send confirmation email
+      if (resendClient) {
+        const templateCandidates = [
+          path.join(__dirname, 'email-templates', 'application-confirmation.html'),
+          path.join(process.cwd(), 'server', 'email-templates', 'application-confirmation.html'),
+          path.join(process.cwd(), 'dist', 'email-templates', 'application-confirmation.html'),
+        ];
+        const found = templateCandidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+        if (found) {
+          try {
+            const html = mustache.render(fs.readFileSync(found, 'utf8'), {
+              userName: firstName || email,
+              orgName: org.name,
+              ideaName: ideaName || 'your idea',
+            });
+            await resendClient.emails.send({
+              from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+              to: email,
+              subject: `Application received — ${org.name}`,
+              html,
+            });
+          } catch (err) {
+            console.error('Failed to send confirmation email:', err);
+          }
+        }
+      }
+
+      // Fire-and-forget AI screening
+      screenApplicationAsync(application.id, challengeId || null, org.id).catch(console.error);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Application submit error:', error);
+      res.status(500).json({ error: 'Failed to submit application' });
+    }
+  });
+
+  // GET /api/my-application — authenticated, returns current user's application
+  app.get('/api/my-application', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+      const [application] = await db
+        .select()
+        .from(memberApplications)
+        .where(eq(memberApplications.userId, userId));
+
+      if (!application) return res.json(null);
+
+      res.json({
+        id: application.id,
+        ideaName: application.ideaName,
+        solutionDescription: application.solutionDescription,
+        differentiator: application.differentiator,
+        targetUser: application.targetUser,
+        problemStatement: application.problemStatement,
+        challengeId: application.challengeId,
+        sector: application.sector,
+        status: application.status,
+      });
+    } catch (error) {
+      console.error('Error fetching my application:', error);
+      res.status(500).json({ error: 'Failed to fetch application' });
+    }
   });
 
   return httpServer;

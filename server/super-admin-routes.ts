@@ -3,9 +3,18 @@ import { isAuthenticated, comparePasswords, hashPassword } from "./auth";
 import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, eq, and } from "drizzle-orm";
-import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events } from "../shared/schema";
+import { sql, eq, and, desc, inArray } from "drizzle-orm";
+import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events, memberApplications } from "../shared/schema";
 import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
+import { Resend } from "resend";
+import mustache from "mustache";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { screenApplicationAsync } from "./lib/applicationScreening";
+
+const __saFilename = fileURLToPath(import.meta.url);
+const __saDir = path.dirname(__saFilename);
 
 function isSuperAdmin(req: Request, res: Response, next: NextFunction) {
   const envEmails = process.env.SUPER_ADMIN_EMAILS || "";
@@ -584,6 +593,182 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error deleting event:", error);
       res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  // ── Applications CRUD ─────────────────────────────────────────────────────
+
+  // GET /api/super-admin/applications — list all applications newest first with joins
+  app.get("/api/super-admin/applications", isAuthenticated, isSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const rows = await db
+        .select({
+          application: memberApplications,
+          user: {
+            id: users.id,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            status: users.status,
+          },
+          org: {
+            id: organizations.id,
+            name: organizations.name,
+            slug: organizations.slug,
+          },
+          challenge: {
+            id: challenges.id,
+            title: challenges.title,
+          },
+        })
+        .from(memberApplications)
+        .leftJoin(users, eq(memberApplications.userId, users.id))
+        .leftJoin(organizations, eq(memberApplications.orgId, organizations.id))
+        .leftJoin(challenges, eq(memberApplications.challengeId, challenges.id))
+        .orderBy(desc(memberApplications.submittedAt));
+
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+      res.status(500).json({ message: "Failed to fetch applications" });
+    }
+  });
+
+  // GET /api/super-admin/applications/:id — single application detail
+  app.get("/api/super-admin/applications/:id", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const [row] = await db
+        .select({
+          application: memberApplications,
+          user: {
+            id: users.id,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            status: users.status,
+          },
+          org: {
+            id: organizations.id,
+            name: organizations.name,
+            slug: organizations.slug,
+          },
+          challenge: {
+            id: challenges.id,
+            title: challenges.title,
+          },
+        })
+        .from(memberApplications)
+        .leftJoin(users, eq(memberApplications.userId, users.id))
+        .leftJoin(organizations, eq(memberApplications.orgId, organizations.id))
+        .leftJoin(challenges, eq(memberApplications.challengeId, challenges.id))
+        .where(eq(memberApplications.id, id));
+
+      if (!row) return res.status(404).json({ message: "Application not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Error fetching application:", error);
+      res.status(500).json({ message: "Failed to fetch application" });
+    }
+  });
+
+  // PATCH /api/super-admin/applications/:id — update score/metrics/status
+  app.patch("/api/super-admin/applications/:id", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status, aiScore, aiMetrics, aiStrengths, aiRecommendations, aiInsights, manualOverride } = req.body;
+
+      const [app] = await db.select().from(memberApplications).where(eq(memberApplications.id, id));
+      if (!app) return res.status(404).json({ message: "Application not found" });
+
+      const update: Record<string, any> = { updatedAt: new Date() };
+      if (status !== undefined) { update.status = status; update.reviewedAt = new Date(); }
+      if (aiScore !== undefined) update.aiScore = aiScore;
+      if (aiMetrics !== undefined) update.aiMetrics = aiMetrics;
+      if (aiStrengths !== undefined) update.aiStrengths = aiStrengths;
+      if (aiRecommendations !== undefined) update.aiRecommendations = aiRecommendations;
+      if (aiInsights !== undefined) update.aiInsights = aiInsights;
+
+      const [updated] = await db.update(memberApplications).set(update).where(eq(memberApplications.id, id)).returning();
+
+      // Handle manual approval/rejection side effects
+      if (manualOverride && status) {
+        const resendApiKey = process.env.RESEND_API_KEY;
+        const resend = resendApiKey ? new Resend(resendApiKey) : null;
+        const hostUrl = process.env.HOST_URL || "https://os.fikrahub.com";
+
+        const [user] = await db.select().from(users).where(eq(users.id, app.userId));
+        const [org] = await db.select().from(organizations).where(eq(organizations.id, app.orgId));
+
+        if (user && org) {
+          const userName = user.firstName || user.email || "there";
+          const orgName = org.name;
+
+          const loadTemplate = (name: string, vars: Record<string, string>) => {
+            const candidates = [
+              path.join(__saDir, "email-templates", `${name}.html`),
+              path.join(process.cwd(), "server", "email-templates", `${name}.html`),
+              path.join(process.cwd(), "dist", "email-templates", `${name}.html`),
+            ];
+            const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+            if (!found) return "";
+            try { return mustache.render(fs.readFileSync(found, "utf8"), vars); } catch { return ""; }
+          };
+
+          if (status === "APPROVED") {
+            await db.update(users).set({ status: "ACTIVE" }).where(eq(users.id, app.userId));
+            if (resend) {
+              const loginUrl = `${hostUrl}/w/${org.slug}`;
+              const html = loadTemplate("application-approved", { userName, orgName, loginUrl });
+              if (html) {
+                await resend.emails.send({
+                  from: process.env.EMAIL_FROM || "no-reply@fikrahub.com",
+                  to: user.email,
+                  subject: `Congratulations! Your application to ${orgName} has been approved`,
+                  html,
+                }).catch(console.error);
+              }
+            }
+          } else if (status === "REJECTED") {
+            if (resend) {
+              const html = loadTemplate("application-rejected", { userName, orgName, ideaName: app.ideaName || "your idea" });
+              if (html) {
+                await resend.emails.send({
+                  from: process.env.EMAIL_FROM || "no-reply@fikrahub.com",
+                  to: user.email,
+                  subject: `Update on your application to ${orgName}`,
+                  html,
+                }).catch(console.error);
+              }
+            }
+          }
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating application:", error);
+      res.status(500).json({ message: "Failed to update application" });
+    }
+  });
+
+  // POST /api/super-admin/applications/:id/rescreen — re-run AI screening
+  app.post("/api/super-admin/applications/:id/rescreen", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const [app] = await db.select().from(memberApplications).where(eq(memberApplications.id, id));
+      if (!app) return res.status(404).json({ message: "Application not found" });
+
+      // Reset to pending
+      await db.update(memberApplications).set({ status: "PENDING_REVIEW", reviewedAt: null, updatedAt: new Date() }).where(eq(memberApplications.id, id));
+
+      // Fire-and-forget re-screening
+      screenApplicationAsync(id, app.challengeId || null, app.orgId).catch(console.error);
+
+      res.json({ success: true, message: "Re-screening started" });
+    } catch (error) {
+      console.error("Error re-screening application:", error);
+      res.status(500).json({ message: "Failed to start re-screening" });
     }
   });
 }

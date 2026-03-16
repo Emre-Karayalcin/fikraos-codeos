@@ -74,6 +74,13 @@ export default function WorkspaceLanding() {
         const email = params.get("email") || "";
         const userId = params.get("userId") || "";
         const role = params.get("role") || "";
+
+        // MEMBER invites go through the structured onboarding flow
+        if (role === "MEMBER" && userId) {
+          setLocation(`/w/${slug}/onboard?userId=${userId}&email=${encodeURIComponent(email)}`);
+          return;
+        }
+
         setInvitedUserId(userId || undefined);
         setInvitedRole(role || undefined);
         if (email) setSignupData(prev => ({ ...prev, email }));

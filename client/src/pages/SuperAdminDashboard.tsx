@@ -38,7 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, Pencil, Trash2, Plus, X, UserPlus, Trophy, CalendarDays } from "lucide-react";
+import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, Pencil, Trash2, Plus, X, UserPlus, Trophy, CalendarDays, ClipboardList, RefreshCw } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
 import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
@@ -134,7 +135,50 @@ interface SuperAdminEvent {
   createdAt: string;
 }
 
-type Tab = "workspaces" | "users" | "ideas" | "challenges" | "events";
+type Tab = "workspaces" | "users" | "ideas" | "challenges" | "events" | "applications";
+
+interface SuperAdminApplication {
+  application: {
+    id: string;
+    userId: string;
+    orgId: string;
+    challengeId: string | null;
+    ideaName: string | null;
+    sector: string | null;
+    problemStatement: string | null;
+    solutionDescription: string | null;
+    differentiator: string | null;
+    targetUser: string | null;
+    relevantSkills: string | null;
+    previousWinner: string | null;
+    hasValidation: string | null;
+    validationDetails: string | null;
+    status: string;
+    aiScore: number | null;
+    aiMetrics: any[] | null;
+    aiStrengths: string[] | null;
+    aiRecommendations: string[] | null;
+    aiInsights: string | null;
+    submittedAt: string;
+    reviewedAt: string | null;
+  };
+  user: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    status: string | null;
+  } | null;
+  org: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  challenge: {
+    id: string;
+    title: string;
+  } | null;
+}
 
 interface WorkspaceFormData {
   name: string;
@@ -222,6 +266,13 @@ export default function SuperAdminDashboard() {
     queryKey: ["/api/super-admin/events"],
     queryFn: () => apiFetch("/api/super-admin/events"),
   });
+
+  const { data: adminApplications = [], isLoading: applicationsLoading } = useQuery<SuperAdminApplication[]>({
+    queryKey: ["/api/super-admin/applications"],
+    queryFn: () => apiFetch("/api/super-admin/applications"),
+  });
+
+  const [selectedApplication, setSelectedApplication] = useState<SuperAdminApplication | null>(null);
 
   // ── Workspace mutations ───────────────────────────────────────────────
   const createWs = useMutation({
@@ -433,6 +484,32 @@ export default function SuperAdminDashboard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // ── Application mutations ────────────────────────────────────────────
+  const updateApplication = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, any> }) =>
+      apiFetch(`/api/super-admin/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/applications"] });
+      toast.success("Application updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rescreenApplication = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/super-admin/applications/${id}/rescreen`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/super-admin/applications"] });
+      toast.success("Re-screening started — check back shortly");
+      setSelectedApplication(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const selectedWorkspace = useMemo(
     () => (filterOrgId !== "all" ? workspaces?.find((w) => w.id === filterOrgId) : null) ?? null,
     [filterOrgId, workspaces]
@@ -496,6 +573,14 @@ export default function SuperAdminDashboard() {
       iconColor: "text-teal-400",
       sub: "platform events",
     },
+    {
+      title: "Applications",
+      value: adminApplications.length,
+      icon: ClipboardList,
+      iconBg: "bg-indigo-500/10",
+      iconColor: "text-indigo-400",
+      sub: "member applications",
+    },
   ];
 
   const filteredUsers = useMemo(() => {
@@ -536,6 +621,7 @@ export default function SuperAdminDashboard() {
     { key: "ideas", label: "Ideas" },
     { key: "challenges", label: "Challenges" },
     { key: "events", label: "Events" },
+    { key: "applications", label: "Applications" },
   ];
 
   return (
@@ -572,7 +658,7 @@ export default function SuperAdminDashboard() {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {summaryCards.map((card) => {
               const Icon = card.icon;
               return (
@@ -911,6 +997,99 @@ export default function SuperAdminDashboard() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* ── Applications table ───────────────────────────────────────── */}
+          {activeTab === "applications" && (
+            <>
+            <Card className="border border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">Member Applications</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {applicationsLoading ? (
+                  <Spinner />
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Applicant</TableHead>
+                        <TableHead>Workspace</TableHead>
+                        <TableHead>Challenge</TableHead>
+                        <TableHead>Idea Name</TableHead>
+                        <TableHead>Sector</TableHead>
+                        <TableHead>Submitted</TableHead>
+                        <TableHead>AI Score</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {adminApplications.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                            No applications yet
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        adminApplications.map((row) => (
+                          <TableRow
+                            key={row.application.id}
+                            className="cursor-pointer hover:bg-muted/40"
+                            onClick={() => setSelectedApplication(row)}
+                          >
+                            <TableCell>
+                              <div className="font-medium text-sm">
+                                {[row.user?.firstName, row.user?.lastName].filter(Boolean).join(" ") || "—"}
+                              </div>
+                              <div className="text-xs text-muted-foreground">{row.user?.email}</div>
+                            </TableCell>
+                            <TableCell className="text-sm">{row.org?.name || "—"}</TableCell>
+                            <TableCell className="text-sm">{row.challenge?.title || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium">{row.application.ideaName || "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{row.application.sector || "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {new Date(row.application.submittedAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              {row.application.aiScore != null ? (
+                                <span className={`font-bold text-sm ${row.application.aiScore >= 70 ? "text-green-500" : "text-red-500"}`}>
+                                  {row.application.aiScore}/100
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">Pending</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {row.application.status === "APPROVED" && (
+                                <Badge className="bg-green-500/15 text-green-600 border-green-200 border text-xs">Approved</Badge>
+                              )}
+                              {row.application.status === "REJECTED" && (
+                                <Badge className="bg-red-500/15 text-red-600 border-red-200 border text-xs">Rejected</Badge>
+                              )}
+                              {row.application.status === "PENDING_REVIEW" && (
+                                <Badge className="bg-yellow-500/15 text-yellow-600 border-yellow-200 border text-xs">Pending Review</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Application Detail Modal */}
+            {selectedApplication && (
+              <ApplicationDetailModal
+                row={selectedApplication}
+                onClose={() => setSelectedApplication(null)}
+                onUpdate={(data) => updateApplication.mutate({ id: selectedApplication.application.id, data })}
+                onRescreen={() => rescreenApplication.mutate(selectedApplication.application.id)}
+                isPending={updateApplication.isPending || rescreenApplication.isPending}
+              />
+            )}
+            </>
           )}
 
           {/* ── Challenges table ─────────────────────────────────────────── */}
@@ -1627,6 +1806,200 @@ function EventModal({ mode, event, onClose, onSubmit, isPending }: EventModalPro
           <Button onClick={handleSubmit} disabled={!isValid || isPending}>
             {isPending ? "Saving…" : mode === "create" ? "Create Event" : "Save Changes"}
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── ApplicationDetailModal ───────────────────────────────────────────────────
+
+interface ApplicationDetailModalProps {
+  row: SuperAdminApplication;
+  onClose: () => void;
+  onUpdate: (data: Record<string, any>) => void;
+  onRescreen: () => void;
+  isPending: boolean;
+}
+
+function ApplicationDetailModal({ row, onClose, onUpdate, onRescreen, isPending }: ApplicationDetailModalProps) {
+  const app = row.application;
+  const [editScore, setEditScore] = useState<number>(app.aiScore ?? 0);
+
+  const statusBadge = (status: string) => {
+    if (status === "APPROVED") return <Badge className="bg-green-500/15 text-green-600 border-green-200 border text-xs">Approved</Badge>;
+    if (status === "REJECTED") return <Badge className="bg-red-500/15 text-red-600 border-red-200 border text-xs">Rejected</Badge>;
+    return <Badge className="bg-yellow-500/15 text-yellow-600 border-yellow-200 border text-xs">Pending Review</Badge>;
+  };
+
+  const qaItems = [
+    { label: "Idea Name", value: app.ideaName },
+    { label: "Sector", value: app.sector },
+    { label: "Problem Statement", value: app.problemStatement },
+    { label: "Solution Description", value: app.solutionDescription },
+    { label: "Differentiator", value: app.differentiator },
+    { label: "Target User", value: app.targetUser },
+    { label: "Relevant Skills", value: app.relevantSkills },
+    { label: "Previous Winner", value: app.previousWinner },
+    { label: "Has Validation", value: app.hasValidation },
+    { label: "Validation Details", value: app.validationDetails },
+  ].filter((i) => i.value);
+
+  const metrics: any[] = Array.isArray(app.aiMetrics) ? app.aiMetrics : [];
+  const strengths: string[] = Array.isArray(app.aiStrengths) ? app.aiStrengths : [];
+  const recommendations: string[] = Array.isArray(app.aiRecommendations) ? app.aiRecommendations : [];
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <DialogTitle className="text-base">
+              {app.ideaName || "Application"} — {[row.user?.firstName, row.user?.lastName].filter(Boolean).join(" ") || row.user?.email}
+            </DialogTitle>
+            {statusBadge(app.status)}
+          </div>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+          {/* Left: Q&A */}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Answers</h3>
+            <div className="space-y-4">
+              {qaItems.map((item) => (
+                <div key={item.label}>
+                  <p className="text-xs font-medium text-muted-foreground mb-0.5">{item.label}</p>
+                  <p className="text-sm text-foreground leading-relaxed">{item.value}</p>
+                </div>
+              ))}
+              {qaItems.length === 0 && (
+                <p className="text-sm text-muted-foreground">No answers recorded.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Right: AI Scoring */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">AI Scoring</h3>
+
+            {/* Overall score */}
+            <div className="text-center py-3 rounded-xl bg-muted/30">
+              <div className={`text-5xl font-bold ${(app.aiScore ?? 0) >= 70 ? "text-green-500" : "text-red-500"}`}>
+                {app.aiScore ?? "—"}<span className="text-xl font-normal text-muted-foreground">/100</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">≥ 70 to pass</p>
+            </div>
+
+            {/* Metric sliders */}
+            <div className="space-y-3">
+              {metrics.map((m) => (
+                <div key={m.name}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium">{m.name}</span>
+                    <span className="text-xs text-muted-foreground">{m.score}/100 ({m.weight}%)</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${m.score >= 70 ? "bg-green-500" : m.score >= 50 ? "bg-yellow-500" : "bg-red-500"}`}
+                      style={{ width: `${m.score}%` }}
+                    />
+                  </div>
+                  {m.rationale && (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{m.rationale}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Manual score edit */}
+            <div>
+              <Label className="text-xs font-medium mb-2 block">Override Score</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[editScore]}
+                  onValueChange={([v]) => setEditScore(v)}
+                  min={0} max={100} step={1}
+                  className="flex-1"
+                />
+                <span className="text-sm font-bold w-10 text-right">{editScore}</span>
+              </div>
+              <Button
+                size="sm" variant="outline" className="mt-2 w-full"
+                onClick={() => onUpdate({ aiScore: editScore })}
+                disabled={isPending}
+              >
+                Save Score
+              </Button>
+            </div>
+
+            {/* Rescreen */}
+            <Button
+              size="sm" variant="secondary" className="w-full flex items-center gap-2"
+              onClick={onRescreen}
+              disabled={isPending}
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Regenerate with AI
+            </Button>
+          </div>
+        </div>
+
+        {/* AI Insights */}
+        {(strengths.length > 0 || recommendations.length > 0 || app.aiInsights) && (
+          <div className="border-t border-border pt-4 space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">AI Insights</h3>
+            {strengths.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-1.5">Strengths</p>
+                <ul className="space-y-1">
+                  {strengths.map((s, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <span className="text-green-500 mt-0.5">●</span> {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {recommendations.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-1.5">Recommendations</p>
+                <ul className="space-y-1">
+                  {recommendations.map((r, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">●</span> {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {app.aiInsights && (
+              <p className="text-sm text-muted-foreground leading-relaxed">{app.aiInsights}</p>
+            )}
+          </div>
+        )}
+
+        {/* Footer actions */}
+        <DialogFooter className="flex-row items-center gap-2 pt-4 border-t border-border">
+          {app.status === "PENDING_REVIEW" && (
+            <>
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+                disabled={isPending}
+                onClick={() => onUpdate({ status: "APPROVED", manualOverride: true })}
+              >
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isPending}
+                onClick={() => onUpdate({ status: "REJECTED", manualOverride: true })}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+          <Button variant="outline" onClick={onClose} className="ml-auto">Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

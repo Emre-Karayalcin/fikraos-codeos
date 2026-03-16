@@ -749,6 +749,37 @@ export const courseProgress = pgTable(
   })
 );
 
+export const memberApplications = pgTable("member_applications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  challengeId: varchar("challenge_id").references(() => challenges.id),
+  // Step 2
+  ideaName: varchar("idea_name", { length: 255 }),
+  sector: varchar("sector", { length: 100 }),
+  problemStatement: text("problem_statement"),
+  // Step 3
+  solutionDescription: text("solution_description"),
+  differentiator: text("differentiator"),
+  targetUser: text("target_user"),
+  // Bonus (optional)
+  relevantSkills: text("relevant_skills"),
+  previousWinner: varchar("previous_winner", { length: 10 }),
+  hasValidation: varchar("has_validation", { length: 10 }),
+  validationDetails: text("validation_details"),
+  // Screening result
+  status: varchar("status", { length: 30 }).default("PENDING_REVIEW").notNull(),
+  aiScore: integer("ai_score"),
+  aiMetrics: jsonb("ai_metrics"),
+  aiStrengths: jsonb("ai_strengths"),
+  aiRecommendations: jsonb("ai_recommendations"),
+  aiInsights: text("ai_insights"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
 export const insertCourseProgressSchema = createInsertSchema(courseProgress).omit({ id: true, lastWatchedAt: true });

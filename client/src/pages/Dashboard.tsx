@@ -1,5 +1,6 @@
+import React from "react";
 import { useLocation, useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import MentorDashboard from "./MentorDashboard";
@@ -14,6 +15,10 @@ import {
   FiSearch,
   FiStar,
 } from "react-icons/fi";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { buildIdeaInitialMessage } from "@/lib/buildIdeaMessage";
+import toast from "react-hot-toast";
 
 interface DashboardCard {
   id: string;
@@ -93,6 +98,108 @@ export default function Dashboard() {
   const userIsAdmin = !!(user as any)?.isAdmin;
   // Wait for role to resolve only for non-admin users (to avoid flash of member dashboard for mentors)
   const isResolvingRole = !userIsAdmin && (orgLoading || (!!currentOrg?.id && roleLoading));
+
+  // Popup: show on first visit for approved-via-application members with no projects
+  const [popupDismissed, setPopupDismissed] = React.useState(() => {
+    return !!sessionStorage.getItem('onboarding_popup_shown');
+  });
+
+  const { data: userProjects } = useQuery<any[]>({
+    queryKey: ['/api/organizations', currentOrg?.id, 'projects-user'],
+    queryFn: async () => {
+      if (!currentOrg?.id) return [];
+      const res = await fetch(`/api/organizations/${currentOrg.id}/projects-user`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user && !!currentOrg?.id && !isMentor && !userIsAdmin,
+  });
+
+  const { data: myApplication } = useQuery<any>({
+    queryKey: ['/api/my-application'],
+    queryFn: async () => {
+      const res = await fetch('/api/my-application', { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user && !isMentor && !userIsAdmin,
+  });
+
+  const showPopup =
+    !popupDismissed &&
+    myApplication != null &&
+    Array.isArray(userProjects) &&
+    userProjects.length === 0;
+
+  const dismissPopup = () => {
+    sessionStorage.setItem('onboarding_popup_shown', '1');
+    setPopupDismissed(true);
+  };
+
+  const buildMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentOrg || !myApplication) throw new Error('Missing data');
+
+      // Step 1: Create project
+      const projectResp = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          orgId: currentOrg.id,
+          challengeId: myApplication.challengeId || null,
+          title: myApplication.ideaName || 'My Idea',
+          description: `${myApplication.solutionDescription || ''}\n\nDifferentiator: ${myApplication.differentiator || ''}\n\nTarget User: ${myApplication.targetUser || ''}`,
+          type: 'LAUNCH',
+        }),
+      });
+      if (!projectResp.ok) throw new Error('Failed to create project');
+      const project = await projectResp.json();
+
+      // Step 2: Create chat
+      const chatResp = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId: project.id, title: 'Chat' }),
+      });
+      if (!chatResp.ok) throw new Error('Failed to create chat');
+      const chat = await chatResp.json();
+
+      // Step 3: Build and post initial message
+      const initialMessage = buildIdeaInitialMessage({
+        ideaName: myApplication.ideaName || 'My Idea',
+        ideaDescription: myApplication.solutionDescription || '',
+        countryCode: 'SA',
+        countryName: 'Saudi Arabia',
+        uniqueness: myApplication.differentiator || '',
+      });
+
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ chatId: chat.id, content: initialMessage, role: 'user' }),
+      });
+
+      // Step 4: Trigger AI agent
+      await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message: initialMessage, chatId: chat.id, language: 'en' }),
+      });
+
+      return { chat };
+    },
+    onSuccess: ({ chat }) => {
+      dismissPopup();
+      setLocation(`/w/${slug}/chat/${chat.id}`);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to start generation');
+    },
+  });
 
   const handleSignOut = () => {
     logout();
@@ -177,6 +284,33 @@ export default function Dashboard() {
   }
 
   return (
+    <>
+    {/* First-visit idea generation popup */}
+    <Dialog open={showPopup} onOpenChange={(open) => { if (!open) dismissPopup(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-lg">Generate Your Business Model &amp; Marketing Overview</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Based on your idea submission, our AI is ready to build your complete business model
+            — including SWOT analysis, lean canvas, market research, and more.
+          </p>
+          <div className="flex items-center gap-3 pt-2">
+            <Button
+              className="flex-1"
+              onClick={() => buildMutation.mutate()}
+              disabled={buildMutation.isPending}
+            >
+              {buildMutation.isPending ? "Generating…" : "Get Started"}
+            </Button>
+            <Button variant="ghost" onClick={dismissPopup} disabled={buildMutation.isPending}>
+              Maybe Later
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #e8eeff 40%, #ede8ff 100%)' }}>
       {/* Header */}
       <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 1px 12px rgba(0,0,0,0.06)' }}>
@@ -422,5 +556,6 @@ export default function Dashboard() {
         </div>
       </main>
     </div>
+    </>
   );
 }
