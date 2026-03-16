@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import MentorDashboard from "./MentorDashboard";
+import { CheckCircle2, Clock } from "lucide-react";
 import {
   FiZap,
   FiUsers,
@@ -38,6 +39,22 @@ export default function Dashboard() {
   });
 
   const currentOrg = Array.isArray(organizations) ? organizations[0] : undefined;
+
+  // Fetch user's submitted project to show idea status bar
+  const { data: userProjects } = useQuery<any[]>({
+    queryKey: ['/api/organizations', currentOrg?.id, 'projects-user'],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${currentOrg!.id}/projects-user`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user && !!currentOrg?.id,
+    staleTime: 30_000,
+  });
+
+  const submittedProject = Array.isArray(userProjects)
+    ? userProjects.find((p: any) => p.submitted)
+    : undefined;
 
   const { data: userRole, isLoading: roleLoading } = useQuery<{ role: string } | null>({
     queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'check-role'],
@@ -196,6 +213,110 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-auto relative">
         <div className="max-w-7xl mx-auto px-6 space-y-6 py-6 pb-4 relative z-10">
+
+          {/* Submitted Idea Status Bar */}
+          {submittedProject && (() => {
+            const STEPS = [
+              { key: 'BACKLOG',       label: 'Backlog',       color: 'bg-gray-500' },
+              { key: 'UNDER_REVIEW',  label: 'Under Review',  color: 'bg-blue-500' },
+              { key: 'SHORTLISTED',   label: 'Shortlisted',   color: 'bg-yellow-500' },
+              { key: 'IN_INCUBATION', label: 'In Incubation', color: 'bg-purple-500' },
+            ];
+            const status = submittedProject.status || 'BACKLOG';
+            const isArchived = status === 'ARCHIVED';
+            const currentIdx = STEPS.findIndex(s => s.key === status);
+            const activeIdx = currentIdx === -1 ? 0 : currentIdx;
+
+            // Calculate days remaining (if project has a deadline via challenge, else generic)
+            const totalSteps = STEPS.length;
+            const phaseNum = activeIdx + 1;
+
+            return (
+              <div
+                className="relative z-10 mx-auto w-full max-w-3xl rounded-2xl px-6 py-4 mb-2"
+                style={{
+                  background: 'rgba(255,255,255,0.80)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(255,255,255,0.55)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+                }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {isArchived ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded-full px-2.5 py-1">
+                        Archived
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2.5 py-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Submitted
+                      </span>
+                    )}
+                    <span className="text-sm font-medium text-gray-700 truncate max-w-[200px]">{submittedProject.title}</span>
+                  </div>
+                  {!isArchived && (
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Phase {phaseNum} of {totalSteps}
+                    </span>
+                  )}
+                </div>
+
+                {/* Step track */}
+                <div className="flex items-center gap-0">
+                  {STEPS.map((step, idx) => {
+                    const isDone = idx < activeIdx;
+                    const isActive = idx === activeIdx && !isArchived;
+                    const isPending = idx > activeIdx;
+                    return (
+                      <div key={step.key} className="flex-1 flex items-center">
+                        {/* Node */}
+                        <div className="flex flex-col items-center" style={{ minWidth: 0 }}>
+                          <div
+                            className={`w-3 h-3 rounded-full border-2 flex-shrink-0 transition-all ${
+                              isArchived
+                                ? 'border-gray-300 bg-gray-200'
+                                : isDone
+                                ? 'border-primary bg-primary'
+                                : isActive
+                                ? 'border-primary bg-white ring-2 ring-primary/20'
+                                : 'border-gray-300 bg-white'
+                            }`}
+                          />
+                          <span
+                            className={`mt-1.5 text-[11px] font-medium whitespace-nowrap ${
+                              isArchived
+                                ? 'text-gray-400'
+                                : isActive
+                                ? 'text-primary'
+                                : isDone
+                                ? 'text-gray-500'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                        </div>
+                        {/* Connector line (not after last) */}
+                        {idx < STEPS.length - 1 && (
+                          <div
+                            className={`flex-1 h-0.5 mx-1 rounded-full transition-all ${
+                              isArchived
+                                ? 'bg-gray-200'
+                                : idx < activeIdx
+                                ? 'bg-primary'
+                                : 'bg-gray-200'
+                            }`}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Welcome Section */}
           <div className="text-center py-12 relative min-h-[180px]">
