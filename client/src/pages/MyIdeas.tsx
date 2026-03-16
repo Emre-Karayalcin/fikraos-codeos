@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Trash2, MessageCircle, Bell, Calendar, Clock, MoreHorizontal, Copy, Search, Code, Rocket, ExternalLink, X } from "lucide-react";
+import { Trash2, MessageCircle, Bell, Calendar, Clock, MoreHorizontal, Copy, Search, Code, Rocket, ExternalLink, X, Send, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import toast from "react-hot-toast";
@@ -118,6 +118,29 @@ export default function MyIdeas() {
     },
     onError: () => {
       toast.error(t('projects.duplicateError'));
+    }
+  });
+
+  // Precompute whether any project is already submitted in the same org
+  const hasAnySubmitted = Array.isArray(projects) && (projects as any[]).some((p: any) => p.submitted);
+
+  const submitProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const response = await apiRequest('POST', `/api/projects/${projectId}/submit`, {});
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Failed to submit' }));
+        throw new Error(err.error || 'Failed to submit');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['/api/organizations', Array.isArray(organizations) && organizations[0]?.id, 'projects-user']
+      });
+      toast.success('Idea submitted successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to submit idea');
     }
   });
 
@@ -413,6 +436,32 @@ export default function MyIdeas() {
                           </TableCell>
                           <TableCell className="ltr:text-right rtl:text-left">
                             <div className="flex items-center gap-2 ltr:justify-end rtl:justify-start">
+                              {/* Submit button / badge */}
+                              {project.submitted ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Submitted
+                                </span>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-3 text-xs gap-1"
+                                  disabled={hasAnySubmitted || submitProjectMutation.isPending}
+                                  title={hasAnySubmitted ? 'You have already submitted an idea for this workspace' : 'Submit this idea'}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Submit this idea? You can only submit one idea per workspace.')) {
+                                      submitProjectMutation.mutate(project.id);
+                                    }
+                                  }}
+                                  data-testid={`submit-project-${project.id}`}
+                                >
+                                  <Send className="w-3 h-3" />
+                                  Submit
+                                </Button>
+                              )}
+
                               <Button
                                 variant="ghost"
                                 size="sm"

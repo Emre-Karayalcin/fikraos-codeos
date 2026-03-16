@@ -9,7 +9,7 @@ import { AgentMessage } from "@/components/chat/AgentMessage";
 import { AssetPreview } from "@/components/assets/AssetPreview";
 import { ResearchAgent, AgentState } from "@/components/research/ResearchAgent";
 import { ActivityFeed, ActivityItem } from "@/components/research/ActivityFeed";
-import { MoreHorizontal, Sparkles, Zap, Brain, Rocket, RefreshCw, Trash2, Copy, Trophy, X, CheckCircle2 } from "lucide-react";
+import { MoreHorizontal, Sparkles, Zap, Brain, Rocket, RefreshCw, Trash2, Copy, Trophy, X, CheckCircle2, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAgentChat } from "@/hooks/useAgentChat";
@@ -198,6 +198,32 @@ export function CenterPanel({ chatId, challengeContext, onClearChallenge, onRese
 
   // Agent chat hook for the new cofounder experience
   const agentChat = useAgentChat((project as any)?.id);
+
+  // Submit project mutation
+  const submitProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const response = await apiRequest('POST', `/api/projects/${projectId}/submit`, {});
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Failed to submit' }));
+        throw new Error(err.error || 'Failed to submit');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', chatProjectId] });
+      toast({
+        title: 'Idea submitted!',
+        description: 'Your idea has been submitted successfully.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Submission failed',
+        description: error.message || 'Could not submit your idea.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Delete chat mutation
   const deleteChatMutation = useMutation({
@@ -483,10 +509,37 @@ export function CenterPanel({ chatId, challengeContext, onClearChallenge, onRese
       {/* Chat Header */}
       <div className="px-6 py-5 border-b border-border">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary mb-1" data-testid="chat-title">
-              {(project as any)?.title || t('centerPanel.launchpad')}
-            </h2>
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary mb-1" data-testid="chat-title">
+                {(project as any)?.title || t('centerPanel.launchpad')}
+              </h2>
+            </div>
+            {/* Submit button - shown when project exists */}
+            {chatProjectId && (
+              (project as any)?.submitted ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-full px-3 py-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Submitted
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  className="h-8 px-3 gap-1.5 text-xs"
+                  disabled={assets.length === 0 || submitProjectMutation.isPending}
+                  title={assets.length === 0 ? 'Generate at least one asset before submitting' : 'Submit your idea'}
+                  onClick={() => {
+                    if (confirm('Submit this idea? You can only submit one idea per workspace.')) {
+                      submitProjectMutation.mutate(chatProjectId);
+                    }
+                  }}
+                  data-testid="submit-idea"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {submitProjectMutation.isPending ? 'Submitting...' : 'Submit idea'}
+                </Button>
+              )
+            )}
           </div>
           <div className="flex items-center gap-2">
             

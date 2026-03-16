@@ -895,6 +895,33 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Submit project (one submission per workspace per user)
+  app.post('/api/projects/:id/submit', isAuthenticated, canModifyProject, async (req: any, res) => {
+    try {
+      const project = req.project; // attached by canModifyProject middleware
+      const userId = req.user.id;
+
+      if (project.submitted) {
+        return res.status(400).json({ error: 'Project is already submitted' });
+      }
+
+      // Enforce 1 submission per workspace
+      const allUserProjects = await storage.getProjectsByUser(userId);
+      const alreadySubmitted = allUserProjects.find(
+        (p: any) => p.orgId === project.orgId && p.submitted && p.id !== project.id
+      );
+      if (alreadySubmitted) {
+        return res.status(400).json({ error: 'You have already submitted an idea for this workspace' });
+      }
+
+      const updated = await storage.updateProject(project.id, { submitted: true });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error submitting project:', error);
+      res.status(500).json({ error: 'Failed to submit project' });
+    }
+  });
+
   // Chat routes
   app.get('/api/projects/:projectId/chats', isAuthenticated, canAccessProject, async (req, res) => {
     try {
