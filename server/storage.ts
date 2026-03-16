@@ -11,6 +11,8 @@ import {
   passwordResetTokens,
   comments,
   ideas,
+  courseProgress,
+  type CourseProgress,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -69,6 +71,10 @@ export interface IStorage {
     totalMembers: number;
   }>;
   
+  // Course progress operations
+  getCourseProgress(userId: string, courseSlug: string): Promise<CourseProgress[]>;
+  upsertVideoProgress(userId: string, courseSlug: string, videoSlug: string, watchedSeconds: number, completed: boolean): Promise<CourseProgress>;
+
   // Project operations
   getProjectsByOrg(orgId: string): Promise<Project[]>;
   getProject(id: string): Promise<Project | undefined>;
@@ -747,6 +753,52 @@ export class DatabaseStorage implements IStorage {
   async getIdea(id: string): Promise<Idea | undefined> {
     const [idea] = await db.select().from(ideas).where(eq(ideas.id, id));
     return idea;
+  }
+
+  async getCourseProgress(userId: string, courseSlug: string): Promise<CourseProgress[]> {
+    return db
+      .select()
+      .from(courseProgress)
+      .where(and(eq(courseProgress.userId, userId), eq(courseProgress.courseSlug, courseSlug)));
+  }
+
+  async upsertVideoProgress(
+    userId: string,
+    courseSlug: string,
+    videoSlug: string,
+    watchedSeconds: number,
+    completed: boolean
+  ): Promise<CourseProgress> {
+    const existing = await db
+      .select()
+      .from(courseProgress)
+      .where(
+        and(
+          eq(courseProgress.userId, userId),
+          eq(courseProgress.courseSlug, courseSlug),
+          eq(courseProgress.videoSlug, videoSlug)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(courseProgress)
+        .set({
+          watchedSeconds: Math.max(existing[0].watchedSeconds, watchedSeconds),
+          completed: existing[0].completed || completed,
+          lastWatchedAt: new Date(),
+        })
+        .where(eq(courseProgress.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(courseProgress)
+      .values({ userId, courseSlug, videoSlug, watchedSeconds, completed, lastWatchedAt: new Date() })
+      .returning();
+    return created;
   }
 }
 

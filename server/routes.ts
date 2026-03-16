@@ -922,6 +922,38 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Academy course progress routes
+  app.get('/api/academy/progress/:courseSlug', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { courseSlug } = req.params;
+      const progress = await storage.getCourseProgress(userId, courseSlug);
+      res.json(progress);
+    } catch (error) {
+      console.error('Error fetching course progress:', error);
+      res.status(500).json({ error: 'Failed to fetch progress' });
+    }
+  });
+
+  app.post('/api/academy/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { courseSlug, videoSlug, watchedSeconds, completed } = req.body;
+      if (!courseSlug || !videoSlug || typeof watchedSeconds !== 'number') {
+        return res.status(400).json({ error: 'courseSlug, videoSlug, and watchedSeconds are required' });
+      }
+      const record = await storage.upsertVideoProgress(
+        userId, courseSlug, videoSlug,
+        Math.max(0, Math.round(watchedSeconds)),
+        !!completed
+      );
+      res.json(record);
+    } catch (error) {
+      console.error('Error saving course progress:', error);
+      res.status(500).json({ error: 'Failed to save progress' });
+    }
+  });
+
   // Chat routes
   app.get('/api/projects/:projectId/chats', isAuthenticated, canAccessProject, async (req, res) => {
     try {

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   index,
+  uniqueIndex,
   jsonb,
   pgTable,
   timestamp,
@@ -731,8 +732,26 @@ export const mentorBookings = pgTable("mentor_bookings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Academy course progress tracking
+export const courseProgress = pgTable(
+  "course_progress",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    courseSlug: varchar("course_slug", { length: 100 }).notNull(),
+    videoSlug: varchar("video_slug", { length: 100 }).notNull(),
+    watchedSeconds: integer("watched_seconds").default(0).notNull(),
+    completed: boolean("completed").default(false).notNull(),
+    lastWatchedAt: timestamp("last_watched_at").defaultNow(),
+  },
+  (t) => ({
+    userVideoIdx: uniqueIndex("idx_course_progress_user_video").on(t.userId, t.courseSlug, t.videoSlug),
+  })
+);
+
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
+export const insertCourseProgressSchema = createInsertSchema(courseProgress).omit({ id: true, lastWatchedAt: true });
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -828,6 +847,7 @@ export type MetricsSet = typeof metricsSets.$inferSelect;
 export type IdeaScore = typeof ideaScores.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type CourseProgress = typeof courseProgress.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
