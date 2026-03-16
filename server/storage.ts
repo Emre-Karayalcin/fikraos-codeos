@@ -503,7 +503,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(projects.createdById, userId))
       .orderBy(desc(projects.updatedAt));
 
-    // attach commentsCount for each project
+    // attach commentsCount and assetsCount for each project
     for (const project of userProjects) {
       try {
         const commentRows = await db
@@ -513,6 +513,15 @@ export class DatabaseStorage implements IStorage {
         (project as any).commentsCount = commentRows.length;
       } catch (e) {
         (project as any).commentsCount = 0;
+      }
+      try {
+        const assetRows = await db
+          .select()
+          .from(assets)
+          .where(eq(assets.projectId, project.id));
+        (project as any).assetsCount = assetRows.length;
+      } catch (e) {
+        (project as any).assetsCount = 0;
       }
     }
 

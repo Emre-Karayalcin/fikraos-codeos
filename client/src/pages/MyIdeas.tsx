@@ -447,8 +447,14 @@ export default function MyIdeas() {
                                   variant="outline"
                                   size="sm"
                                   className="h-8 px-3 text-xs gap-1"
-                                  disabled={hasAnySubmitted || submitProjectMutation.isPending}
-                                  title={hasAnySubmitted ? 'You have already submitted an idea for this workspace' : 'Submit this idea'}
+                                  disabled={hasAnySubmitted || (project.assetsCount ?? 0) < 13 || submitProjectMutation.isPending}
+                                  title={
+                                    hasAnySubmitted
+                                      ? 'You have already submitted an idea for this workspace'
+                                      : (project.assetsCount ?? 0) < 13
+                                      ? `Need all 13 assets before submitting (${project.assetsCount ?? 0}/13 ready)`
+                                      : 'Submit this idea'
+                                  }
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (confirm('Submit this idea? You can only submit one idea per workspace.')) {

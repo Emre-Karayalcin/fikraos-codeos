@@ -526,8 +526,8 @@ export function CenterPanel({ chatId, challengeContext, onClearChallenge, onRese
                 <Button
                   size="sm"
                   className="h-8 px-3 gap-1.5 text-xs"
-                  disabled={assets.length === 0 || submitProjectMutation.isPending}
-                  title={assets.length === 0 ? 'Generate at least one asset before submitting' : 'Submit your idea'}
+                  disabled={assets.length < 13 || submitProjectMutation.isPending}
+                  title={assets.length < 13 ? `Need all 13 assets before submitting (${assets.length}/13 ready)` : 'Submit your idea'}
                   onClick={() => {
                     if (confirm('Submit this idea? You can only submit one idea per workspace.')) {
                       submitProjectMutation.mutate(chatProjectId);
