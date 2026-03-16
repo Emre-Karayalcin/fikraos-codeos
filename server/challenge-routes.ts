@@ -92,6 +92,7 @@ export function registerChallengeRoutes(app: Express) {
           description: projects.description,
           type: projects.type,
           status: projects.status,
+          submitted: projects.submitted,
           createdAt: projects.createdAt,
           updatedAt: projects.updatedAt,
           deploymentUrl: projects.deploymentUrl,
@@ -107,8 +108,7 @@ export function registerChallengeRoutes(app: Express) {
         .where(
           and(
             eq(projects.challengeId, result.challenge.id),
-            eq(projects.createdById, req.user.id), // ✅ SECURITY FIX: Only show user's own ideas
-            eq(projects.submitted, false) // ✅ Only show unsubmitted projects
+            eq(projects.createdById, req.user.id) // ✅ SECURITY FIX: Only show user's own ideas
           )
         )
         .orderBy(desc(projects.createdAt));

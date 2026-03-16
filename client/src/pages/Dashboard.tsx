@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import MentorDashboard from "./MentorDashboard";
-import { CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import {
   FiZap,
   FiUsers,
@@ -52,9 +53,28 @@ export default function Dashboard() {
     staleTime: 30_000,
   });
 
-  const submittedProject = Array.isArray(userProjects)
-    ? userProjects.find((p: any) => p.submitted)
-    : undefined;
+  const submittedProjects = Array.isArray(userProjects)
+    ? userProjects.filter((p: any) => p.submitted)
+    : [];
+
+  const [activeSlide, setActiveSlide] = useState(0);
+  const slideTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (submittedProjects.length <= 1) return;
+    slideTimer.current = setInterval(() => {
+      setActiveSlide(prev => (prev + 1) % submittedProjects.length);
+    }, 4000);
+    return () => { if (slideTimer.current) clearInterval(slideTimer.current); };
+  }, [submittedProjects.length]);
+
+  const goToSlide = (idx: number) => {
+    setActiveSlide(idx);
+    if (slideTimer.current) clearInterval(slideTimer.current);
+    slideTimer.current = setInterval(() => {
+      setActiveSlide(prev => (prev + 1) % submittedProjects.length);
+    }, 4000);
+  };
 
   const { data: userRole, isLoading: roleLoading } = useQuery<{ role: string } | null>({
     queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'check-role'],
@@ -214,14 +234,16 @@ export default function Dashboard() {
       <main className="flex-1 overflow-auto relative">
         <div className="max-w-7xl mx-auto px-6 space-y-6 py-6 pb-4 relative z-10">
 
-          {/* Submitted Idea Status Bar */}
-          {submittedProject && (() => {
+          {/* Submitted Ideas Status Bar — auto-slides when multiple */}
+          {submittedProjects.length > 0 && (() => {
             const STEPS = [
               { key: 'BACKLOG',       label: 'Backlog' },
               { key: 'UNDER_REVIEW',  label: 'Under Review' },
               { key: 'SHORTLISTED',   label: 'Shortlisted' },
               { key: 'IN_INCUBATION', label: 'In Incubation' },
             ];
+            const currentSlideIdx = activeSlide % submittedProjects.length;
+            const submittedProject = submittedProjects[currentSlideIdx];
             const status = submittedProject.status || 'BACKLOG';
             const isArchived = status === 'ARCHIVED';
             const currentIdx = STEPS.findIndex(s => s.key === status);
@@ -229,6 +251,7 @@ export default function Dashboard() {
             const phaseNum = activeIdx + 1;
             const totalSteps = STEPS.length;
             const fillPct = activeIdx === 0 ? 0 : (activeIdx / (totalSteps - 1)) * 100;
+            const multi = submittedProjects.length > 1;
 
             return (
               <div
@@ -242,39 +265,70 @@ export default function Dashboard() {
               >
                 {/* Header row */}
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {/* Prev arrow */}
+                    {multi && (
+                      <button
+                        onClick={() => goToSlide((currentSlideIdx - 1 + submittedProjects.length) % submittedProjects.length)}
+                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    )}
                     {isArchived ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 flex-shrink-0">
                         Archived
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5 flex-shrink-0">
                         <CheckCircle2 className="w-3 h-3" />
                         Submitted
                       </span>
                     )}
-                    <span className="text-sm font-medium text-gray-700 truncate max-w-[180px]">{submittedProject.title}</span>
+                    <span className="text-sm font-medium text-gray-700 truncate">{submittedProject.title}</span>
+                    {/* Next arrow */}
+                    {multi && (
+                      <button
+                        onClick={() => goToSlide((currentSlideIdx + 1) % submittedProjects.length)}
+                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    )}
                   </div>
-                  {!isArchived && (
-                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      Phase {phaseNum} of {totalSteps}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Dot indicators */}
+                    {multi && (
+                      <div className="flex items-center gap-1">
+                        {submittedProjects.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => goToSlide(i)}
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${
+                              i === currentSlideIdx ? 'bg-primary' : 'bg-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {!isArchived && (
+                      <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Phase {phaseNum} of {totalSteps}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Step track — circles centered via justify-between, connector as absolute behind */}
+                {/* Step track */}
                 <div className="relative flex items-start justify-between">
-                  {/* Background line */}
                   <div className="absolute top-[5px] left-0 right-0 h-px bg-gray-200" />
-                  {/* Filled portion */}
                   {!isArchived && (
                     <div
-                      className="absolute top-[5px] left-0 h-px bg-primary transition-all"
+                      className="absolute top-[5px] left-0 h-px bg-primary transition-all duration-500"
                       style={{ width: `${fillPct}%` }}
                     />
                   )}
-
                   {STEPS.map((step, idx) => {
                     const isDone = idx < activeIdx;
                     const isActive = idx === activeIdx && !isArchived;
