@@ -78,7 +78,7 @@ interface ChallengeWithCreator {
   };
 }
 
-function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Challenge; workspaceSlug?: string; isAdmin?: boolean }) {
+function ChallengeCard({ challenge, workspaceSlug, isAdmin, userApplicationChallengeId }: { challenge: Challenge; workspaceSlug?: string; isAdmin?: boolean; userApplicationChallengeId?: string | null }) {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
@@ -99,7 +99,8 @@ function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Chall
   // Check if user is admin (OWNER or ADMIN role)
   const isAdminUser = isAdmin || roleData?.isAdmin === true || (roleData as any)?.role === 'OWNER' || (roleData as any)?.role === 'ADMIN';
 
-  // Inactive challenges are visible but blurred/non-clickable for all users
+  // Per-user blur: non-admin users with an approved application only see their challenge
+  const isLockedForUser = !isAdminUser && !!userApplicationChallengeId && challenge.id !== userApplicationChallengeId;
 
   const deleteMutation = useMutation({
     mutationFn: async (challengeId: string) => {
@@ -156,7 +157,7 @@ function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Chall
   };
 
   return (
-    <div className={`relative ${!challenge.isActive ? 'group/inactive' : ''}`}>
+    <div className={`relative ${!challenge.isActive || isLockedForUser ? 'group/inactive' : ''}`}>
       {/* Blur overlay for inactive challenges */}
       {!challenge.isActive && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-background/60 backdrop-blur-sm border border-dashed border-border pointer-events-none">
@@ -165,10 +166,18 @@ function ChallengeCard({ challenge, workspaceSlug, isAdmin }: { challenge: Chall
           </span>
         </div>
       )}
+      {/* Blur overlay for challenges not matching user's application */}
+      {isLockedForUser && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-background/60 backdrop-blur-sm border border-dashed border-border pointer-events-none">
+          <span className="text-xs font-semibold text-muted-foreground bg-background/80 px-2 py-1 rounded-md">
+            Not Available
+          </span>
+        </div>
+      )}
       <Card
-        className={`group hover:shadow-lg transition-all cursor-pointer border border-border/50 hover:border-border h-full ${!challenge.isActive ? 'opacity-50 pointer-events-none select-none' : ''}`}
+        className={`group hover:shadow-lg transition-all cursor-pointer border border-border/50 hover:border-border h-full ${!challenge.isActive || isLockedForUser ? 'opacity-50 pointer-events-none select-none' : ''}`}
         onClick={() => {
-          if (!challenge.isActive) return;
+          if (!challenge.isActive || isLockedForUser) return;
           if (workspaceSlug) {
             setLocation(`/w/${workspaceSlug}/challenges/${challenge.slug}`);
           } else {
@@ -604,6 +613,17 @@ export default function Challenges() {
    });
    const isAdmin = user?.isAdmin === true || (workspaceRoleData as any)?.isAdmin === true || (workspaceRoleData as any)?.role === 'OWNER' || (workspaceRoleData as any)?.role === 'ADMIN';
 
+   const { data: myApplication } = useQuery({
+     queryKey: ['/api/my-application'],
+     queryFn: async () => {
+       const response = await fetch('/api/my-application', { credentials: 'include' });
+       if (!response.ok) return null;
+       return response.json();
+     },
+     enabled: !!user && !isAdmin,
+     staleTime: 5 * 60 * 1000,
+   });
+
    return (
      <div className="h-screen w-full bg-background text-foreground overflow-hidden flex relative">
        <div className="hidden sm:block">
@@ -689,7 +709,7 @@ export default function Challenges() {
              {!isLoading && filteredChallenges.length > 0 && (
                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="challenges-grid">
                  {filteredChallenges.map(challenge => (
-                   <ChallengeCard key={challenge.id} challenge={challenge} workspaceSlug={currentWorkspaceSlug} isAdmin={isAdmin} />
+                   <ChallengeCard key={challenge.id} challenge={challenge} workspaceSlug={currentWorkspaceSlug} isAdmin={isAdmin} userApplicationChallengeId={myApplication?.challengeId ?? null} />
                  ))}
                </div>
              )}
