@@ -895,7 +895,9 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Submit project (one submission per workspace per user)
+  // Submit project:
+  //   - Projects with no challengeId: 1 submission per workspace
+  //   - Projects tied to a challenge: 1 submission per challenge
   app.post('/api/projects/:id/submit', isAuthenticated, canModifyProject, async (req: any, res) => {
     try {
       const project = req.project; // attached by canModifyProject middleware
@@ -905,13 +907,24 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: 'Project is already submitted' });
       }
 
-      // Enforce 1 submission per workspace
       const allUserProjects = await storage.getProjectsByUser(userId);
-      const alreadySubmitted = allUserProjects.find(
-        (p: any) => p.orgId === project.orgId && p.submitted && p.id !== project.id
-      );
-      if (alreadySubmitted) {
-        return res.status(400).json({ error: 'You have already submitted an idea for this workspace' });
+
+      if (project.challengeId) {
+        // 1 submission per challenge
+        const alreadySubmitted = allUserProjects.find(
+          (p: any) => p.challengeId === project.challengeId && p.submitted && p.id !== project.id
+        );
+        if (alreadySubmitted) {
+          return res.status(400).json({ error: 'You have already submitted an idea for this challenge' });
+        }
+      } else {
+        // 1 submission per workspace (only count projects not tied to any challenge)
+        const alreadySubmitted = allUserProjects.find(
+          (p: any) => p.orgId === project.orgId && !p.challengeId && p.submitted && p.id !== project.id
+        );
+        if (alreadySubmitted) {
+          return res.status(400).json({ error: 'You have already submitted an idea for this workspace' });
+        }
       }
 
       const updated = await storage.updateProject(project.id, { submitted: true });

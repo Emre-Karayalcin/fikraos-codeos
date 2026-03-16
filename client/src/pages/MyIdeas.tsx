@@ -121,8 +121,18 @@ export default function MyIdeas() {
     }
   });
 
-  // Precompute whether any project is already submitted in the same org
-  const hasAnySubmitted = Array.isArray(projects) && (projects as any[]).some((p: any) => p.submitted);
+  // Per-project submit block: workspace projects share 1 slot, challenge projects share 1 slot per challenge
+  const isSubmitBlocked = (proj: any): boolean => {
+    if (!Array.isArray(projects)) return false;
+    if (proj.challengeId) {
+      return (projects as any[]).some(
+        (p: any) => p.id !== proj.id && p.submitted && p.challengeId === proj.challengeId
+      );
+    }
+    return (projects as any[]).some(
+      (p: any) => p.id !== proj.id && p.submitted && !p.challengeId && p.orgId === proj.orgId
+    );
+  };
 
   const submitProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
@@ -447,17 +457,20 @@ export default function MyIdeas() {
                                   variant="outline"
                                   size="sm"
                                   className="h-8 px-3 text-xs gap-1"
-                                  disabled={hasAnySubmitted || (project.assetsCount ?? 0) < 13 || submitProjectMutation.isPending}
+                                  disabled={isSubmitBlocked(project) || (project.assetsCount ?? 0) < 13 || submitProjectMutation.isPending}
                                   title={
-                                    hasAnySubmitted
-                                      ? 'You have already submitted an idea for this workspace'
+                                    isSubmitBlocked(project)
+                                      ? project.challengeId
+                                        ? 'You have already submitted an idea for this challenge'
+                                        : 'You have already submitted an idea for this workspace'
                                       : (project.assetsCount ?? 0) < 13
                                       ? `Need all 13 assets before submitting (${project.assetsCount ?? 0}/13 ready)`
                                       : 'Submit this idea'
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm('Submit this idea? You can only submit one idea per workspace.')) {
+                                    const scope = project.challengeId ? 'this challenge' : 'this workspace';
+                                    if (confirm(`Submit this idea? You can only submit one idea per ${scope}.`)) {
                                       submitProjectMutation.mutate(project.id);
                                     }
                                   }}
