@@ -33,7 +33,7 @@ const COURSES = [
     description: "Master the fundamentals of building and launching your startup",
     thumbnail: "/fikracourse-cover.png",
     videoCount: 14,
-    duration: "2h 30min",
+    duration: "19 min",
     videos: [
       {
         id: "brand-identity",
@@ -41,7 +41,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-brand-identity.mp4",
         title: "Brand Identity",
         description: "Learn how to create a compelling brand identity for your startup",
-        duration: "12:45"
+        duration: "1:34"
       },
       {
         id: "brand-wheel",
@@ -49,7 +49,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-brand-wheel.mp4",
         title: "Brand Wheel",
         description: "Understand your brand positioning with the brand wheel framework",
-        duration: "10:30"
+        duration: "1:34"
       },
       {
         id: "customer-interview",
@@ -57,7 +57,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-customer-interview-questions.mp4",
         title: "Customer Interview Questions",
         description: "Master the art of customer interviews with the right questions",
-        duration: "15:20"
+        duration: "1:33"
       },
       {
         id: "landing-pages",
@@ -65,7 +65,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-landing-pages.mp4",
         title: "Landing Pages",
         description: "Build high-converting landing pages that capture leads",
-        duration: "18:15"
+        duration: "1:22"
       },
       {
         id: "launch-roadmap",
@@ -73,7 +73,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-launch-roadmap.mp4",
         title: "Launch Roadmap",
         description: "Plan your product launch with a structured roadmap",
-        duration: "14:40"
+        duration: "1:12"
       },
       {
         id: "lean-canvas",
@@ -81,7 +81,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-lean-canvas.mp4",
         title: "Lean Canvas",
         description: "Validate your business model with the Lean Canvas framework",
-        duration: "16:25"
+        duration: "1:33"
       },
       {
         id: "marketing-content",
@@ -89,7 +89,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-marketing-content.mp4",
         title: "Marketing Content",
         description: "Create engaging marketing content that resonates",
-        duration: "11:50"
+        duration: "1:12"
       },
       {
         id: "marketing-overview",
@@ -97,7 +97,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-marketing-overview.mp4",
         title: "Marketing Overview",
         description: "Get a comprehensive overview of marketing strategies",
-        duration: "13:30"
+        duration: "1:42"
       },
       {
         id: "swot-analysis",
@@ -105,7 +105,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-swot-analysis.mp4",
         title: "SWOT Analysis",
         description: "Analyze your strengths, weaknesses, opportunities, and threats",
-        duration: "9:45"
+        duration: "1:09"
       },
       {
         id: "tasks-management",
@@ -113,7 +113,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-tasks-management.mp4",
         title: "Tasks Management",
         description: "Organize and prioritize tasks effectively",
-        duration: "8:20"
+        duration: "1:16"
       },
       {
         id: "team-roles",
@@ -121,7 +121,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-team-roles.mp4",
         title: "Team Roles",
         description: "Define clear roles and responsibilities for your team",
-        duration: "10:15"
+        duration: "1:00"
       },
       {
         id: "user-journey",
@@ -129,7 +129,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-user-journey-map.mp4",
         title: "User Journey Map",
         description: "Map out your customer's journey from awareness to advocacy",
-        duration: "12:30"
+        duration: "1:46"
       },
       {
         id: "user-personas",
@@ -137,7 +137,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-user-personas.mp4",
         title: "User Personas",
         description: "Create detailed personas to understand your target users",
-        duration: "11:40"
+        duration: "1:14"
       },
       {
         id: "user-stories",
@@ -145,7 +145,7 @@ const COURSES = [
         url: "https://app.fikrahub.com/videos/FrikaHub-user-stories.mp4",
         title: "User Stories",
         description: "Write effective user stories for product development",
-        duration: "9:55"
+        duration: "1:01"
       },
     ]
   }
