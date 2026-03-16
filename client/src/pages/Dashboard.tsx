@@ -104,17 +104,6 @@ export default function Dashboard() {
     return !!sessionStorage.getItem('onboarding_popup_shown');
   });
 
-  const { data: userProjects } = useQuery<any[]>({
-    queryKey: ['/api/organizations', currentOrg?.id, 'projects-user'],
-    queryFn: async () => {
-      if (!currentOrg?.id) return [];
-      const res = await fetch(`/api/organizations/${currentOrg.id}/projects-user`, { credentials: 'include' });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!user && !!currentOrg?.id && !isMentor && !userIsAdmin,
-  });
-
   const { data: myApplication } = useQuery<any>({
     queryKey: ['/api/my-application'],
     queryFn: async () => {
