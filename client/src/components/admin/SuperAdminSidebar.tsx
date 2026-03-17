@@ -41,14 +41,14 @@ export function SuperAdminSidebar({ isCollapsed, onToggle }: SuperAdminSidebarPr
     <div
       className={cn(
         "h-screen bg-card border-r border-border flex flex-col transition-all duration-300",
-        isCollapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-14" : "w-52"
       )}
     >
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         {!isCollapsed && (
           <div>
-            <h2 className="font-semibold text-lg">Super Admin</h2>
+            <h2 className="font-semibold text-sm">Super Admin</h2>
             <p className="text-xs text-muted-foreground">Platform Overview</p>
           </div>
         )}
@@ -67,15 +67,15 @@ export function SuperAdminSidebar({ isCollapsed, onToggle }: SuperAdminSidebarPr
             <Link key={item.href} href={item.href}>
               <a
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
+                  "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md transition-colors text-sm",
                   "hover:bg-accent hover:text-accent-foreground",
                   isActive && "bg-primary text-primary-foreground hover:bg-primary/90",
                   isCollapsed && "justify-center"
                 )}
                 title={isCollapsed ? item.title : undefined}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {!isCollapsed && <div className="font-medium">{item.title}</div>}
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {!isCollapsed && <span className="font-medium">{item.title}</span>}
               </a>
             </Link>
           );
