@@ -288,7 +288,7 @@ export default function Dashboard() {
         </div>
       </DialogContent>
     </Dialog>
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 40%, #f3f0ff 100%)' }}>
+    <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.80)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(200,210,255,0.35)', boxShadow: '0 1px 16px rgba(24,80,238,0.06)' }}>
         {/* Logo */}
