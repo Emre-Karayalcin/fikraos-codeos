@@ -12,7 +12,10 @@ import {
   comments,
   ideas,
   courseProgress,
+  workspaceProgramProgress,
   type CourseProgress,
+  type WorkspaceProgramProgress,
+  type ProgramStep,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -74,6 +77,10 @@ export interface IStorage {
   // Course progress operations
   getCourseProgress(userId: string, courseSlug: string): Promise<CourseProgress[]>;
   upsertVideoProgress(userId: string, courseSlug: string, videoSlug: string, watchedSeconds: number, completed: boolean): Promise<CourseProgress>;
+
+  // Program progress operations
+  getProgramProgress(orgId: string): Promise<WorkspaceProgramProgress | undefined>;
+  upsertProgramProgress(orgId: string, currentStep: number, steps: ProgramStep[], updatedBy: string): Promise<WorkspaceProgramProgress>;
 
   // Project operations
   getProjectsByOrg(orgId: string): Promise<Project[]>;
@@ -799,6 +806,32 @@ export class DatabaseStorage implements IStorage {
       .values({ userId, courseSlug, videoSlug, watchedSeconds, completed, lastWatchedAt: new Date() })
       .returning();
     return created;
+  }
+
+  async getProgramProgress(orgId: string): Promise<WorkspaceProgramProgress | undefined> {
+    const rows = await db
+      .select()
+      .from(workspaceProgramProgress)
+      .where(eq(workspaceProgramProgress.orgId, orgId))
+      .limit(1);
+    return rows[0];
+  }
+
+  async upsertProgramProgress(
+    orgId: string,
+    currentStep: number,
+    steps: ProgramStep[],
+    updatedBy: string,
+  ): Promise<WorkspaceProgramProgress> {
+    const [row] = await db
+      .insert(workspaceProgramProgress)
+      .values({ orgId, currentStep, steps, updatedBy, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: workspaceProgramProgress.orgId,
+        set: { currentStep, steps, updatedBy, updatedAt: new Date() },
+      })
+      .returning();
+    return row;
   }
 }
 

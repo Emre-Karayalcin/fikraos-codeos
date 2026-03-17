@@ -936,6 +936,68 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ── Program Progress routes ──────────────────────────────────────────────────
+  // GET /api/organizations/:orgId/program-progress — any authenticated member
+  app.get('/api/organizations/:orgId/program-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user.id;
+      const role = await storage.getUserRole(userId, orgId);
+      if (!role) return res.status(403).json({ message: 'Access denied' });
+      const progress = await storage.getProgramProgress(orgId);
+      // Return defaults if not yet configured
+      if (!progress) {
+        return res.json({
+          orgId,
+          currentStep: 1,
+          steps: [
+            { titleEn: 'Ideation & Business Foundations', titleAr: 'الريادة وأسس الأعمال' },
+            { titleEn: 'Product Strategy & Validation', titleAr: 'استراتيجية المنتج والتحقق' },
+            { titleEn: 'Product Design & Insights', titleAr: 'تصميم المنتج والرؤى' },
+            { titleEn: 'Pitching & Presentation', titleAr: 'العرض التقديمي' },
+          ],
+        });
+      }
+      res.json(progress);
+    } catch (error) {
+      console.error('Error fetching program progress:', error);
+      res.status(500).json({ message: 'Failed to fetch program progress' });
+    }
+  });
+
+  // PATCH /api/organizations/:orgId/program-progress — Admin/Owner only
+  app.patch('/api/organizations/:orgId/program-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user.id;
+      const role = await storage.getUserRole(userId, orgId);
+      if (!role || (role !== 'ADMIN' && role !== 'OWNER')) {
+        return res.status(403).json({ message: 'Admin or Owner access required' });
+      }
+      const { currentStep, steps } = req.body;
+      if (currentStep !== undefined && (typeof currentStep !== 'number' || currentStep < 1 || currentStep > 4)) {
+        return res.status(400).json({ message: 'currentStep must be 1–4' });
+      }
+      if (steps !== undefined && (!Array.isArray(steps) || steps.length !== 4)) {
+        return res.status(400).json({ message: 'steps must be an array of exactly 4 items' });
+      }
+      // Fetch current to fill in unchanged fields
+      const existing = await storage.getProgramProgress(orgId);
+      const newStep = currentStep ?? existing?.currentStep ?? 1;
+      const newSteps = steps ?? existing?.steps ?? [
+        { titleEn: 'Ideation & Business Foundations', titleAr: 'الريادة وأسس الأعمال' },
+        { titleEn: 'Product Strategy & Validation', titleAr: 'استراتيجية المنتج والتحقق' },
+        { titleEn: 'Product Design & Insights', titleAr: 'تصميم المنتج والرؤى' },
+        { titleEn: 'Pitching & Presentation', titleAr: 'العرض التقديمي' },
+      ];
+      const updated = await storage.upsertProgramProgress(orgId, newStep, newSteps, userId);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating program progress:', error);
+      res.status(500).json({ message: 'Failed to update program progress' });
+    }
+  });
+
   // Academy course progress routes
   app.get('/api/academy/progress/:courseSlug', isAuthenticated, async (req: any, res) => {
     try {

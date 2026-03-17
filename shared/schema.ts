@@ -780,6 +780,29 @@ export const memberApplications = pgTable("member_applications", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ── Workspace Program Progress ───────────────────────────────────────────────
+// Stores the 4-step program timeline per workspace, editable by ADMIN/OWNER/SuperAdmin
+export interface ProgramStep {
+  titleEn: string;
+  titleAr: string;
+}
+
+export const workspaceProgramProgress = pgTable("workspace_program_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().unique().references(() => organizations.id, { onDelete: "cascade" }),
+  currentStep: integer("current_step").notNull().default(1), // 1-based index
+  steps: jsonb("steps").$type<ProgramStep[]>().notNull().default(sql`'[
+    {"titleEn":"Ideation & Business Foundations","titleAr":"الريادة وأسس الأعمال"},
+    {"titleEn":"Product Strategy & Validation","titleAr":"استراتيجية المنتج والتحقق"},
+    {"titleEn":"Product Design & Insights","titleAr":"تصميم المنتج والرؤى"},
+    {"titleEn":"Pitching & Presentation","titleAr":"العرض التقديمي"}
+  ]'::jsonb`),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: varchar("updated_by").references(() => users.id),
+});
+
+export type WorkspaceProgramProgress = typeof workspaceProgramProgress.$inferSelect;
+
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
 export const insertCourseProgressSchema = createInsertSchema(courseProgress).omit({ id: true, lastWatchedAt: true });

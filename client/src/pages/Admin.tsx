@@ -1,11 +1,15 @@
 import React, { useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Settings, Users, BarChart3, List } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertTriangle, Settings, Users, BarChart3, List, CalendarDays } from "lucide-react";
 import WorkspaceSettings from "@/components/admin/WorkspaceSettings";
 import ModuleManagement from "@/components/admin/ModuleManagement";
 import UserManagement from "@/components/admin/UserManagement";
@@ -13,6 +17,149 @@ import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import IdeasOverview from "@/components/admin/IdeasOverview";
 import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
+import toast from "react-hot-toast";
+
+// ─── Program Progress Manager component (used inside Admin) ──────────────────
+
+interface ProgramStep { titleEn: string; titleAr: string; }
+interface ProgramData { orgId: string; currentStep: number; steps: ProgramStep[]; }
+
+const DEFAULT_STEPS: ProgramStep[] = [
+  { titleEn: "Ideation & Business Foundations", titleAr: "الريادة وأسس الأعمال" },
+  { titleEn: "Product Strategy & Validation",   titleAr: "استراتيجية المنتج والتحقق" },
+  { titleEn: "Product Design & Insights",        titleAr: "تصميم المنتج والرؤى" },
+  { titleEn: "Pitching & Presentation",          titleAr: "العرض التقديمي" },
+];
+
+function ProgramProgressManager({ orgId }: { orgId?: string }) {
+  const qc = useQueryClient();
+  const queryKey = ["/api/program-progress", orgId];
+
+  const { data, isLoading } = useQuery<ProgramData>({
+    queryKey,
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${orgId}/program-progress`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!orgId,
+  });
+
+  const [currentStep, setCurrentStep] = useState<number | null>(null);
+  const [steps, setSteps] = useState<ProgramStep[] | null>(null);
+
+  // Initialise local state from fetched data
+  React.useEffect(() => {
+    if (data) {
+      setCurrentStep(data.currentStep);
+      setSteps(data.steps ?? DEFAULT_STEPS);
+    }
+  }, [data]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/organizations/${orgId}/program-progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentStep, steps }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast.success("Program progress saved");
+    },
+    onError: () => toast.error("Failed to save"),
+  });
+
+  const activeSteps = steps ?? DEFAULT_STEPS;
+  const activeCurrentStep = currentStep ?? data?.currentStep ?? 1;
+
+  if (isLoading) {
+    return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <CalendarDays className="w-4 h-4" /> Program Timeline
+        </CardTitle>
+        <CardDescription>
+          Set the active week and customise step titles in English and Arabic. All workspace members will see the updated progress bar.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Current step selector */}
+        <div className="flex items-center gap-4">
+          <Label className="w-40 shrink-0">Active week</Label>
+          <Select
+            value={String(activeCurrentStep)}
+            onValueChange={(v) => setCurrentStep(Number(v))}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {activeSteps.map((_, i) => (
+                <SelectItem key={i} value={String(i + 1)}>
+                  Week {i + 1}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Step editors */}
+        <div className="space-y-4">
+          {activeSteps.map((step, idx) => (
+            <div key={idx} className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+                  idx + 1 === activeCurrentStep ? "border-primary bg-primary text-white" : "border-gray-300 text-gray-400"
+                }`}>
+                  {idx + 1}
+                </div>
+                <span className="text-sm font-medium text-foreground">Week {idx + 1}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">English</Label>
+                  <Input
+                    value={step.titleEn}
+                    onChange={(e) => {
+                      const next = [...activeSteps];
+                      next[idx] = { ...next[idx], titleEn: e.target.value };
+                      setSteps(next);
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Arabic (عربي)</Label>
+                  <Input
+                    dir="rtl"
+                    value={step.titleAr}
+                    onChange={(e) => {
+                      const next = [...activeSteps];
+                      next[idx] = { ...next[idx], titleAr: e.target.value };
+                      setSteps(next);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? "Saving…" : "Save changes"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Admin() {
   const { slug } = useParams();
@@ -130,7 +277,7 @@ export default function Admin() {
 
           {/* Tabbed Interface */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4" data-testid="tabs-admin-navigation">
+             <TabsList className="grid w-full grid-cols-5" data-testid="tabs-admin-navigation">
               <TabsTrigger value="dashboard" className="flex items-center gap-2" data-testid="tab-dashboard">
                 <BarChart3 className="w-4 h-4" />
                 Dashboard
@@ -142,6 +289,10 @@ export default function Admin() {
               <TabsTrigger value="ideas" className="flex items-center gap-2" data-testid="tab-ideas">
                 <List className="w-4 h-4" />
                 Ideas
+              </TabsTrigger>
+              <TabsTrigger value="program" className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4" />
+                Program
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2" data-testid="tab-settings">
                 <Settings className="w-4 h-4" />
@@ -159,6 +310,10 @@ export default function Admin() {
 
             <TabsContent value="ideas" className="space-y-6">
               <IdeasOverview orgId={slug!} />
+            </TabsContent>
+
+            <TabsContent value="program" className="space-y-6">
+              <ProgramProgressManager orgId={currentOrg?.id} />
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">

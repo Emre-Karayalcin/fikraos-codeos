@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import { RatingModal, useAutoRatingTrigger } from "@/components/entrepreneur/RatingModal";
 import {
@@ -11,6 +12,24 @@ import {
   FiBell,
   FiLogOut
 } from "react-icons/fi";
+
+interface ProgramStep {
+  titleEn: string;
+  titleAr: string;
+}
+
+interface ProgramProgress {
+  orgId: string;
+  currentStep: number;
+  steps: ProgramStep[];
+}
+
+const DEFAULT_STEPS: ProgramStep[] = [
+  { titleEn: "Ideation & Business Foundations", titleAr: "الريادة وأسس الأعمال" },
+  { titleEn: "Product Strategy & Validation",   titleAr: "استراتيجية المنتج والتحقق" },
+  { titleEn: "Product Design & Insights",        titleAr: "تصميم المنتج والرؤى" },
+  { titleEn: "Pitching & Presentation",          titleAr: "العرض التقديمي" },
+];
 
 interface CleanCard {
   id: string;
@@ -32,6 +51,26 @@ export default function EntrepreneurDashboard() {
     setShowRatingModal,
     handleSkip,
   } = useAutoRatingTrigger(user?.id || 0);
+
+  // Detect language (ar vs en)
+  const lang = typeof navigator !== "undefined" && navigator.language?.startsWith("ar") ? "ar" : "en";
+
+  // Fetch program progress from DB
+  const { data: programData } = useQuery<ProgramProgress>({
+    queryKey: ["/api/program-progress", (user as any)?.primaryOrgId],
+    queryFn: async () => {
+      const orgId = (user as any)?.primaryOrgId;
+      if (!orgId) throw new Error("No org");
+      const res = await fetch(`/api/organizations/${orgId}/program-progress`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!(user as any)?.primaryOrgId,
+    staleTime: 60_000,
+  });
+
+  const programSteps: ProgramStep[] = programData?.steps ?? DEFAULT_STEPS;
+  const currentStep: number = programData?.currentStep ?? 1; // 1-based
 
   const handleSignOut = () => {
     signOut();
@@ -158,30 +197,73 @@ export default function EntrepreneurDashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
         <div className="page-container space-y-6 py-6 pb-4 relative z-10">
-          {/* Progress Indicator */}
-          <div className="glass-card p-4">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-gradient-to-br from-primary to-primary-hover rounded-full shadow-glow-sm"></div>
-                  <span className="font-medium text-primary">Application Phase</span>
-                </div>
-                <div className="flex items-center space-x-2 opacity-50">
-                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                  <span className="text-muted-foreground">Evaluation</span>
-                </div>
-                <div className="flex items-center space-x-2 opacity-50">
-                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                  <span className="text-muted-foreground">Incubation</span>
-                </div>
-                <div className="flex items-center space-x-2 opacity-50">
-                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                  <span className="text-muted-foreground">Demo Day</span>
-                </div>
-              </div>
-              <div className="text-muted-foreground">
-                Phase 1 of 4 • 45 days remaining
-              </div>
+          {/* Program Progress Bar */}
+          <div className="glass-card px-5 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                {lang === "ar" ? "مراحل البرنامج" : "Program Timeline"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {lang === "ar"
+                  ? `المرحلة ${currentStep} من ${programSteps.length}`
+                  : `Week ${currentStep} of ${programSteps.length}`}
+              </span>
+            </div>
+
+            {/* Step track */}
+            <div className="relative flex items-start justify-between">
+              {/* Base line */}
+              <div className="absolute top-[9px] left-0 right-0 h-[2px] bg-gray-200 rounded-full" />
+              {/* Progress fill */}
+              <div
+                className="absolute top-[9px] left-0 h-[2px] bg-primary rounded-full transition-all duration-500"
+                style={{
+                  width: programSteps.length > 1
+                    ? `${((currentStep - 1) / (programSteps.length - 1)) * 100}%`
+                    : "0%",
+                }}
+              />
+
+              {programSteps.map((step, idx) => {
+                const stepNum = idx + 1;
+                const isDone = stepNum < currentStep;
+                const isActive = stepNum === currentStep;
+                return (
+                  <div key={idx} className="relative z-10 flex flex-col items-center flex-1">
+                    {/* Dot */}
+                    <div
+                      className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all ${
+                        isDone
+                          ? "border-primary bg-primary"
+                          : isActive
+                          ? "border-primary bg-white ring-4 ring-primary/15"
+                          : "border-gray-300 bg-white"
+                      }`}
+                    >
+                      {isDone && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {isActive && (
+                        <div className="w-2 h-2 rounded-full bg-primary" />
+                      )}
+                    </div>
+
+                    {/* Label */}
+                    <div className="mt-2 text-center px-1" style={{ maxWidth: "100px" }}>
+                      <span className={`text-[10px] leading-tight font-medium block ${
+                        isActive ? "text-primary" : isDone ? "text-gray-500" : "text-gray-400"
+                      }`}>
+                        <span className="block text-[9px] font-semibold mb-0.5 opacity-70">
+                          {lang === "ar" ? `أسبوع ${stepNum}` : `Week ${stepNum}`}
+                        </span>
+                        {lang === "ar" ? step.titleAr : step.titleEn}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
