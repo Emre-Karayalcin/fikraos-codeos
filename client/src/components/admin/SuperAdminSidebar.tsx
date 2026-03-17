@@ -16,11 +16,11 @@ const navItems = [
     href: "/admin",
     icon: LayoutDashboard,
   },
-  {
-    title: "Idea Management",
-    href: "/admin/ideas",
-    icon: Kanban,
-  },
+  // {
+  //   title: "Idea Management",
+  //   href: "/admin/ideas",
+  //   icon: Kanban,
+  // },
 ];
 
 export function SuperAdminSidebar({ isCollapsed, onToggle }: SuperAdminSidebarProps) {
