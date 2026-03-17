@@ -4,13 +4,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import MentorDashboard from "./MentorDashboard";
-import { CheckCircle2, Clock, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+
+import { useState } from "react";
 import {
   FiZap,
   FiUsers,
   FiBookOpen,
-  FiBarChart2,
   FiLogOut,
   FiSearch,
   FiStar,
@@ -55,41 +54,6 @@ export default function Dashboard() {
   });
 
   const currentOrg = Array.isArray(organizations) ? organizations[0] : undefined;
-
-  // Fetch user's submitted project to show idea status bar
-  const { data: userProjects } = useQuery<any[]>({
-    queryKey: ['/api/organizations', currentOrg?.id, 'projects-user'],
-    queryFn: async () => {
-      const res = await fetch(`/api/organizations/${currentOrg!.id}/projects-user`, { credentials: 'include' });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!user && !!currentOrg?.id,
-    staleTime: 30_000,
-  });
-
-  const submittedProjects = Array.isArray(userProjects)
-    ? userProjects.filter((p: any) => p.submitted)
-    : [];
-
-  const [activeSlide, setActiveSlide] = useState(0);
-  const slideTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (submittedProjects.length <= 1) return;
-    slideTimer.current = setInterval(() => {
-      setActiveSlide(prev => (prev + 1) % submittedProjects.length);
-    }, 4000);
-    return () => { if (slideTimer.current) clearInterval(slideTimer.current); };
-  }, [submittedProjects.length]);
-
-  const goToSlide = (idx: number) => {
-    setActiveSlide(idx);
-    if (slideTimer.current) clearInterval(slideTimer.current);
-    slideTimer.current = setInterval(() => {
-      setActiveSlide(prev => (prev + 1) % submittedProjects.length);
-    }, 4000);
-  };
 
   const { data: userRole, isLoading: roleLoading } = useQuery<{ role: string } | null>({
     queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'check-role'],
@@ -142,9 +106,7 @@ export default function Dashboard() {
 
   const showPopup =
     !popupDismissed &&
-    myApplication != null &&
-    Array.isArray(userProjects) &&
-    userProjects.length === 0;
+    myApplication != null;
 
   const dismissPopup = () => {
     sessionStorage.setItem('onboarding_popup_shown', '1');
@@ -326,9 +288,9 @@ export default function Dashboard() {
         </div>
       </DialogContent>
     </Dialog>
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #e8eeff 40%, #ede8ff 100%)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e8eeff 50%, #ede8ff 100%)' }}>
       {/* Header */}
-      <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 1px 12px rgba(0,0,0,0.06)' }}>
+      <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.80)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(200,210,255,0.35)', boxShadow: '0 1px 16px rgba(24,80,238,0.06)' }}>
         {/* Logo */}
         <div className="flex items-center gap-1.5">
           <img src="/codelogo.png" alt="Logo" className="h-7 object-contain dark:hidden" style={{ display: 'block', marginTop: '-2px' }} loading="eager" />
@@ -360,6 +322,13 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Background Gradient Blobs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+        <div className="absolute top-20 left-10 w-96 h-96 rounded-full blur-3xl" style={{ background: 'rgba(24, 80, 238, 0.12)' }}></div>
+        <div className="absolute top-40 right-20 w-80 h-80 rounded-full blur-3xl" style={{ background: 'rgba(39, 75, 219, 0.15)' }}></div>
+        <div className="absolute bottom-20 left-1/4 w-72 h-72 rounded-full blur-3xl" style={{ background: 'rgba(24, 80, 238, 0.10)' }}></div>
+      </div>
+
       {/* 3D Orb - Fixed to Bottom of Viewport */}
       <div className="absolute left-1/2 pointer-events-none" style={{
         bottom: '-450px',
@@ -372,192 +341,50 @@ export default function Dashboard() {
         <OrbVisualization state="idle" size={1000} />
       </div>
 
-      {/* Background Gradient Blobs */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
-        <div className="absolute top-20 left-10 w-96 h-96 rounded-full blur-3xl" style={{ background: 'rgba(24, 80, 238, 0.10)' }}></div>
-        <div className="absolute top-40 right-20 w-80 h-80 rounded-full blur-3xl" style={{ background: 'rgba(99, 74, 219, 0.12)' }}></div>
-        <div className="absolute bottom-20 left-1/4 w-72 h-72 rounded-full blur-3xl" style={{ background: 'rgba(24, 80, 238, 0.08)' }}></div>
-      </div>
-
       {/* Main Content */}
       <main className="flex-1 overflow-auto relative">
         <div className="max-w-7xl mx-auto px-6 space-y-6 py-6 pb-4 relative z-10">
 
-          {/* Program Timeline — DB-backed 4-step progress bar */}
+          {/* Program Timeline — DB-backed, horizontal dot style */}
           <div
-            className="relative z-10 mx-auto w-full max-w-2xl rounded-xl px-5 py-3"
+            className="relative z-10 mx-auto w-full max-w-2xl rounded-xl px-5 py-4"
             style={{
-              background: 'rgba(255,255,255,0.85)',
-              backdropFilter: 'blur(16px)',
+              background: 'rgba(255,255,255,0.80)',
+              backdropFilter: 'blur(20px)',
               border: '1px solid rgba(255,255,255,0.6)',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 16px rgba(24,80,238,0.07)',
             }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                {lang === 'ar' ? 'مراحل البرنامج' : 'Program Timeline'}
-              </span>
-              <span className="text-[11px] text-gray-400">
-                {lang === 'ar' ? `الأسبوع ${currentProgramStep} من ${programSteps.length}` : `Week ${currentProgramStep} of ${programSteps.length}`}
-              </span>
-            </div>
-            <div className="relative flex items-start justify-between">
-              <div className="absolute top-[5px] left-0 right-0 h-px bg-gray-200" />
-              <div
-                className="absolute top-[5px] left-0 h-px bg-primary transition-all duration-500"
-                style={{ width: `${currentProgramStep === 1 ? 0 : ((currentProgramStep - 1) / (programSteps.length - 1)) * 100}%` }}
-              />
-              {programSteps.map((step, idx) => {
-                const isDone = idx + 1 < currentProgramStep;
-                const isActive = idx + 1 === currentProgramStep;
-                return (
-                  <div key={idx} className="relative z-10 flex flex-col items-center" style={{ flex: 1, maxWidth: '25%' }}>
-                    <div className={`w-2.5 h-2.5 rounded-full border-2 transition-all ${
-                      isDone ? 'border-primary bg-primary' :
-                      isActive ? 'border-primary bg-white ring-2 ring-primary/20' :
-                      'border-gray-300 bg-white'
-                    }`} />
-                    <span className={`mt-1.5 text-[9px] font-bold block text-center ${
-                      isActive ? 'text-primary' : isDone ? 'text-gray-500' : 'text-gray-400'
-                    }`}>
-                      {lang === 'ar' ? `أسبوع ${idx + 1}` : `Week ${idx + 1}`}
-                    </span>
-                    <span className={`text-[9px] text-center leading-tight px-0.5 ${
-                      isActive ? 'text-primary/80' : 'text-gray-400'
-                    }`} style={{ maxWidth: '70px' }}>
-                      {lang === 'ar' ? step.titleAr : step.titleEn}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-6">
+                {programSteps.map((step, idx) => {
+                  const isActive = idx + 1 === currentProgramStep;
+                  const isDone = idx + 1 < currentProgramStep;
+                  return (
+                    <div key={idx} className={`flex items-center space-x-2 ${!isActive && !isDone ? 'opacity-50' : ''}`}>
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                        isDone
+                          ? 'bg-primary shadow-sm'
+                          : isActive
+                          ? 'bg-gradient-to-br from-primary to-primary/70 shadow-[0_0_6px_rgba(24,80,238,0.45)]'
+                          : 'bg-gray-300'
+                      }`} />
+                      <span className={`font-medium whitespace-nowrap ${
+                        isActive ? 'text-primary' : isDone ? 'text-gray-600' : 'text-gray-400'
+                      }`}>
+                        {lang === 'ar' ? step.titleAr : step.titleEn}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="text-gray-400 text-xs flex-shrink-0 ml-4">
+                {lang === 'ar'
+                  ? `أسبوع ${currentProgramStep} من ${programSteps.length}`
+                  : `Week ${currentProgramStep} of ${programSteps.length}`}
+              </div>
             </div>
           </div>
-
-          {/* Submitted Ideas Status Bar — auto-slides when multiple */}
-          {submittedProjects.length > 0 && (() => {
-            const STEPS = [
-              { key: 'BACKLOG',       label: 'Backlog' },
-              { key: 'UNDER_REVIEW',  label: 'Under Review' },
-              { key: 'SHORTLISTED',   label: 'Shortlisted' },
-              { key: 'IN_INCUBATION', label: 'In Incubation' },
-            ];
-            const currentSlideIdx = activeSlide % submittedProjects.length;
-            const submittedProject = submittedProjects[currentSlideIdx];
-            const status = submittedProject.status || 'BACKLOG';
-            const isArchived = status === 'ARCHIVED';
-            const currentIdx = STEPS.findIndex(s => s.key === status);
-            const activeIdx = currentIdx === -1 ? 0 : currentIdx;
-            const phaseNum = activeIdx + 1;
-            const totalSteps = STEPS.length;
-            const fillPct = activeIdx === 0 ? 0 : (activeIdx / (totalSteps - 1)) * 100;
-            const multi = submittedProjects.length > 1;
-
-            return (
-              <div
-                className="relative z-10 mx-auto w-full max-w-2xl rounded-xl px-5 py-3 mb-2"
-                style={{
-                  background: 'rgba(255,255,255,0.85)',
-                  backdropFilter: 'blur(16px)',
-                  border: '1px solid rgba(255,255,255,0.6)',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                }}
-              >
-                {/* Header row */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {/* Prev arrow */}
-                    {multi && (
-                      <button
-                        onClick={() => goToSlide((currentSlideIdx - 1 + submittedProjects.length) % submittedProjects.length)}
-                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-                      >
-                        <ChevronLeft className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                    )}
-                    {isArchived ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 flex-shrink-0">
-                        Archived
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5 flex-shrink-0">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Submitted
-                      </span>
-                    )}
-                    <span className="text-sm font-medium text-gray-700 truncate">{submittedProject.title}</span>
-                    {/* Next arrow */}
-                    {multi && (
-                      <button
-                        onClick={() => goToSlide((currentSlideIdx + 1) % submittedProjects.length)}
-                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-                      >
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Dot indicators */}
-                    {multi && (
-                      <div className="flex items-center gap-1">
-                        {submittedProjects.map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => goToSlide(i)}
-                            className={`w-1.5 h-1.5 rounded-full transition-all ${
-                              i === currentSlideIdx ? 'bg-primary' : 'bg-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {!isArchived && (
-                      <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Phase {phaseNum} of {totalSteps}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Step track */}
-                <div className="relative flex items-start justify-between">
-                  <div className="absolute top-[5px] left-0 right-0 h-px bg-gray-200" />
-                  {!isArchived && (
-                    <div
-                      className="absolute top-[5px] left-0 h-px bg-primary transition-all duration-500"
-                      style={{ width: `${fillPct}%` }}
-                    />
-                  )}
-                  {STEPS.map((step, idx) => {
-                    const isDone = idx < activeIdx;
-                    const isActive = idx === activeIdx && !isArchived;
-                    return (
-                      <div key={step.key} className="relative z-10 flex flex-col items-center" style={{ minWidth: 0 }}>
-                        <div
-                          className={`w-2.5 h-2.5 rounded-full border-2 transition-all ${
-                            isArchived
-                              ? 'border-gray-300 bg-gray-200'
-                              : isDone
-                              ? 'border-primary bg-primary'
-                              : isActive
-                              ? 'border-primary bg-white ring-2 ring-primary/20'
-                              : 'border-gray-300 bg-white'
-                          }`}
-                        />
-                        <span
-                          className={`mt-1.5 text-[10px] font-medium whitespace-nowrap ${
-                            isArchived ? 'text-gray-400' : isActive ? 'text-primary' : isDone ? 'text-gray-500' : 'text-gray-400'
-                          }`}
-                        >
-                          {step.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
 
           {/* Welcome Section */}
           <div className="text-center py-12 relative min-h-[180px]">
