@@ -771,4 +771,70 @@ export function registerSuperAdminRoutes(app: Express) {
       res.status(500).json({ message: "Failed to start re-screening" });
     }
   });
+
+  // ── Kanban / Idea Management (Super Admin) ────────────────────────────────
+
+  // GET /api/super-admin/kanban/ideas — fetch ideas for a workspace or challenge
+  app.get("/api/super-admin/kanban/ideas", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { orgId, challengeId } = req.query as { orgId?: string; challengeId?: string };
+
+      let conditions: any[] = [];
+      if (challengeId) {
+        conditions.push(eq(projects.challengeId, challengeId));
+      } else if (orgId) {
+        conditions.push(eq(projects.orgId, orgId));
+      } else {
+        return res.status(400).json({ error: "orgId or challengeId is required" });
+      }
+
+      const results = await db
+        .select({
+          idea: projects,
+          owner: {
+            id: users.id,
+            username: users.username,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          },
+        })
+        .from(projects)
+        .leftJoin(users, eq(projects.createdById, users.id))
+        .where(and(...conditions))
+        .orderBy(desc(projects.createdAt));
+
+      res.json({ data: results });
+    } catch (error) {
+      console.error("Error fetching super-admin kanban ideas:", error);
+      res.status(500).json({ error: "Failed to fetch ideas" });
+    }
+  });
+
+  // PATCH /api/super-admin/kanban/ideas/:id/status — update idea status
+  app.patch("/api/super-admin/kanban/ideas/:id/status", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body as { status: string };
+
+      const VALID_STATUSES = ["BACKLOG", "UNDER_REVIEW", "SHORTLISTED", "IN_INCUBATION", "ARCHIVED"];
+      if (!status || !VALID_STATUSES.includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const [project] = await db.select().from(projects).where(eq(projects.id, id));
+      if (!project) return res.status(404).json({ error: "Idea not found" });
+
+      const [updated] = await db
+        .update(projects)
+        .set({ status: status as any, updatedAt: new Date() })
+        .where(eq(projects.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating idea status:", error);
+      res.status(500).json({ error: "Failed to update status" });
+    }
+  });
 }

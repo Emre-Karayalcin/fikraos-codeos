@@ -38,9 +38,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, Pencil, Trash2, Plus, X, UserPlus, Trophy, CalendarDays, ClipboardList, RefreshCw } from "lucide-react";
+import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, Pencil, Trash2, Plus, X, UserPlus, Trophy, CalendarDays, ClipboardList, RefreshCw, Kanban } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
+import { SuperAdminIdeasKanban } from "@/components/admin/SuperAdminIdeasKanban";
 import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
 
@@ -135,7 +136,7 @@ interface SuperAdminEvent {
   createdAt: string;
 }
 
-type Tab = "workspaces" | "users" | "ideas" | "challenges" | "events" | "applications";
+type Tab = "workspaces" | "users" | "ideas" | "challenges" | "events" | "applications" | "kanban";
 
 interface SuperAdminApplication {
   application: {
@@ -622,6 +623,7 @@ export default function SuperAdminDashboard() {
     { key: "challenges", label: "Challenges" },
     { key: "events", label: "Events" },
     { key: "applications", label: "Applications" },
+    { key: "kanban", label: "Idea Kanban" },
   ];
 
   return (
@@ -1093,6 +1095,19 @@ export default function SuperAdminDashboard() {
           )}
 
           {/* ── Challenges table ─────────────────────────────────────────── */}
+          {activeTab === "kanban" && (
+            <Card className="border border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Kanban className="w-4 h-4" /> Idea Kanban
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SuperAdminIdeasKanban workspaces={sortedWorkspaces} />
+              </CardContent>
+            </Card>
+          )}
+
           {activeTab === "challenges" && (
             <Card className="border border-border/50">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
