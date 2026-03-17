@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Kanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
@@ -15,6 +15,11 @@ const navItems = [
     title: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Idea Management",
+    href: "/admin/ideas",
+    icon: Kanban,
   },
 ];
 

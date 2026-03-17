@@ -49,6 +49,7 @@ import { WorkspaceGuard } from "@/components/WorkspaceGuard";
 import { AdminGuard } from "@/components/AdminGuard";
 import { SuperAdminGuard } from "@/components/SuperAdminGuard";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
+import SuperAdminIdeasPage from "@/pages/SuperAdminIdeasPage";
 import SuperAdminLogin from "@/pages/SuperAdminLogin";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
@@ -279,6 +280,12 @@ function Router() {
       <Route path="/admin" component={() => (
         <PageTransition>
           <SuperAdminGuard><SuperAdminDashboard /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/ideas" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminIdeasPage /></SuperAdminGuard>
         </PageTransition>
       )} />
 
