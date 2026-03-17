@@ -942,8 +942,12 @@ export function registerRoutes(app: Express): Server {
     try {
       const { orgId } = req.params;
       const userId = req.user.id;
-      const role = await storage.getUserRole(userId, orgId);
-      if (!role) return res.status(403).json({ message: 'Access denied' });
+      const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS || '').split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean);
+      const isSuperAdmin = superAdminEmails.includes((req.user.email || '').toLowerCase());
+      if (!isSuperAdmin) {
+        const role = await storage.getUserRole(userId, orgId);
+        if (!role) return res.status(403).json({ message: 'Access denied' });
+      }
       const progress = await storage.getProgramProgress(orgId);
       // Return defaults if not yet configured
       if (!progress) {
@@ -965,14 +969,18 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // PATCH /api/organizations/:orgId/program-progress — Admin/Owner only
+  // PATCH /api/organizations/:orgId/program-progress — Admin/Owner or Super Admin
   app.patch('/api/organizations/:orgId/program-progress', isAuthenticated, async (req: any, res) => {
     try {
       const { orgId } = req.params;
       const userId = req.user.id;
-      const role = await storage.getUserRole(userId, orgId);
-      if (!role || (role !== 'ADMIN' && role !== 'OWNER')) {
-        return res.status(403).json({ message: 'Admin or Owner access required' });
+      const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS || '').split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean);
+      const isSuperAdmin = superAdminEmails.includes((req.user.email || '').toLowerCase());
+      if (!isSuperAdmin) {
+        const role = await storage.getUserRole(userId, orgId);
+        if (!role || (role !== 'ADMIN' && role !== 'OWNER')) {
+          return res.status(403).json({ message: 'Admin or Owner access required' });
+        }
       }
       const { currentStep, steps } = req.body;
       if (currentStep !== undefined && (typeof currentStep !== 'number' || currentStep < 1 || currentStep > 4)) {
