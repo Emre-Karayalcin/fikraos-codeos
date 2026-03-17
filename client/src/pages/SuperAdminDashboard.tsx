@@ -236,6 +236,7 @@ export default function SuperAdminDashboard() {
   // Modal state
   const [wsModal, setWsModal] = useState<{ mode: "create" | "edit"; workspace?: Workspace } | null>(null);
   const [deleteWs, setDeleteWs] = useState<Workspace | null>(null);
+  const [progModal, setProgModal] = useState<Workspace | null>(null);
   const [userModalId, setUserModalId] = useState<string | null>(null);
   const [challengeModal, setChallengeModal] = useState<{ mode: "create" | "edit"; challenge?: SuperAdminChallenge } | null>(null);
   const [deleteChallenge, setDeleteChallenge] = useState<SuperAdminChallenge | null>(null);
@@ -761,6 +762,13 @@ export default function SuperAdminDashboard() {
                                   title="Edit workspace"
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary"
+                                  onClick={() => setProgModal(w)}
+                                  title="Manage program timeline"
+                                >
+                                  <CalendarDays className="w-3.5 h-3.5" />
                                 </Button>
                                 <Button
                                   variant="ghost" size="icon"
@@ -1311,6 +1319,13 @@ export default function SuperAdminDashboard() {
       )}
 
       {/* ── Edit User Modal ───────────────────────────────────────────────── */}
+      {progModal && (
+        <ProgTimelineModal
+          workspace={progModal}
+          onClose={() => setProgModal(null)}
+        />
+      )}
+
       {userForModal && (
         <UserModal
           user={userForModal}
@@ -1340,6 +1355,149 @@ function Spinner() {
     <div className="flex items-center justify-center h-40">
       <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
+  );
+}
+
+// ─── Program Timeline Modal (Super Admin) ────────────────────────────────────
+
+interface PStep { titleEn: string; titleAr: string; }
+interface ProgData { orgId: string; currentStep: number; steps: PStep[]; }
+
+const DEFAULT_PROG_STEPS: PStep[] = [
+  { titleEn: "Ideation & Business Foundations", titleAr: "الريادة وأسس الأعمال" },
+  { titleEn: "Product Strategy & Validation",   titleAr: "استراتيجية المنتج والتحقق" },
+  { titleEn: "Product Design & Insights",       titleAr: "تصميم المنتج والرؤى" },
+  { titleEn: "Pitching & Presentation",         titleAr: "العرض التقديمي" },
+];
+
+function ProgTimelineModal({ workspace, onClose }: { workspace: Workspace; onClose: () => void }) {
+  const qc = useQueryClient();
+  const queryKey = ["/api/program-progress", workspace.id];
+
+  const { data, isLoading } = useQuery<ProgData>({
+    queryKey,
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${workspace.id}/program-progress`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const [currentStep, setCurrentStep] = React.useState<number | null>(null);
+  const [steps, setSteps] = React.useState<PStep[] | null>(null);
+
+  React.useEffect(() => {
+    if (data) {
+      setCurrentStep(data.currentStep);
+      setSteps(data.steps ?? DEFAULT_PROG_STEPS);
+    }
+  }, [data]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/organizations/${workspace.id}/program-progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentStep, steps }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast.success("Program progress saved");
+      onClose();
+    },
+    onError: () => toast.error("Failed to save"),
+  });
+
+  const activeSteps = steps ?? DEFAULT_PROG_STEPS;
+  const activeCurrentStep = currentStep ?? data?.currentStep ?? 1;
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4" />
+            Program Timeline — {workspace.name}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-6 py-2">
+            {/* Active week selector */}
+            <div className="flex items-center gap-4">
+              <Label className="w-36 shrink-0">Active week</Label>
+              <Select
+                value={String(activeCurrentStep)}
+                onValueChange={(v) => setCurrentStep(Number(v))}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeSteps.map((_, i) => (
+                    <SelectItem key={i} value={String(i + 1)}>Week {i + 1}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step editors */}
+            <div className="space-y-3">
+              {activeSteps.map((step, idx) => (
+                <div key={idx} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold ${
+                      idx + 1 === activeCurrentStep ? "border-primary bg-primary text-white" : "border-gray-300 text-gray-400"
+                    }`}>{idx + 1}</div>
+                    <span className="text-sm font-medium">Week {idx + 1}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">English</Label>
+                      <Input
+                        value={step.titleEn}
+                        onChange={(e) => {
+                          const next = [...activeSteps];
+                          next[idx] = { ...next[idx], titleEn: e.target.value };
+                          setSteps(next);
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Arabic (عربي)</Label>
+                      <Input
+                        dir="rtl"
+                        value={step.titleAr}
+                        onChange={(e) => {
+                          const next = [...activeSteps];
+                          next[idx] = { ...next[idx], titleAr: e.target.value };
+                          setSteps(next);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || isLoading}>
+            {save.isPending ? "Saving…" : "Save changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
