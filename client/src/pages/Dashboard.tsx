@@ -29,6 +29,16 @@ interface DashboardCard {
   path: string;
 }
 
+interface ProgramStep { titleEn: string; titleAr: string; }
+interface ProgramProgress { orgId: string; currentStep: number; steps: ProgramStep[]; }
+
+const DEFAULT_PROGRAM_STEPS: ProgramStep[] = [
+  { titleEn: "Ideation & Business Foundations", titleAr: "الريادة وأسس الأعمال" },
+  { titleEn: "Product Strategy & Validation",   titleAr: "استراتيجية المنتج والتحقق" },
+  { titleEn: "Product Design & Insights",       titleAr: "تصميم المنتج والرؤى" },
+  { titleEn: "Pitching & Presentation",         titleAr: "العرض التقديمي" },
+];
+
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, logout } = useAuth();
@@ -92,6 +102,22 @@ export default function Dashboard() {
     enabled: !!user && !!currentOrg?.id,
     retry: false,
   });
+
+  // Fetch program timeline progress
+  const { data: programData } = useQuery<ProgramProgress>({
+    queryKey: ['/api/program-progress', currentOrg?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${currentOrg!.id}/program-progress`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    enabled: !!currentOrg?.id,
+    staleTime: 60_000,
+  });
+
+  const programSteps: ProgramStep[] = programData?.steps ?? DEFAULT_PROGRAM_STEPS;
+  const currentProgramStep: number = programData?.currentStep ?? 1;
+  const lang = typeof navigator !== 'undefined' && navigator.language?.startsWith('ar') ? 'ar' : 'en';
 
   const isMentor = userRole?.role === 'MENTOR';
   // If user is already known to be admin (from /api/user response), skip spinner
@@ -356,6 +382,56 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="flex-1 overflow-auto relative">
         <div className="max-w-7xl mx-auto px-6 space-y-6 py-6 pb-4 relative z-10">
+
+          {/* Program Timeline — DB-backed 4-step progress bar */}
+          <div
+            className="relative z-10 mx-auto w-full max-w-2xl rounded-xl px-5 py-3"
+            style={{
+              background: 'rgba(255,255,255,0.85)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255,255,255,0.6)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                {lang === 'ar' ? 'مراحل البرنامج' : 'Program Timeline'}
+              </span>
+              <span className="text-[11px] text-gray-400">
+                {lang === 'ar' ? `الأسبوع ${currentProgramStep} من ${programSteps.length}` : `Week ${currentProgramStep} of ${programSteps.length}`}
+              </span>
+            </div>
+            <div className="relative flex items-start justify-between">
+              <div className="absolute top-[5px] left-0 right-0 h-px bg-gray-200" />
+              <div
+                className="absolute top-[5px] left-0 h-px bg-primary transition-all duration-500"
+                style={{ width: `${currentProgramStep === 1 ? 0 : ((currentProgramStep - 1) / (programSteps.length - 1)) * 100}%` }}
+              />
+              {programSteps.map((step, idx) => {
+                const isDone = idx + 1 < currentProgramStep;
+                const isActive = idx + 1 === currentProgramStep;
+                return (
+                  <div key={idx} className="relative z-10 flex flex-col items-center" style={{ flex: 1, maxWidth: '25%' }}>
+                    <div className={`w-2.5 h-2.5 rounded-full border-2 transition-all ${
+                      isDone ? 'border-primary bg-primary' :
+                      isActive ? 'border-primary bg-white ring-2 ring-primary/20' :
+                      'border-gray-300 bg-white'
+                    }`} />
+                    <span className={`mt-1.5 text-[9px] font-bold block text-center ${
+                      isActive ? 'text-primary' : isDone ? 'text-gray-500' : 'text-gray-400'
+                    }`}>
+                      {lang === 'ar' ? `أسبوع ${idx + 1}` : `Week ${idx + 1}`}
+                    </span>
+                    <span className={`text-[9px] text-center leading-tight px-0.5 ${
+                      isActive ? 'text-primary/80' : 'text-gray-400'
+                    }`} style={{ maxWidth: '70px' }}>
+                      {lang === 'ar' ? step.titleAr : step.titleEn}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Submitted Ideas Status Bar — auto-slides when multiple */}
           {submittedProjects.length > 0 && (() => {
