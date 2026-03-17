@@ -98,7 +98,7 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className="w-[300px] shrink-0 flex flex-col bg-muted/40 rounded-lg p-4"
+      className="w-[300px] shrink-0 flex flex-col bg-muted/40 rounded-lg p-4 min-h-[500px]"
     >
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-3 h-3 rounded-full ${color}`} />
@@ -388,8 +388,8 @@ export function SuperAdminIdeasKanban({ workspaces }: Props) {
           collisionDetection={closestCorners}
           onDragEnd={handleDragEnd}
         >
-          <div className="overflow-x-auto pb-2">
-            <div className="flex gap-3 min-w-max">
+          <div className="overflow-x-auto overflow-y-auto pb-2">
+            <div className="flex gap-3 min-w-max items-start">
               {STATUSES.map((status) => {
                 const col = getByStatus(status.id);
                 return (

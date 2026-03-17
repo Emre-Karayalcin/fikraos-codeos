@@ -58,7 +58,7 @@ export function SuperAdminSidebar({ isCollapsed, onToggle }: SuperAdminSidebarPr
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.href;
@@ -67,7 +67,7 @@ export function SuperAdminSidebar({ isCollapsed, onToggle }: SuperAdminSidebarPr
             <Link key={item.href} href={item.href}>
               <a
                 className={cn(
-                  "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md transition-colors text-sm",
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors text-sm",
                   "hover:bg-accent hover:text-accent-foreground",
                   isActive && "bg-primary text-primary-foreground hover:bg-primary/90",
                   isCollapsed && "justify-center"
