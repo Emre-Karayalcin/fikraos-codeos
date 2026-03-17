@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { Building2, Save } from 'lucide-react';
+import { ProgramProgressManager } from '@/components/admin/ProgramProgressManager';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { getCsrfToken } from '@/lib/csrf';
@@ -562,6 +563,10 @@ export default function AdminWorkspace() {
             {/* Save Button */}
             {/* keep form without inline save - Save is fixed to viewport */}
            </form>
+
+          {/* Program Timeline */}
+          <ProgramProgressManager orgId={workspace?.id} />
+
          </div>
        </div>
 
