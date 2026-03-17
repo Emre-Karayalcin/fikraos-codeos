@@ -98,7 +98,7 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-1 min-w-[280px] flex flex-col bg-muted/40 rounded-lg p-4"
+      className="w-[300px] shrink-0 flex flex-col bg-muted/40 rounded-lg p-4"
     >
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-3 h-3 rounded-full ${color}`} />
@@ -341,12 +341,12 @@ export function SuperAdminIdeasKanban({ workspaces }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground font-medium">Filter:</span>
+          <span className="text-sm text-muted-foreground font-medium">Challenge:</span>
           <Select
             value={selectedChallengeId}
             onValueChange={setSelectedChallengeId}
           >
-            <SelectTrigger className="w-56">
+            <SelectTrigger className="w-64">
               <SelectValue placeholder="All workspace ideas" />
             </SelectTrigger>
             <SelectContent>
