@@ -288,7 +288,7 @@ export default function Dashboard() {
         </div>
       </DialogContent>
     </Dialog>
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e8eeff 50%, #ede8ff 100%)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 40%, #f3f0ff 100%)' }}>
       {/* Header */}
       <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.80)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(200,210,255,0.35)', boxShadow: '0 1px 16px rgba(24,80,238,0.06)' }}>
         {/* Logo */}
@@ -343,7 +343,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
-        <div className="max-w-7xl mx-auto px-6 space-y-6 py-6 pb-4 relative z-10">
+        <div className="mx-auto px-12 space-y-6 py-6 pb-4 relative z-10">
 
           {/* Progress Indicator */}
           <div style={{
@@ -352,7 +352,7 @@ export default function Dashboard() {
             WebkitBackdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.6)',
             boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-            borderRadius: '16px',
+            borderRadius: '30px',
             padding: '16px',
           }}>
             <div className="flex items-center justify-between text-sm">
