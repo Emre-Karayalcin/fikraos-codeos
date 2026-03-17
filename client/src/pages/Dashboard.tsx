@@ -290,7 +290,9 @@ export default function Dashboard() {
     </Dialog>
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e8eeff 50%, #ede8ff 100%)' }}>
       {/* Header */}
-      <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.80)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(200,210,255,0.35)', boxShadow: '0 1px 16px rgba(24,80,238,0.06)' }}>
+      <header className="sticky top-0 z-50" style={{ background: 'rgba(255,255,255,0.80)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(200,210,255,0.35)', boxShadow: '0 1px 16px rgba(24,80,238,0.06)' }}>
+        {/* Top row: logo + user */}
+        <div className="h-16 flex items-center justify-between px-6">
         {/* Logo */}
         <div className="flex items-center gap-1.5">
           <img src="/codelogo.png" alt="Logo" className="h-7 object-contain dark:hidden" style={{ display: 'block', marginTop: '-2px' }} loading="eager" />
@@ -320,6 +322,40 @@ export default function Dashboard() {
             <FiLogOut size={20} className="text-gray-600" />
           </button>
         </div>
+        </div>
+
+        {/* Program Timeline row */}
+        <div className="px-6 pb-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-6">
+              {programSteps.map((step, idx) => {
+                const isActive = idx + 1 === currentProgramStep;
+                const isDone = idx + 1 < currentProgramStep;
+                return (
+                  <div key={idx} className={`flex items-center space-x-2 ${!isActive && !isDone ? 'opacity-50' : ''}`}>
+                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                      isDone
+                        ? 'bg-primary'
+                        : isActive
+                        ? 'bg-gradient-to-br from-primary to-primary/70 shadow-[0_0_6px_rgba(24,80,238,0.4)]'
+                        : 'bg-gray-300'
+                    }`} />
+                    <span className={`font-medium whitespace-nowrap ${
+                      isActive ? 'text-primary' : isDone ? 'text-gray-600' : 'text-gray-400'
+                    }`}>
+                      {lang === 'ar' ? step.titleAr : step.titleEn}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-gray-400 text-xs flex-shrink-0 ml-4">
+              {lang === 'ar'
+                ? `أسبوع ${currentProgramStep} من ${programSteps.length}`
+                : `Week ${currentProgramStep} of ${programSteps.length}`}
+            </div>
+          </div>
+        </div>
       </header>
 
       {/* Background Gradient Blobs */}
@@ -342,49 +378,8 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto relative">
+      <main className="flex-1 overflow-hidden relative">
         <div className="max-w-7xl mx-auto px-6 space-y-6 py-6 pb-4 relative z-10">
-
-          {/* Program Timeline — DB-backed, horizontal dot style */}
-          <div
-            className="relative z-10 mx-auto w-full max-w-2xl rounded-xl px-5 py-4"
-            style={{
-              background: 'rgba(255,255,255,0.80)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.6)',
-              boxShadow: '0 2px 16px rgba(24,80,238,0.07)',
-            }}
-          >
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center space-x-6">
-                {programSteps.map((step, idx) => {
-                  const isActive = idx + 1 === currentProgramStep;
-                  const isDone = idx + 1 < currentProgramStep;
-                  return (
-                    <div key={idx} className={`flex items-center space-x-2 ${!isActive && !isDone ? 'opacity-50' : ''}`}>
-                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                        isDone
-                          ? 'bg-primary shadow-sm'
-                          : isActive
-                          ? 'bg-gradient-to-br from-primary to-primary/70 shadow-[0_0_6px_rgba(24,80,238,0.45)]'
-                          : 'bg-gray-300'
-                      }`} />
-                      <span className={`font-medium whitespace-nowrap ${
-                        isActive ? 'text-primary' : isDone ? 'text-gray-600' : 'text-gray-400'
-                      }`}>
-                        {lang === 'ar' ? step.titleAr : step.titleEn}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="text-gray-400 text-xs flex-shrink-0 ml-4">
-                {lang === 'ar'
-                  ? `أسبوع ${currentProgramStep} من ${programSteps.length}`
-                  : `Week ${currentProgramStep} of ${programSteps.length}`}
-              </div>
-            </div>
-          </div>
 
           {/* Welcome Section */}
           <div className="text-center py-12 relative min-h-[180px]">
