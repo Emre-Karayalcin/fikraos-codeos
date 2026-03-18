@@ -228,12 +228,6 @@ function LengthOption({
 // Uses real SlideSpeak S3 thumbnail images (cover shown by default, content on hover)
 const TEMPLATES: Array<{ id: string; label: string; cover: string; content: string }> = [
   {
-    id: "cmm1wzc65002pjn04a14llb35",
-    label: "SAB",
-    cover: "https://my.xelerate-sa.com/images/cover-sab.png",
-    content: "https://my.xelerate-sa.com/images/content-sab.png",
-  },
-  {
     id: "default",
     label: "Default",
     cover: "https://slidespeak-files.s3.amazonaws.com/default-cover_2025-04-03_12-37-38.jpg",
