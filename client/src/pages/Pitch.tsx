@@ -521,9 +521,17 @@ function CreatePitchDialog({
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [slideLength, setSlideLength] = useState(6);
   const [tone, setTone] = useState("professional");
+  const [verbosity, setVerbosity] = useState("standard");
+  const [language, setLanguage] = useState("ORIGINAL");
+  const [speakerNotes, setSpeakerNotes] = useState(false);
+  const [fetchImages, setFetchImages] = useState(true);
+  const [stockImages, setStockImages] = useState(false);
+  const [useBrandedLogo, setUseBrandedLogo] = useState(false);
+  const [contentExpansion, setContentExpansion] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState("cmm1wzc65002pjn04a14llb35");
   const [customInstructions, setCustomInstructions] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [overwriteConfirm, setOverwriteConfirm] = useState<{ pendingId: string; description: string } | null>(null);
 
   const { data: organizations } = useQuery<any[]>({
     queryKey: ["/api/organizations"],
@@ -549,6 +557,13 @@ function CreatePitchDialog({
       setSelectedProjectId("");
       setSlideLength(6);
       setTone("professional");
+      setVerbosity("standard");
+      setLanguage("ORIGINAL");
+      setSpeakerNotes(false);
+      setFetchImages(true);
+      setStockImages(false);
+      setUseBrandedLogo(false);
+      setContentExpansion(true);
       setSelectedTemplate("cmm1wzc65002pjn04a14llb35");
       setCustomInstructions("");
       setError(null);
@@ -563,6 +578,13 @@ function CreatePitchDialog({
         length: slideLength,
         tone,
         template: selectedTemplate,
+        verbosity,
+        language,
+        speaker_notes: speakerNotes,
+        fetch_images: fetchImages,
+        stock_images: stockImages,
+        use_branded_logo: useBrandedLogo,
+        content_expansion: contentExpansion,
       };
       if (customInstructions.trim()) {
         body.custom_user_instructions = customInstructions.trim();
@@ -589,6 +611,21 @@ function CreatePitchDialog({
     },
   });
 
+  function handleProjectSelect(projectId: string) {
+    const project = Array.isArray(projects) ? projects.find((p) => p.id === projectId) : undefined;
+    const description = project?.description?.trim() ?? "";
+    if (description) {
+      if (topic.trim()) {
+        setOverwriteConfirm({ pendingId: projectId, description });
+      } else {
+        setSelectedProjectId(projectId);
+        setTopic(description);
+      }
+    } else {
+      setSelectedProjectId(projectId);
+    }
+  }
+
   const INSTRUCTION_SUGGESTIONS = [
     "Focus on the market opportunity",
     "Highlight the competitive advantage",
@@ -604,6 +641,7 @@ function CreatePitchDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-[580px] p-0 overflow-hidden rounded-xl max-h-[90vh] flex flex-col">
         {/* Header */}
@@ -667,7 +705,7 @@ function CreatePitchDialog({
                     Which idea would you like to use?
                   </span>
                 </Label>
-                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
                   <SelectTrigger className="bg-background border-border">
                     <SelectValue placeholder="Choose an idea…" />
                   </SelectTrigger>
@@ -691,6 +729,7 @@ function CreatePitchDialog({
           {/* ── Step 2: Settings ─────────────────────────────────────── */}
           {step === 2 && (
             <div className="p-6 flex flex-col gap-6">
+              {/* Length */}
               <div className="flex flex-col gap-3">
                 <Label className="text-sm font-medium text-foreground">Presentation length</Label>
                 <div className="grid grid-cols-3 gap-2">
@@ -700,25 +739,87 @@ function CreatePitchDialog({
                 </div>
               </div>
 
+              {/* Tone + Verbosity side by side */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium text-foreground">Tone</Label>
+                  <Select value={tone} onValueChange={setTone}>
+                    <SelectTrigger className="bg-background border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {([
+                        ["professional", "Professional"],
+                        ["casual", "Casual"],
+                        ["educational", "Educational"],
+                        ["sales_pitch", "Sales Pitch"],
+                        ["funny", "Funny"],
+                        ["default", "Default"],
+                      ] as [string, string][]).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium text-foreground">Verbosity</Label>
+                  <Select value={verbosity} onValueChange={setVerbosity}>
+                    <SelectTrigger className="bg-background border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="concise">Concise</SelectItem>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="detailed">Detailed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Language */}
               <div className="flex flex-col gap-2">
-                <Label className="text-sm font-medium text-foreground">Tone</Label>
-                <Select value={tone} onValueChange={setTone}>
+                <Label className="text-sm font-medium text-foreground">Language</Label>
+                <Select value={language} onValueChange={setLanguage}>
                   <SelectTrigger className="bg-background border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {([
-                      ["professional", "Professional"],
-                      ["casual", "Casual"],
-                      ["educational", "Educational"],
-                      ["sales_pitch", "Sales Pitch"],
-                      ["funny", "Funny"],
-                      ["default", "Default"],
-                    ] as [string, string][]).map(([val, label]) => (
-                      <SelectItem key={val} value={val}>{label}</SelectItem>
-                    ))}
+                    <SelectItem value="ORIGINAL">Auto-detect (match input)</SelectItem>
+                    <SelectItem value="English">English</SelectItem>
+                    <SelectItem value="Arabic">Arabic</SelectItem>
+                    <SelectItem value="French">French</SelectItem>
+                    <SelectItem value="Spanish">Spanish</SelectItem>
+                    <SelectItem value="German">German</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Toggle options */}
+              <div className="flex flex-col gap-3">
+                <Label className="text-sm font-medium text-foreground">Options</Label>
+                <div className="flex flex-col gap-2">
+                  {([
+                    [fetchImages, setFetchImages, "Include relevant images"],
+                    [stockImages, setStockImages, "Include stock photos"],
+                    [speakerNotes, setSpeakerNotes, "Generate speaker notes"],
+                    [useBrandedLogo, setUseBrandedLogo, "Use branded logo"],
+                    [contentExpansion, setContentExpansion, "Expand content with general knowledge"],
+                  ] as [boolean, (v: boolean) => void, string][]).map(([val, setter, label]) => (
+                    <label key={label} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 cursor-pointer hover:bg-accent transition-colors">
+                      <span className="text-sm text-foreground">{label}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={val}
+                        onClick={() => setter(!val)}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${val ? "bg-primary" : "bg-muted"}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${val ? "translate-x-4" : "translate-x-0"}`} />
+                      </button>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -813,6 +914,36 @@ function CreatePitchDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    {/* ── Overwrite confirmation dialog ────────────────────────────────── */}
+    <Dialog open={!!overwriteConfirm} onOpenChange={(v) => !v && setOverwriteConfirm(null)}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Overwrite description?</DialogTitle>
+          <DialogDescription>
+            You already have text in the pitch topic field. Do you want to replace it with this idea's description?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="outline" size="sm" onClick={() => {
+            if (overwriteConfirm) setSelectedProjectId(overwriteConfirm.pendingId);
+            setOverwriteConfirm(null);
+          }}>
+            Keep existing text
+          </Button>
+          <Button size="sm" onClick={() => {
+            if (overwriteConfirm) {
+              setSelectedProjectId(overwriteConfirm.pendingId);
+              setTopic(overwriteConfirm.description);
+            }
+            setOverwriteConfirm(null);
+          }}>
+            Overwrite
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

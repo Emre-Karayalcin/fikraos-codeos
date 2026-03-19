@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { loadVisualization, VisualizationFallback } from '../../visuals';
@@ -180,6 +180,7 @@ export function RightPanel({ chatId, isFullscreen = false, onToggleFullscreen, o
   const { t } = useTranslation();
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [VisualizationComponent, setVisualizationComponent] = useState<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [previewComponents, setPreviewComponents] = useState<{ [key: string]: any }>({});
   const [activeTab, setActiveTab] = useState<string>("all");
   const [tabOffset, setTabOffset] = useState<number>(0);
@@ -221,6 +222,26 @@ export function RightPanel({ chatId, isFullscreen = false, onToggleFullscreen, o
   });
 
   const projectId = (chat as any)?.projectId || (chat as any)?.project_id;
+
+  const handleExportPdf = useCallback(async () => {
+    if (!projectId || isExporting) return;
+    setIsExporting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/export-pdf`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'project-export.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silent
+    } finally {
+      setIsExporting(false);
+    }
+  }, [projectId, isExporting]);
 
   const { data: assets = [], isLoading: assetsLoading } = useQuery({
     queryKey: ["/api/projects", projectId, "assets"],
@@ -355,6 +376,21 @@ export function RightPanel({ chatId, isFullscreen = false, onToggleFullscreen, o
                 <span className="px-3 py-1 bg-orange-100 text-orange-800 text-sm font-medium rounded-full">
                   {Array.isArray(assets) ? assets.length : 0} {t('assets.generated')}
                 </span>
+
+                {/* Export PDF */}
+                {projectId && Array.isArray(assets) && assets.length > 0 && (
+                  <button
+                    onClick={handleExportPdf}
+                    disabled={isExporting}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                    title="Export as PDF"
+                  >
+                    {isExporting
+                      ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                      : <Download className="w-4 h-4" />
+                    }
+                  </button>
+                )}
 
                 {/* Fullscreen Toggle */}
                 {onToggleFullscreen && (

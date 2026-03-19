@@ -32,13 +32,19 @@ export async function convertPptxToPdf(pptxSource: Buffer | string): Promise<str
     fs.writeFileSync(pptxPath, pptxBuffer);
     console.log(`📄 Converting PPTX → PDF with LibreOffice...`);
 
+    // Give LibreOffice a writable HOME for its user profile (required in containers)
+    const loHome = path.join(tmpDir, 'lo-home');
+    fs.mkdirSync(loHome, { recursive: true });
+
     // LibreOffice headless conversion
     await execFileAsync('libreoffice', [
       '--headless',
+      '--norestore',
+      '--nofirststartwizard',
       '--convert-to', 'pdf',
       '--outdir', tmpDir,
       pptxPath,
-    ], { timeout: 120000 });
+    ], { timeout: 120000, env: { ...process.env, HOME: loHome } });
 
     const pdfTmpPath = path.join(tmpDir, 'input.pdf');
     if (!fs.existsSync(pdfTmpPath)) {

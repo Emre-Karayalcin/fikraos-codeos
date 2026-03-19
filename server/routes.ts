@@ -872,6 +872,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Export project + all assets as a PDF
+  app.get('/api/projects/:id/export-pdf', isAuthenticated, canAccessProject, async (req: any, res) => {
+    try {
+      const project = req.project;
+      const assets = await storage.getAssetsByProject(project.id);
+
+      const { buildExportHtml, convertHtmlToPdf } = await import('./project-export.js');
+      const html = buildExportHtml(project, assets);
+      const pdfBuffer = await convertHtmlToPdf(html);
+
+      const safeTitle = (project.title || 'project').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeTitle}-export.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.end(pdfBuffer);
+    } catch (error: any) {
+      console.error('Error exporting project PDF:', error?.message || error);
+      res.status(500).json({ message: error?.message || 'Failed to generate PDF export' });
+    }
+  });
+
   app.get('/api/projects/:id', isAuthenticated, canAccessProject, async (req: any, res) => {
     try {
       // Project already attached to req by middleware
@@ -1488,7 +1509,11 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
   app.post('/api/my-pitch-decks', isAuthenticated, aiRateLimiter, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { plain_text, projectId, length, tone, template, custom_user_instructions } = req.body;
+      const {
+        plain_text, projectId, length, tone, template, custom_user_instructions,
+        verbosity, language, speaker_notes, fetch_images, stock_images,
+        use_branded_logo, content_expansion,
+      } = req.body;
 
       if (!plain_text || !projectId) {
         return res.status(400).json({ message: 'plain_text and projectId are required' });
@@ -1516,14 +1541,20 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
       };
       const normalizedTone = tone ? (toneMap[tone.toLowerCase()] ?? 'professional') : undefined;
 
-      // Build SlideSpeak request body (matching PHP PitchController fields)
+      // Build SlideSpeak request body
       const slideSpeakBody: Record<string, any> = {
         plain_text,
         length: slideCount,
         template: chosenTemplate,
-        language: 'English',
+        language: language || 'ORIGINAL',
       };
       if (normalizedTone) slideSpeakBody.tone = normalizedTone;
+      if (verbosity) slideSpeakBody.verbosity = verbosity;
+      if (typeof speaker_notes === 'boolean') slideSpeakBody.speaker_notes = speaker_notes;
+      if (typeof fetch_images === 'boolean') slideSpeakBody.fetch_images = fetch_images;
+      if (typeof stock_images === 'boolean') slideSpeakBody.stock_images = stock_images;
+      if (typeof use_branded_logo === 'boolean') slideSpeakBody.use_branded_logo = use_branded_logo;
+      if (typeof content_expansion === 'boolean') slideSpeakBody.content_expansion = content_expansion;
       if (custom_user_instructions) slideSpeakBody.custom_user_instructions = custom_user_instructions;
 
       // Call SlideSpeak directly with plain_text
