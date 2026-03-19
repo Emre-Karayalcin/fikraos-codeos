@@ -1,15 +1,7 @@
 import OpenAI from 'openai';
 import { db } from '../db';
-import { memberApplications, users, challenges, organizations } from '../../shared/schema';
+import { memberApplications, challenges } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
-import { Resend } from 'resend';
-import mustache from 'mustache';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const azureOpenAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT_DEV;
 const azureOpenAIKey = process.env.AZURE_OPENAI_API_KEY_DEV;
@@ -24,42 +16,11 @@ const openai = (azureOpenAIKey && cleanEndpoint) ? new OpenAI({
   defaultHeaders: { 'api-key': azureOpenAIKey },
 }) : null;
 
-function loadEmailTemplate(name: string, vars: Record<string, string>): string {
-  const candidates = [
-    path.join(__dirname, '..', 'email-templates', `${name}.html`),
-    path.join(process.cwd(), 'server', 'email-templates', `${name}.html`),
-    path.join(process.cwd(), 'dist', 'email-templates', `${name}.html`),
-    path.join(process.cwd(), 'email-templates', `${name}.html`),
-  ];
-  const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
-  if (!found) return '';
-  try {
-    return mustache.render(fs.readFileSync(found, 'utf8'), vars);
-  } catch {
-    return '';
-  }
-}
-
-async function sendApplicationEmail(to: string, subject: string, html: string): Promise<void> {
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey || !html) return;
-  const resend = new Resend(resendApiKey);
-  try {
-    await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
-      to,
-      subject,
-      html,
-    });
-  } catch (err) {
-    console.error('❌ Failed to send application email:', err);
-  }
-}
 
 export async function screenApplicationAsync(
   applicationId: string,
   challengeId: string | null,
-  orgId: string,
+  _orgId: string,
 ): Promise<void> {
   try {
     console.log(`🔄 Starting application screening for ${applicationId}`);
@@ -152,40 +113,20 @@ Validation Details: ${app.validationDetails || 'N/A'}`;
     }
 
     const aiScore = Math.max(0, Math.min(100, Math.round(evaluationData.overallScore)));
-    const isApproved = aiScore >= 70;
 
+    // Only store AI scores — no emails, no user activation.
+    // The Super Admin will review and manually approve or reject.
     await db.update(memberApplications).set({
       aiScore,
       aiMetrics: evaluationData.metrics,
       aiStrengths: evaluationData.strengths,
       aiRecommendations: evaluationData.recommendations,
       aiInsights: evaluationData.insights,
-      status: isApproved ? 'APPROVED' : 'REJECTED',
-      reviewedAt: new Date(),
+      status: 'AI_REVIEWED',
       updatedAt: new Date(),
     }).where(eq(memberApplications.id, applicationId));
 
-    const [user] = await db.select().from(users).where(eq(users.id, app.userId));
-    if (!user) return;
-
-    const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId));
-    const orgSlug = org?.slug || '';
-    const orgName = org?.name || 'the platform';
-    const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
-    const userName = user.firstName || user.email || 'there';
-
-    if (isApproved) {
-      await db.update(users).set({ status: 'ACTIVE' }).where(eq(users.id, app.userId));
-
-      const loginUrl = `${hostUrl}/w/${orgSlug}`;
-      const html = loadEmailTemplate('application-approved', { userName, orgName, loginUrl });
-      await sendApplicationEmail(user.email, `Congratulations! Your application to ${orgName} has been approved`, html);
-      console.log(`✅ Application ${applicationId} APPROVED (score: ${aiScore})`);
-    } else {
-      const html = loadEmailTemplate('application-rejected', { userName, orgName, ideaName: app.ideaName || 'your idea' });
-      await sendApplicationEmail(user.email, `Update on your application to ${orgName}`, html);
-      console.log(`✅ Application ${applicationId} REJECTED (score: ${aiScore})`);
-    }
+    console.log(`✅ Application ${applicationId} AI-reviewed (score: ${aiScore}) — awaiting Super Admin decision`);
   } catch (error) {
     console.error(`❌ Application screening failed for ${applicationId}:`, error);
   }

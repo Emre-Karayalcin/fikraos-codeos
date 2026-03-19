@@ -1069,13 +1069,16 @@ export default function SuperAdminDashboard() {
                             </TableCell>
                             <TableCell>
                               {row.application.status === "APPROVED" && (
-                                <Badge className="bg-green-500/15 text-green-600 border-green-200 border text-xs">Approved</Badge>
+                                <Badge className="bg-green-500/15 text-green-600 border-green-200 border text-xs">Accepted</Badge>
                               )}
                               {row.application.status === "REJECTED" && (
                                 <Badge className="bg-red-500/15 text-red-600 border-red-200 border text-xs">Rejected</Badge>
                               )}
                               {row.application.status === "PENDING_REVIEW" && (
                                 <Badge className="bg-yellow-500/15 text-yellow-600 border-yellow-200 border text-xs">Pending Review</Badge>
+                              )}
+                              {row.application.status === "AI_REVIEWED" && (
+                                <Badge className="bg-blue-500/15 text-blue-600 border-blue-200 border text-xs">AI Reviewed</Badge>
                               )}
                             </TableCell>
                           </TableRow>
@@ -2138,7 +2141,7 @@ function ApplicationDetailModal({ row, onClose, onUpdate, onRescreen, isPending 
 
         {/* Footer actions */}
         <DialogFooter className="flex-row items-center gap-2 pt-4 border-t border-border">
-          {app.status === "PENDING_REVIEW" && (
+          {(app.status === "PENDING_REVIEW" || app.status === "AI_REVIEWED") && (
             <>
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
@@ -2146,7 +2149,7 @@ function ApplicationDetailModal({ row, onClose, onUpdate, onRescreen, isPending 
                 disabled={isPending}
                 onClick={() => onUpdate({ status: "APPROVED", manualOverride: true })}
               >
-                Approve
+                Accept
               </Button>
               <Button
                 variant="destructive"

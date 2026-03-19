@@ -796,7 +796,7 @@ export function registerSuperAdminRoutes(app: Express) {
                 await resend.emails.send({
                   from: process.env.EMAIL_FROM || "no-reply@fikrahub.com",
                   to: user.email,
-                  subject: `Congratulations! Your application to ${orgName} has been approved`,
+                  subject: `🎉 You've been accepted to ${orgName}!`,
                   html,
                 }).catch(console.error);
               }
@@ -808,7 +808,7 @@ export function registerSuperAdminRoutes(app: Express) {
                 await resend.emails.send({
                   from: process.env.EMAIL_FROM || "no-reply@fikrahub.com",
                   to: user.email,
-                  subject: `Update on your application to ${orgName}`,
+                  subject: `Your application to ${orgName} was not accepted`,
                   html,
                 }).catch(console.error);
               }
