@@ -12,7 +12,7 @@ import mustache from "mustache";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { screenApplicationAsync } from "./lib/applicationScreening";
+import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 
 const __saFilename = fileURLToPath(import.meta.url);
 const __saDir = path.dirname(__saFilename);
@@ -841,6 +841,26 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error re-screening application:", error);
       res.status(500).json({ message: "Failed to start re-screening" });
+    }
+  });
+
+  // POST /api/super-admin/applications/:id/refine — re-score with additional admin context
+  app.post("/api/super-admin/applications/:id/refine", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { additionalContext } = req.body as { additionalContext?: string };
+      if (!additionalContext?.trim()) return res.status(400).json({ message: "additionalContext is required" });
+
+      const [existing] = await db.select().from(memberApplications).where(eq(memberApplications.id, id));
+      if (!existing) return res.status(404).json({ message: "Application not found" });
+
+      const result = await refineApplicationAsync(id, additionalContext.trim());
+      if (!result) return res.status(500).json({ message: "AI refinement failed — check OpenAI configuration" });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error refining application:", error);
+      res.status(500).json({ message: "Failed to refine application" });
     }
   });
 

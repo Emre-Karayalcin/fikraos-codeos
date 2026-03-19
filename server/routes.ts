@@ -59,7 +59,7 @@ if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
 import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations } from "@shared/schema";
-import { screenApplicationAsync } from "./lib/applicationScreening";
+import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
 import { eq, and, inArray } from "drizzle-orm";
@@ -5548,6 +5548,146 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
     } catch (error) {
       console.error('Error fetching my application:', error);
       res.status(500).json({ error: 'Failed to fetch application' });
+    }
+  });
+
+  // ── Workspace-level Admin Application Management ────────────────────────────
+
+  // Helper: verify user is ADMIN or OWNER of the given org
+  async function requireOrgAdmin(req: any, orgId: string): Promise<boolean> {
+    const userId = req.user?.id;
+    if (!userId) return false;
+    const [member] = await db
+      .select()
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    return !!member && (member.role === 'OWNER' || member.role === 'ADMIN');
+  }
+
+  // GET /api/workspaces/:orgId/admin/applications
+  app.get('/api/workspaces/:orgId/admin/applications', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const rows = await db
+        .select({
+          application: memberApplications,
+          user: { id: users.id, email: users.email, firstName: users.firstName, lastName: users.lastName, status: users.status },
+          org: { id: organizations.id, name: organizations.name, slug: organizations.slug },
+          challenge: { id: challenges.id, title: challenges.title },
+        })
+        .from(memberApplications)
+        .leftJoin(users, eq(memberApplications.userId, users.id))
+        .leftJoin(organizations, eq(memberApplications.orgId, organizations.id))
+        .leftJoin(challenges, eq(memberApplications.challengeId, challenges.id))
+        .where(eq(memberApplications.orgId, orgId))
+        .orderBy(desc(memberApplications.submittedAt));
+
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching workspace applications:', error);
+      res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+  });
+
+  // PATCH /api/workspaces/:orgId/admin/applications/:id
+  app.patch('/api/workspaces/:orgId/admin/applications/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const { status, aiScore, aiMetrics, aiStrengths, aiRecommendations, aiInsights, manualOverride } = req.body;
+
+      const [application] = await db.select().from(memberApplications).where(and(eq(memberApplications.id, id), eq(memberApplications.orgId, orgId)));
+      if (!application) return res.status(404).json({ error: 'Application not found' });
+
+      const update: Record<string, any> = { updatedAt: new Date() };
+      if (status !== undefined) { update.status = status; update.reviewedAt = new Date(); }
+      if (aiScore !== undefined) update.aiScore = aiScore;
+      if (aiMetrics !== undefined) update.aiMetrics = aiMetrics;
+      if (aiStrengths !== undefined) update.aiStrengths = aiStrengths;
+      if (aiRecommendations !== undefined) update.aiRecommendations = aiRecommendations;
+      if (aiInsights !== undefined) update.aiInsights = aiInsights;
+
+      const [updated] = await db.update(memberApplications).set(update).where(eq(memberApplications.id, id)).returning();
+
+      if (manualOverride && status) {
+        const resendApiKey = process.env.RESEND_API_KEY;
+        const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
+        const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
+        const [appUser] = await db.select().from(users).where(eq(users.id, application.userId));
+        const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId));
+
+        if (appUser && org && resendClient) {
+          const userName = appUser.firstName || appUser.email || 'there';
+          const orgName = org.name;
+          const loadTpl = (name: string, vars: Record<string, string>) => {
+            const candidates = [
+              path.join(__dirname, 'email-templates', `${name}.html`),
+              path.join(process.cwd(), 'server', 'email-templates', `${name}.html`),
+            ];
+            const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+            if (!found) return '';
+            try { return mustache.render(fs.readFileSync(found, 'utf8'), vars); } catch { return ''; }
+          };
+
+          if (status === 'APPROVED') {
+            await db.update(users).set({ status: 'ACTIVE' }).where(eq(users.id, application.userId));
+            const html = loadTpl('application-approved', { userName, orgName, loginUrl: `${hostUrl}/w/${org.slug}` });
+            if (html) resendClient.emails.send({ from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com', to: appUser.email, subject: `🎉 You've been accepted to ${orgName}!`, html }).catch(console.error);
+          } else if (status === 'REJECTED') {
+            const html = loadTpl('application-rejected', { userName, orgName, ideaName: application.ideaName || 'your idea' });
+            if (html) resendClient.emails.send({ from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com', to: appUser.email, subject: `Your application to ${orgName} was not accepted`, html }).catch(console.error);
+          }
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating workspace application:', error);
+      res.status(500).json({ error: 'Failed to update application' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/admin/applications/:id/rescreen
+  app.post('/api/workspaces/:orgId/admin/applications/:id/rescreen', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const [application] = await db.select().from(memberApplications).where(and(eq(memberApplications.id, id), eq(memberApplications.orgId, orgId)));
+      if (!application) return res.status(404).json({ error: 'Application not found' });
+
+      await db.update(memberApplications).set({ status: 'PENDING_REVIEW', reviewedAt: null, updatedAt: new Date() }).where(eq(memberApplications.id, id));
+      screenApplicationAsync(id, application.challengeId || null, orgId).catch(console.error);
+
+      res.json({ success: true, message: 'Re-screening started' });
+    } catch (error) {
+      console.error('Error re-screening workspace application:', error);
+      res.status(500).json({ error: 'Failed to start re-screening' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/admin/applications/:id/refine
+  app.post('/api/workspaces/:orgId/admin/applications/:id/refine', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const { additionalContext } = req.body as { additionalContext?: string };
+      if (!additionalContext?.trim()) return res.status(400).json({ error: 'additionalContext is required' });
+
+      const [application] = await db.select().from(memberApplications).where(and(eq(memberApplications.id, id), eq(memberApplications.orgId, orgId)));
+      if (!application) return res.status(404).json({ error: 'Application not found' });
+
+      const result = await refineApplicationAsync(id, additionalContext.trim());
+      if (!result) return res.status(500).json({ error: 'AI refinement failed — check OpenAI configuration' });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error refining workspace application:', error);
+      res.status(500).json({ error: 'Failed to refine application' });
     }
   });
 

@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   GraduationCap,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -84,6 +85,12 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
       descKey: 'admin.sidebar.mentors.description',
       href: `/w/${workspaceSlug}/admin/mentors`,
       icon: GraduationCap,
+    },
+    {
+      titleKey: 'Applications',
+      descKey: 'Review member applications',
+      href: `/w/${workspaceSlug}/admin/applications`,
+      icon: ClipboardList,
     },
     {
       titleKey: 'admin.sidebar.settings.title',
