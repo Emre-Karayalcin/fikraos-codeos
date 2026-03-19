@@ -13,9 +13,11 @@ import {
   ideas,
   courseProgress,
   workspaceProgramProgress,
+  mentorAssignments,
   type CourseProgress,
   type WorkspaceProgramProgress,
   type ProgramStep,
+  type MentorAssignment,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -81,6 +83,13 @@ export interface IStorage {
   // Program progress operations
   getProgramProgress(orgId: string): Promise<WorkspaceProgramProgress | undefined>;
   upsertProgramProgress(orgId: string, currentStep: number, steps: ProgramStep[], updatedBy: string): Promise<WorkspaceProgramProgress>;
+
+  // Mentor assignment operations
+  getMentorAssignments(orgId: string): Promise<MentorAssignment[]>;
+  getMentorAssignmentsWithDetails(orgId: string): Promise<any[]>;
+  assignMemberToMentor(orgId: string, mentorUserId: string, memberUserId: string): Promise<MentorAssignment>;
+  removeMentorAssignment(id: string, orgId: string): Promise<void>;
+  getMentorParticipantIds(mentorUserId: string, orgId: string): Promise<string[]>;
 
   // Project operations
   getProjectsByOrg(orgId: string): Promise<Project[]>;
@@ -832,6 +841,68 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return row;
+  }
+
+  // ── Mentor assignments ───────────────────────────────────────────────────
+  async getMentorAssignments(orgId: string): Promise<MentorAssignment[]> {
+    return db.select().from(mentorAssignments).where(eq(mentorAssignments.orgId, orgId));
+  }
+
+  async getMentorAssignmentsWithDetails(orgId: string): Promise<any[]> {
+    const rows = await db
+      .select({
+        id: mentorAssignments.id,
+        orgId: mentorAssignments.orgId,
+        mentorUserId: mentorAssignments.mentorUserId,
+        memberUserId: mentorAssignments.memberUserId,
+        createdAt: mentorAssignments.createdAt,
+        mentorFirstName: users.firstName,
+        mentorLastName: users.lastName,
+        mentorEmail: users.email,
+        mentorProfileImageUrl: users.profileImageUrl,
+      })
+      .from(mentorAssignments)
+      .innerJoin(users, eq(mentorAssignments.mentorUserId, users.id))
+      .where(eq(mentorAssignments.orgId, orgId));
+    return rows;
+  }
+
+  async assignMemberToMentor(orgId: string, mentorUserId: string, memberUserId: string): Promise<MentorAssignment> {
+    const [row] = await db
+      .insert(mentorAssignments)
+      .values({ orgId, mentorUserId, memberUserId })
+      .onConflictDoNothing()
+      .returning();
+    // If duplicate (onConflictDoNothing returned nothing), fetch existing
+    if (!row) {
+      const [existing] = await db
+        .select()
+        .from(mentorAssignments)
+        .where(
+          and(
+            eq(mentorAssignments.orgId, orgId),
+            eq(mentorAssignments.mentorUserId, mentorUserId),
+            eq(mentorAssignments.memberUserId, memberUserId),
+          )
+        )
+        .limit(1);
+      return existing;
+    }
+    return row;
+  }
+
+  async removeMentorAssignment(id: string, orgId: string): Promise<void> {
+    await db
+      .delete(mentorAssignments)
+      .where(and(eq(mentorAssignments.id, id), eq(mentorAssignments.orgId, orgId)));
+  }
+
+  async getMentorParticipantIds(mentorUserId: string, orgId: string): Promise<string[]> {
+    const rows = await db
+      .select({ memberUserId: mentorAssignments.memberUserId })
+      .from(mentorAssignments)
+      .where(and(eq(mentorAssignments.mentorUserId, mentorUserId), eq(mentorAssignments.orgId, orgId)));
+    return rows.map((r) => r.memberUserId);
   }
 }
 

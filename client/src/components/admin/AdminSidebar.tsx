@@ -9,7 +9,8 @@ import {
   Palette,
   Target,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -77,6 +78,12 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
       descKey: 'admin.sidebar.members.description',
       href: `/w/${workspaceSlug}/admin/members`,
       icon: Users,
+    },
+    {
+      titleKey: 'admin.sidebar.mentors.title',
+      descKey: 'admin.sidebar.mentors.description',
+      href: `/w/${workspaceSlug}/admin/mentors`,
+      icon: GraduationCap,
     },
     {
       titleKey: 'admin.sidebar.settings.title',

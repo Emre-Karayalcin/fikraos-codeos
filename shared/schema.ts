@@ -803,6 +803,19 @@ export const workspaceProgramProgress = pgTable("workspace_program_progress", {
 
 export type WorkspaceProgramProgress = typeof workspaceProgramProgress.$inferSelect;
 
+// ── Mentor ↔ Member assignments (PMO assigns members to mentors) ─────────────
+export const mentorAssignments = pgTable("mentor_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  mentorUserId: varchar("mentor_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  memberUserId: varchar("member_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  uniqAssignment: uniqueIndex("mentor_assignments_unique").on(t.orgId, t.mentorUserId, t.memberUserId),
+}));
+
+export type MentorAssignment = typeof mentorAssignments.$inferSelect;
+
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
 export const insertCourseProgressSchema = createInsertSchema(courseProgress).omit({ id: true, lastWatchedAt: true });

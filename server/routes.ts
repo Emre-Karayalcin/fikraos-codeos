@@ -58,11 +58,11 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations } from "@shared/schema";
 import { screenApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { canAccessProject, canModifyProject, canAccessChat, canAccessAssets } from "./middleware/authorization";
 import { requireApiKey } from "./middleware/api-key-auth";
 import { passwordResetLimiter, authRateLimiter, orgCreationLimiter, fileUploadLimiter, aiRateLimiter, dataExportLimiter } from "./middleware/security";
@@ -1024,6 +1024,129 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error updating program progress:', error);
       res.status(500).json({ message: 'Failed to update program progress' });
+    }
+  });
+
+  // ── Mentor assignments ─────────────────────────────────────────────────────
+  // GET /api/organizations/:orgId/mentor-assignments — Admin/Owner: list all assignments with member details
+  app.get('/api/organizations/:orgId/mentor-assignments', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const rows = await storage.getMentorAssignmentsWithDetails(orgId);
+      // For each assignment row, also fetch the member's user info
+      const memberIds = [...new Set(rows.map((r: any) => r.memberUserId as string))];
+      let memberMap: Record<string, any> = {};
+      if (memberIds.length > 0) {
+        const members = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(inArray(users.id, memberIds));
+        memberMap = Object.fromEntries(members.map((m) => [m.id, m]));
+      }
+      res.json(rows.map((r: any) => ({ ...r, memberInfo: memberMap[r.memberUserId] ?? null })));
+    } catch (error) {
+      console.error('Error fetching mentor assignments:', error);
+      res.status(500).json({ message: 'Failed to fetch mentor assignments' });
+    }
+  });
+
+  // POST /api/organizations/:orgId/mentor-assignments — Admin/Owner: assign a member to a mentor
+  app.post('/api/organizations/:orgId/mentor-assignments', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const { mentorUserId, memberUserId } = req.body;
+      if (!mentorUserId || !memberUserId) {
+        return res.status(400).json({ message: 'mentorUserId and memberUserId are required' });
+      }
+      // Validate both users are members of this org
+      const [mentorMembership, memberMembership] = await Promise.all([
+        storage.hasOrganizationMember(orgId, mentorUserId),
+        storage.hasOrganizationMember(orgId, memberUserId),
+      ]);
+      if (!mentorMembership) return res.status(400).json({ message: 'Mentor is not a member of this workspace' });
+      if (!memberMembership) return res.status(400).json({ message: 'Member is not a member of this workspace' });
+      // Verify mentor has MENTOR role
+      const mentorRole = await storage.getUserRole(mentorUserId, orgId);
+      if (mentorRole !== 'MENTOR') {
+        return res.status(400).json({ message: 'Selected user does not have the MENTOR role' });
+      }
+      const assignment = await storage.assignMemberToMentor(orgId, mentorUserId, memberUserId);
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error('Error creating mentor assignment:', error);
+      res.status(500).json({ message: 'Failed to create assignment' });
+    }
+  });
+
+  // DELETE /api/organizations/:orgId/mentor-assignments/:id — Admin/Owner: remove assignment
+  app.delete('/api/organizations/:orgId/mentor-assignments/:id', isAuthenticated, isOrgAdmin, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      await storage.removeMentorAssignment(id, orgId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error removing mentor assignment:', error);
+      res.status(500).json({ message: 'Failed to remove assignment' });
+    }
+  });
+
+  // GET /api/mentor-profile/my-participants — Mentor: get assigned members + their ideas & pitch decks
+  app.get('/api/mentor-profile/my-participants', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      // Get this mentor's org
+      const [membership] = await db
+        .select({ orgId: organizationMembers.orgId, role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.userId, userId))
+        .limit(1);
+      if (!membership) return res.json([]);
+      const { orgId, role } = membership;
+      if (role !== 'MENTOR' && role !== 'ADMIN' && role !== 'OWNER') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const participantIds = await storage.getMentorParticipantIds(userId, orgId);
+      if (participantIds.length === 0) return res.json([]);
+      // Fetch participant user info
+      const members = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(users)
+        .where(inArray(users.id, participantIds));
+      // Fetch their ideas (projects)
+      const memberProjects = await db
+        .select()
+        .from(projects)
+        .where(inArray(projects.createdById, participantIds));
+      // Fetch their pitch decks
+      const memberPitchDecks = await db
+        .select()
+        .from(pitchDeckGenerations)
+        .where(inArray(pitchDeckGenerations.createdById, participantIds));
+      // Group by member
+      const memberMap: Record<string, any> = {};
+      for (const m of members) {
+        memberMap[m.id] = {
+          user: m,
+          ideas: memberProjects.filter((p) => p.createdById === m.id),
+          pitchDecks: memberPitchDecks.filter((p) => p.createdById === m.id),
+        };
+      }
+      res.json(Object.values(memberMap));
+    } catch (error) {
+      console.error('Error fetching mentor participants:', error);
+      res.status(500).json({ message: 'Failed to fetch participants' });
     }
   });
 

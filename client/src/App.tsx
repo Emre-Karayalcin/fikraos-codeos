@@ -38,6 +38,7 @@ import AdminChallengeIdeas from "@/pages/AdminChallengeIdeas";
 import AdminChallenges from "@/pages/AdminChallenges";
 import AdminIdeaDetail from "@/pages/AdminIdeaDetail";
 import AdminBranding from "@/pages/AdminBranding";
+import AdminMentors from "@/pages/AdminMentors";
 import WorkspaceCreate from "@/pages/WorkspaceCreate";
 import WorkspaceLanding from "@/pages/WorkspaceLanding";
 import MemberOnboarding from "@/pages/MemberOnboarding";
@@ -255,6 +256,12 @@ function Router() {
       <Route path="/w/:slug/admin/branding" component={() => (
         <PageTransition>
           <AdminGuard><AdminBranding /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/mentors" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminMentors /></AdminGuard>
         </PageTransition>
       )} />
 
