@@ -4,7 +4,7 @@ import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart2, Users, Trophy, CheckCircle, XCircle, FileText } from "lucide-react";
+import { BarChart2, Users, Trophy, CheckCircle, XCircle, FileText, Activity } from "lucide-react";
 
 interface Totals {
   totalSubmissions: number;
@@ -17,7 +17,6 @@ interface Totals {
 interface SubmissionRow {
   workspaceId: string;
   workspaceName: string;
-  workspaceSlug: string;
   challengeId: string;
   challengeTitle: string;
   totalSubmissions: number;
@@ -34,6 +33,7 @@ interface ApplicationRow {
   approved: number;
   rejected: number;
   pending: number;
+  aiReviewed: number;
 }
 
 interface InviteRow {
@@ -45,11 +45,26 @@ interface InviteRow {
   admins: number;
 }
 
+interface ActivityLogEntry {
+  type: "submission" | "application" | "invite";
+  id: string;
+  eventAt: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  detail: string | null;
+  subDetail: string | null;
+  workspaceName: string;
+  workspaceSlug: string;
+  status: string | null;
+}
+
 interface InsightsData {
   totals: Totals;
   submissions: SubmissionRow[];
   applications: ApplicationRow[];
   invites: InviteRow[];
+  activityLog: ActivityLogEntry[];
 }
 
 interface Workspace {
@@ -111,9 +126,26 @@ export default function SuperAdminActivityInsights() {
   const submissions = data?.submissions || [];
   const applications = data?.applications || [];
   const invites = data?.invites || [];
+  const activityLog = data?.activityLog || [];
 
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+
+  const fmtFull = (d: string | null) =>
+    d
+      ? new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "—";
+
+  const activityTypeBadge = (entry: ActivityLogEntry) => {
+    if (entry.type === "submission") return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-500/10 text-blue-600 border border-blue-200 rounded-full px-2 py-0.5">🏆 Submission</span>;
+    if (entry.type === "application") {
+      if (entry.status === "APPROVED") return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-green-500/10 text-green-600 border border-green-200 rounded-full px-2 py-0.5">✓ Approved</span>;
+      if (entry.status === "REJECTED") return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-red-500/10 text-red-600 border border-red-200 rounded-full px-2 py-0.5">✗ Rejected</span>;
+      if (entry.status === "AI_REVIEWED") return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-purple-500/10 text-purple-600 border border-purple-200 rounded-full px-2 py-0.5">🤖 AI Reviewed</span>;
+      return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-yellow-500/10 text-yellow-600 border border-yellow-200 rounded-full px-2 py-0.5">⏳ Applied</span>;
+    }
+    return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-orange-500/10 text-orange-600 border border-orange-200 rounded-full px-2 py-0.5">👤 Joined</span>;
+  };
 
   return (
     <div className="flex h-screen bg-background">
@@ -127,7 +159,7 @@ export default function SuperAdminActivityInsights() {
               <BarChart2 className="w-8 h-8 text-primary" />
               <div>
                 <h1 className="text-3xl font-bold">Activity Insights</h1>
-                <p className="text-muted-foreground">Cross-workspace submissions, applications, and invites</p>
+                <p className="text-muted-foreground">Cross-workspace submissions, applications, and invites — all time</p>
               </div>
             </div>
 
@@ -216,6 +248,55 @@ export default function SuperAdminActivityInsights() {
               </Card>
             </div>
 
+            {/* Activity Log — individual events */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary" />
+                  Activity Log
+                  <span className="text-xs font-normal text-muted-foreground ml-1">(latest 200 events, all time)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {activityLog.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-6 pb-5">No activity recorded yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left px-5 py-2.5 font-medium text-muted-foreground">Date</th>
+                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Event</th>
+                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">User</th>
+                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Detail</th>
+                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Workspace</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activityLog.map((entry, i) => (
+                          <tr key={`${entry.type}-${entry.id}-${i}`} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                            <td className="px-5 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFull(entry.eventAt)}</td>
+                            <td className="px-4 py-2.5">{activityTypeBadge(entry)}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="text-xs font-medium">{[entry.firstName, entry.lastName].filter(Boolean).join(" ") || "—"}</div>
+                              <div className="text-xs text-muted-foreground">{entry.email}</div>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs">
+                              {entry.detail && <span className="font-medium">{entry.detail}</span>}
+                              {entry.subDetail && entry.type === "submission" && (
+                                <span className="text-muted-foreground"> · {entry.subDetail}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-muted-foreground">{entry.workspaceName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Submissions by challenge */}
             <Card>
               <CardHeader className="pb-3">
@@ -287,33 +368,19 @@ export default function SuperAdminActivityInsights() {
                           <tr className="border-b border-border bg-muted/30">
                             <th className="text-left px-5 py-2.5 font-medium text-muted-foreground">Workspace</th>
                             <th className="text-center px-3 py-2.5 font-medium text-muted-foreground">Total</th>
-                            <th className="text-center px-3 py-2.5 font-medium text-muted-foreground">
-                              <span className="text-green-600">Approved</span>
-                            </th>
-                            <th className="text-center px-3 py-2.5 font-medium text-muted-foreground">
-                              <span className="text-red-500">Rejected</span>
-                            </th>
-                            <th className="text-center px-3 py-2.5 font-medium text-muted-foreground">
-                              <span className="text-yellow-600">Pending</span>
-                            </th>
+                            <th className="text-center px-3 py-2.5 font-medium text-muted-foreground text-green-600">Approved</th>
+                            <th className="text-center px-3 py-2.5 font-medium text-muted-foreground text-red-500">Rejected</th>
+                            <th className="text-center px-3 py-2.5 font-medium text-muted-foreground text-yellow-600">Pending</th>
                           </tr>
                         </thead>
                         <tbody>
                           {applications.map((row) => (
                             <tr key={row.workspaceId} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                               <td className="px-5 py-3 font-medium">{row.workspaceName}</td>
-                              <td className="px-3 py-3 text-center">
-                                <Badge variant="secondary">{row.total}</Badge>
-                              </td>
-                              <td className="px-3 py-3 text-center">
-                                <span className="text-xs font-medium text-green-600">{row.approved}</span>
-                              </td>
-                              <td className="px-3 py-3 text-center">
-                                <span className="text-xs font-medium text-red-500">{row.rejected}</span>
-                              </td>
-                              <td className="px-3 py-3 text-center">
-                                <span className="text-xs font-medium text-yellow-600">{row.pending}</span>
-                              </td>
+                              <td className="px-3 py-3 text-center"><Badge variant="secondary">{row.total}</Badge></td>
+                              <td className="px-3 py-3 text-center text-xs font-medium text-green-600">{row.approved}</td>
+                              <td className="px-3 py-3 text-center text-xs font-medium text-red-500">{row.rejected}</td>
+                              <td className="px-3 py-3 text-center text-xs font-medium text-yellow-600">{row.pending}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -323,7 +390,7 @@ export default function SuperAdminActivityInsights() {
                 </CardContent>
               </Card>
 
-              {/* Invites by workspace */}
+              {/* Members by workspace */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -350,9 +417,7 @@ export default function SuperAdminActivityInsights() {
                           {invites.map((row) => (
                             <tr key={row.workspaceId} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                               <td className="px-5 py-3 font-medium">{row.workspaceName}</td>
-                              <td className="px-3 py-3 text-center">
-                                <Badge variant="secondary">{row.totalInvited}</Badge>
-                              </td>
+                              <td className="px-3 py-3 text-center"><Badge variant="secondary">{row.totalInvited}</Badge></td>
                               <td className="px-3 py-3 text-center text-xs font-medium">{row.members}</td>
                               <td className="px-3 py-3 text-center text-xs font-medium">{row.mentors}</td>
                               <td className="px-3 py-3 text-center text-xs font-medium">{row.admins}</td>

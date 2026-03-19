@@ -903,17 +903,16 @@ export function registerSuperAdminRoutes(app: Express) {
     }
   });
 
-  // GET /api/super-admin/activity-insights — cross-workspace activity stats
+  // GET /api/super-admin/activity-insights — cross-workspace activity stats + event log
   app.get("/api/super-admin/activity-insights", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
     try {
       const { workspaceId, challengeId } = req.query as { workspaceId?: string; challengeId?: string };
 
-      // Build WHERE clauses for optional filters
-      const wsFilter = workspaceId ? sql`AND o.id = ${workspaceId}` : sql``;
+      const wsFilter     = workspaceId  ? sql`AND o.id = ${workspaceId}`        : sql``;
+      const wsFilterDirect = workspaceId ? sql`AND om.org_id = ${workspaceId}`  : sql``;
       const challengeFilter = challengeId ? sql`AND cs.challenge_id = ${challengeId}` : sql``;
-      const challengeFilterApps = challengeId ? sql`AND 1=0` : sql``; // applications not linked to specific challenges
 
-      // Submissions aggregated by workspace
+      // Submissions aggregated by challenge
       const submissionsResult = await db.execute(sql`
         SELECT
           o.id            AS "workspaceId",
@@ -921,61 +920,138 @@ export function registerSuperAdminRoutes(app: Express) {
           o.slug          AS "workspaceSlug",
           c.id            AS "challengeId",
           c.title         AS "challengeTitle",
-          COUNT(cs.id)::int                                                       AS "totalSubmissions",
-          COUNT(cs.pitch_deck_url)::int                                           AS "withPitchDeck",
-          COUNT(cs.prototype_url)::int                                            AS "withPrototype",
-          MIN(cs.submitted_at)                                                    AS "firstSubmissionAt",
-          MAX(cs.submitted_at)                                                    AS "lastSubmissionAt"
+          COUNT(cs.id)::int                        AS "totalSubmissions",
+          COUNT(cs.pitch_deck_url)::int            AS "withPitchDeck",
+          COUNT(cs.prototype_url)::int             AS "withPrototype",
+          MIN(cs.submitted_at)                     AS "firstSubmissionAt",
+          MAX(cs.submitted_at)                     AS "lastSubmissionAt"
         FROM   challenge_submissions cs
-        JOIN   challenges            c  ON c.id  = cs.challenge_id
-        JOIN   organizations         o  ON o.id  = c.org_id
+        JOIN   challenges c ON c.id = cs.challenge_id
+        JOIN   organizations o ON o.id = c.org_id
         WHERE  1=1 ${wsFilter} ${challengeFilter}
         GROUP BY o.id, o.name, o.slug, c.id, c.title
         ORDER BY MAX(cs.submitted_at) DESC NULLS LAST
       `);
 
-      // Member applications (invites, approvals, rejections) aggregated by workspace
+      // Applications aggregated by workspace (fixed status casing)
       const applicationsResult = await db.execute(sql`
         SELECT
-          o.id            AS "workspaceId",
-          o.name          AS "workspaceName",
-          o.slug          AS "workspaceSlug",
-          COUNT(*)::int                                                              AS "total",
-          COUNT(*) FILTER (WHERE ma.status = 'approved')::int                      AS "approved",
-          COUNT(*) FILTER (WHERE ma.status = 'rejected')::int                      AS "rejected",
-          COUNT(*) FILTER (WHERE ma.status = 'PENDING_REVIEW')::int                AS "pending"
+          o.id   AS "workspaceId",
+          o.name AS "workspaceName",
+          o.slug AS "workspaceSlug",
+          COUNT(*)::int                                                         AS "total",
+          COUNT(*) FILTER (WHERE ma.status = 'APPROVED')::int                  AS "approved",
+          COUNT(*) FILTER (WHERE ma.status = 'REJECTED')::int                  AS "rejected",
+          COUNT(*) FILTER (WHERE ma.status = 'PENDING_REVIEW')::int            AS "pending",
+          COUNT(*) FILTER (WHERE ma.status = 'AI_REVIEWED')::int               AS "aiReviewed"
         FROM   member_applications ma
-        JOIN   organizations        o ON o.id = ma.org_id
-        WHERE  1=1 ${wsFilter} ${challengeFilterApps}
+        JOIN   organizations o ON o.id = ma.org_id
+        WHERE  1=1 ${wsFilter}
         GROUP BY o.id, o.name, o.slug
         ORDER BY COUNT(*) DESC
       `);
 
-      // User invites (organization members joined via invite, i.e. non-owner) by workspace
+      // Members by workspace
       const invitesResult = await db.execute(sql`
         SELECT
-          o.id            AS "workspaceId",
-          o.name          AS "workspaceName",
-          o.slug          AS "workspaceSlug",
-          COUNT(*)::int   AS "totalInvited",
-          COUNT(*) FILTER (WHERE om.role = 'MEMBER')::int   AS "members",
-          COUNT(*) FILTER (WHERE om.role = 'MENTOR')::int   AS "mentors",
-          COUNT(*) FILTER (WHERE om.role = 'ADMIN')::int    AS "admins"
+          o.id   AS "workspaceId",
+          o.name AS "workspaceName",
+          o.slug AS "workspaceSlug",
+          COUNT(*)::int                                               AS "totalInvited",
+          COUNT(*) FILTER (WHERE om.role = 'MEMBER')::int            AS "members",
+          COUNT(*) FILTER (WHERE om.role = 'MENTOR')::int            AS "mentors",
+          COUNT(*) FILTER (WHERE om.role = 'ADMIN')::int             AS "admins"
         FROM   organization_members om
-        JOIN   organizations         o ON o.id = om.org_id
-        WHERE  om.role != 'OWNER' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``}
+        JOIN   organizations o ON o.id = om.org_id
+        WHERE  om.role != 'OWNER' ${wsFilterDirect}
         GROUP BY o.id, o.name, o.slug
         ORDER BY COUNT(*) DESC
       `);
 
-      // High-level totals
+      // High-level totals (fixed status casing)
       const totalsResult = await db.execute(sql`
         SELECT
-          (SELECT COUNT(*)::int FROM challenge_submissions cs JOIN challenges c ON c.id = cs.challenge_id JOIN organizations o ON o.id = c.org_id WHERE 1=1 ${wsFilter} ${challengeFilter})  AS "totalSubmissions",
-          (SELECT COUNT(*)::int FROM member_applications  ma JOIN organizations o ON o.id = ma.org_id WHERE 1=1 ${wsFilter})                                                               AS "totalApplications",
-          (SELECT COUNT(*)::int FROM member_applications  ma JOIN organizations o ON o.id = ma.org_id WHERE ma.status = 'approved' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``})  AS "approvedApplications",
-          (SELECT COUNT(*)::int FROM member_applications  ma JOIN organizations o ON o.id = ma.org_id WHERE ma.status = 'rejected' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``})  AS "rejectedApplications",
-          (SELECT COUNT(*)::int FROM organization_members om JOIN organizations o ON o.id = om.org_id WHERE om.role != 'OWNER' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``})        AS "totalInvites"
+          (SELECT COUNT(*)::int FROM challenge_submissions cs
+            JOIN challenges c ON c.id = cs.challenge_id
+            JOIN organizations o ON o.id = c.org_id
+            WHERE 1=1 ${wsFilter} ${challengeFilter})                             AS "totalSubmissions",
+          (SELECT COUNT(*)::int FROM member_applications ma
+            JOIN organizations o ON o.id = ma.org_id
+            WHERE 1=1 ${wsFilter})                                                AS "totalApplications",
+          (SELECT COUNT(*)::int FROM member_applications ma
+            JOIN organizations o ON o.id = ma.org_id
+            WHERE ma.status = 'APPROVED' ${wsFilter})                             AS "approvedApplications",
+          (SELECT COUNT(*)::int FROM member_applications ma
+            JOIN organizations o ON o.id = ma.org_id
+            WHERE ma.status = 'REJECTED' ${wsFilter})                             AS "rejectedApplications",
+          (SELECT COUNT(*)::int FROM organization_members om
+            WHERE om.role != 'OWNER' ${wsFilterDirect})                           AS "totalInvites"
+      `);
+
+      // Activity log — individual events sorted newest first (all time, respects workspace filter)
+      const activityLogResult = await db.execute(sql`
+        SELECT * FROM (
+          -- Challenge submissions
+          SELECT
+            'submission'       AS "type",
+            cs.id              AS "id",
+            cs.submitted_at    AS "eventAt",
+            u.first_name       AS "firstName",
+            u.last_name        AS "lastName",
+            u.email            AS "email",
+            cs.title           AS "detail",
+            c.title            AS "subDetail",
+            o.name             AS "workspaceName",
+            o.slug             AS "workspaceSlug",
+            NULL               AS "status"
+          FROM challenge_submissions cs
+          JOIN challenges c ON c.id = cs.challenge_id
+          JOIN organizations o ON o.id = c.org_id
+          JOIN users u ON u.id = cs.user_id
+          WHERE 1=1 ${wsFilter} ${challengeFilter}
+
+          UNION ALL
+
+          -- Application reviews (approved/rejected)
+          SELECT
+            'application'      AS "type",
+            ma.id              AS "id",
+            COALESCE(ma.reviewed_at, ma.submitted_at) AS "eventAt",
+            u.first_name       AS "firstName",
+            u.last_name        AS "lastName",
+            u.email            AS "email",
+            ma.idea_name       AS "detail",
+            o.name             AS "subDetail",
+            o.name             AS "workspaceName",
+            o.slug             AS "workspaceSlug",
+            ma.status          AS "status"
+          FROM member_applications ma
+          JOIN organizations o ON o.id = ma.org_id
+          JOIN users u ON u.id = ma.user_id
+          WHERE 1=1 ${wsFilter}
+
+          UNION ALL
+
+          -- Member invites / joins
+          SELECT
+            'invite'           AS "type",
+            om.id              AS "id",
+            om.created_at      AS "eventAt",
+            u.first_name       AS "firstName",
+            u.last_name        AS "lastName",
+            u.email            AS "email",
+            om.role            AS "detail",
+            o.name             AS "subDetail",
+            o.name             AS "workspaceName",
+            o.slug             AS "workspaceSlug",
+            NULL               AS "status"
+          FROM organization_members om
+          JOIN organizations o ON o.id = om.org_id
+          JOIN users u ON u.id = om.user_id
+          WHERE om.role != 'OWNER' ${wsFilterDirect}
+        ) events
+        ORDER BY "eventAt" DESC NULLS LAST
+        LIMIT 200
       `);
 
       res.json({
@@ -983,6 +1059,7 @@ export function registerSuperAdminRoutes(app: Express) {
         submissions: submissionsResult.rows,
         applications: applicationsResult.rows,
         invites: invitesResult.rows,
+        activityLog: activityLogResult.rows,
       });
     } catch (error) {
       console.error("Error fetching activity insights:", error);

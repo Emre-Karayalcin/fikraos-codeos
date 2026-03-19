@@ -62,7 +62,7 @@ import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAsset
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { canAccessProject, canModifyProject, canAccessChat, canAccessAssets } from "./middleware/authorization";
 import { requireApiKey } from "./middleware/api-key-auth";
 import { passwordResetLimiter, authRateLimiter, orgCreationLimiter, fileUploadLimiter, aiRateLimiter, dataExportLimiter } from "./middleware/security";
