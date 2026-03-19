@@ -5402,29 +5402,66 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
         status: 'PENDING_REVIEW',
       }).returning();
 
-      // Send confirmation email
+      // Send confirmation + submission review emails
       if (resendClient) {
-        const templateCandidates = [
-          path.join(__dirname, 'email-templates', 'application-confirmation.html'),
-          path.join(process.cwd(), 'server', 'email-templates', 'application-confirmation.html'),
-          path.join(process.cwd(), 'dist', 'email-templates', 'application-confirmation.html'),
-        ];
-        const found = templateCandidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
-        if (found) {
+        const loadTemplate = (name: string) => {
+          const candidates = [
+            path.join(__dirname, 'email-templates', `${name}.html`),
+            path.join(process.cwd(), 'server', 'email-templates', `${name}.html`),
+            path.join(process.cwd(), 'dist', 'email-templates', `${name}.html`),
+          ];
+          const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+          if (!found) return null;
+          try { return fs.readFileSync(found, 'utf8'); } catch { return null; }
+        };
+
+        const userName = firstName || email;
+
+        // 1. Confirmation email
+        const confirmTpl = loadTemplate('application-confirmation');
+        if (confirmTpl) {
           try {
-            const html = mustache.render(fs.readFileSync(found, 'utf8'), {
-              userName: firstName || email,
-              orgName: org.name,
-              ideaName: ideaName || 'your idea',
-            });
             await resendClient.emails.send({
               from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
               to: email,
               subject: `Application received — ${org.name}`,
-              html,
+              html: mustache.render(confirmTpl, { userName, orgName: org.name, ideaName: ideaName || 'your idea' }),
             });
           } catch (err) {
             console.error('Failed to send confirmation email:', err);
+          }
+        }
+
+        // 2. Submission review email
+        const reviewTpl = loadTemplate('application-submission-review');
+        if (reviewTpl) {
+          try {
+            // Resolve challenge name if provided
+            let challengeName = '';
+            if (challengeId) {
+              const [ch] = await db.select({ title: challenges.title }).from(challenges).where(eq(challenges.id, challengeId)).limit(1);
+              challengeName = ch?.title || '';
+            }
+            await resendClient.emails.send({
+              from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+              to: email,
+              subject: `Your submission summary — ${org.name}`,
+              html: mustache.render(reviewTpl, {
+                userName,
+                orgName: org.name,
+                challengeName,
+                ideaName: ideaName || '',
+                sector: sector || '',
+                problemStatement: problemStatement || '',
+                solutionDescription: solutionDescription || '',
+                differentiator: differentiator || '',
+                targetUser: targetUser || '',
+                relevantSkills: relevantSkills || '',
+                validationDetails: validationDetails || '',
+              }),
+            });
+          } catch (err) {
+            console.error('Failed to send submission review email:', err);
           }
         }
       }

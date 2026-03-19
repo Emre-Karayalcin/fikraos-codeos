@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Your Submission Summary — FikraHub</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--bg:#f6f8fb;--card:#ffffff;--accent:#2563eb;--muted:#6b7280}
+    body{margin:0;background:var(--bg);font-family:Inter,system-ui,Arial,sans-serif;color:#111}
+    .wrap{max-width:680px;margin:28px auto;padding:24px}
+    .card{background:var(--card);border-radius:12px;box-shadow:0 6px 30px rgba(16,24,40,0.06);overflow:hidden}
+    .header{display:flex;gap:16px;align-items:center;padding:28px 32px;border-bottom:1px solid #f1f5f9;background:linear-gradient(135deg,#eff6ff,#dbeafe)}
+    .logo{margin-right:10px;height:64px;flex:0 0 64px;border-radius:12px;background:#ffffff;display:flex;align-items:center;justify-content:center}
+    .logo img{height:auto;display:block}
+    .title{font-size:18px;font-weight:600;color:#1e40af}
+    .body{padding:28px 32px;line-height:1.6;color:#0f172a}
+    .greeting{margin:0 0 12px;font-size:16px}
+    .muted{color:var(--muted);font-size:14px;margin:8px 0}
+    .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin:24px 0 12px;border-bottom:1px solid #f1f5f9;padding-bottom:6px}
+    .field{margin-bottom:14px}
+    .field-label{font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px}
+    .field-value{font-size:14px;color:#0f172a;background:#f8fafc;border-radius:6px;padding:10px 14px;border:1px solid #e2e8f0;line-height:1.6}
+    .idea-badge{display:inline-block;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;padding:4px 12px;font-size:13px;font-weight:600;margin:4px 0 16px}
+    .small{font-size:13px;color:#64748b}
+    .footer{padding:20px 32px;background:#fbfdff;border-top:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:13px}
+    .logo-light{display:block}
+    .logo-dark{display:none}
+    @media (prefers-color-scheme: dark) {
+      :root{--bg:#0f172a;--card:#1e293b;--muted:#94a3b8}
+      body{color:#f1f5f9}
+      .header{background:linear-gradient(135deg,#0f172a,#1e3a5f);border-bottom-color:#1e40af}
+      .title{color:#93c5fd}
+      .body{color:#e2e8f0}
+      .section-title{color:#94a3b8;border-bottom-color:#334155}
+      .field-label{color:#94a3b8}
+      .field-value{background:#0f172a;color:#e2e8f0;border-color:#334155}
+      .idea-badge{background:#1e3a5f;color:#93c5fd;border-color:#1e40af}
+      .footer{background:#1e293b;border-top-color:#334155;color:#94a3b8}
+      .logo{background:#1e293b}
+      .logo-light{display:none}
+      .logo-dark{display:block}
+    }
+    @media (max-width:520px){.wrap{padding:12px}.header,.body,.footer{padding:18px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <div class="logo">
+          <img class="logo-light" src="https://os.fikrahub.com/logo-white.png" alt="FikraHub" />
+          <img class="logo-dark" src="https://app.fikrahub.com/images/logo-black-lp.png" alt="FikraHub" />
+        </div>
+        <div>
+          <div class="title">Your Submission Summary</div>
+          <div class="muted"><strong>{{orgName}}</strong></div>
+        </div>
+      </div>
+
+      <div class="body">
+        <p class="greeting">Hi {{userName}},</p>
+
+        <p>
+          Here is a summary of everything you submitted to <strong>{{orgName}}</strong>.
+          Please review the details below — if anything looks incorrect, contact your workspace administrator.
+        </p>
+
+        <div class="section-title">Idea Overview</div>
+
+        <div class="field">
+          <div class="field-label">Idea Name</div>
+          <div class="field-value">{{ideaName}}</div>
+        </div>
+
+        {{#challengeName}}
+        <div class="field">
+          <div class="field-label">Problem Statement</div>
+          <div class="field-value">{{challengeName}}</div>
+        </div>
+        {{/challengeName}}
+
+        {{#sector}}
+        <div class="field">
+          <div class="field-label">Sector</div>
+          <div class="field-value">{{sector}}</div>
+        </div>
+        {{/sector}}
+
+        <div class="section-title">Your Application</div>
+
+        {{#problemStatement}}
+        <div class="field">
+          <div class="field-label">Problem You're Solving</div>
+          <div class="field-value">{{problemStatement}}</div>
+        </div>
+        {{/problemStatement}}
+
+        {{#solutionDescription}}
+        <div class="field">
+          <div class="field-label">Your Solution</div>
+          <div class="field-value">{{solutionDescription}}</div>
+        </div>
+        {{/solutionDescription}}
+
+        {{#differentiator}}
+        <div class="field">
+          <div class="field-label">What Makes It Different</div>
+          <div class="field-value">{{differentiator}}</div>
+        </div>
+        {{/differentiator}}
+
+        {{#targetUser}}
+        <div class="field">
+          <div class="field-label">Target User</div>
+          <div class="field-value">{{targetUser}}</div>
+        </div>
+        {{/targetUser}}
+
+        {{#relevantSkills}}
+        <div class="field">
+          <div class="field-label">Relevant Skills</div>
+          <div class="field-value">{{relevantSkills}}</div>
+        </div>
+        {{/relevantSkills}}
+
+        {{#validationDetails}}
+        <div class="field">
+          <div class="field-label">Validation Details</div>
+          <div class="field-value">{{validationDetails}}</div>
+        </div>
+        {{/validationDetails}}
+
+        <p class="small" style="margin-top:24px">
+          Our team is reviewing your submission and will be in touch shortly with the next steps.
+        </p>
+      </div>
+
+      <div class="footer">
+        © 2025 FikraHub — <span style="color:#334155">All rights reserved</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
