@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { randomBytes } from "crypto";
 import { isAuthenticated, comparePasswords, hashPassword } from "./auth";
 import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
@@ -313,6 +314,77 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error creating user:", error);
       res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // POST /api/super-admin/invite — invite a user to a specific workspace (email + role + orgId)
+  app.post("/api/super-admin/invite", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { email, role, orgId } = req.body;
+      if (!email || !orgId) {
+        return res.status(400).json({ message: "email and orgId are required" });
+      }
+
+      const existingMember = await storage.getUserByEmailOrganization(email, orgId);
+      if (existingMember) {
+        return res.status(400).json({ message: "A user with this email is already a member of this workspace" });
+      }
+
+      const localPart = email.split('@')[0].replace(/[^\w\-\.]/g, '').slice(0, 20) || 'user';
+      const rawPassword = randomBytes(16).toString('base64').slice(0, 16);
+      const hashedPassword = await hashPassword(rawPassword);
+
+      const newUser = await storage.createUser({
+        email,
+        username: localPart,
+        firstName: 'New',
+        lastName: 'User',
+        password: hashedPassword,
+        status: 'PENDING',
+      });
+
+      await storage.addOrganizationMember(orgId, newUser.id, role || 'MEMBER');
+
+      const org = await storage.getOrganization(orgId).catch(() => null);
+      const hostUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const orgSlug = org?.slug || orgId;
+      const registerUrl = `${hostUrl}/w/${orgSlug}/register?email=${encodeURIComponent(email)}&userId=${encodeURIComponent(newUser.id)}&role=${encodeURIComponent(role || 'MEMBER')}`;
+
+      const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+      if (resendClient) {
+        const orgName = org?.name || 'your workspace';
+        const userName = newUser.firstName || newUser.username || newUser.email;
+        const templateCandidates = [
+          path.join(__saDir, 'email-templates', 'invite-member.html'),
+          path.join(process.cwd(), 'server', 'email-templates', 'invite-member.html'),
+          path.join(process.cwd(), 'dist', 'email-templates', 'invite-member.html'),
+        ];
+        let html = '';
+        const found = templateCandidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+        if (found) {
+          try {
+            html = mustache.render(fs.readFileSync(found, 'utf8'), { orgName, userName, role: role || 'MEMBER', acceptUrl: registerUrl, hostUrl, orgSlug });
+          } catch {}
+        }
+        if (!html) {
+          html = mustache.render(`<html><body><p>Hi {{userName}},</p><p>You've been invited to join <strong>{{orgName}}</strong>. <a href="{{acceptUrl}}">Complete registration</a></p></body></html>`, { userName, orgName, acceptUrl: registerUrl });
+        }
+        try {
+          await resendClient.emails.send({
+            from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+            to: email,
+            subject: `You're invited to ${org?.name || 'FikraHub'}`,
+            html,
+          });
+        } catch (err) {
+          console.error('Failed to send invite email:', err);
+        }
+      }
+
+      res.status(201).json({ message: "Invitation sent", user: { id: newUser.id, email: newUser.email } });
+    } catch (error) {
+      console.error("Error sending invite:", error);
+      res.status(500).json({ message: "Failed to send invitation" });
     }
   });
 
