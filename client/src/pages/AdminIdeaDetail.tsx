@@ -10,7 +10,6 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AllAIOutputsView } from '@/components/idea/AllAIOutputsView';
-import { IdeaLifecycleTimeline } from '@/components/idea/IdeaLifecycleTimeline';
 import {
   Dialog,
   DialogContent,
@@ -397,10 +396,6 @@ export default function AdminIdeaDetail() {
               <TabsTrigger value="ai-outputs" className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 AI Outputs
-              </TabsTrigger>
-              <TabsTrigger value="lifecycle" className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Lifecycle
               </TabsTrigger>
               <TabsTrigger value="comments" className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
@@ -925,11 +920,6 @@ export default function AdminIdeaDetail() {
             {/* AI Outputs Tab */}
             <TabsContent value="ai-outputs" className="mt-6">
               <AllAIOutputsView ideaId={ideaId!} />
-            </TabsContent>
-
-            {/* Lifecycle Tab */}
-            <TabsContent value="lifecycle" className="mt-6">
-              <IdeaLifecycleTimeline ideaId={ideaId!} />
             </TabsContent>
 
             {/* Comments Tab */}

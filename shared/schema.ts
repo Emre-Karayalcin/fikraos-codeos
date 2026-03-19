@@ -204,6 +204,7 @@ export const projects = pgTable("projects", {
   status: projectStatusEnum("status").default("BACKLOG"),
   generatedFiles: jsonb("generated_files"), // Store Launch mode generated files
   deploymentUrl: varchar("deployment_url"), // Store Vercel deployment URL
+  pitchDeckUrl: varchar("pitch_deck_url"), // URL of selected/uploaded pitch deck for this project
   submitted: boolean("submitted").default(false), // Track if project has been submitted to challenge
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   verscale_chat_id: varchar("verscale_chat_id"),
@@ -434,6 +435,8 @@ export const challengeSubmissions = pgTable("challenge_submissions", {
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   submissionUrl: varchar("submission_url"),
+  pitchDeckUrl: varchar("pitch_deck_url"),
+  prototypeUrl: varchar("prototype_url"),
   attachments: jsonb("attachments").$type<any[]>().default([]),
   status: varchar("status", { length: 50 }).default("submitted"),
   score: integer("score"),

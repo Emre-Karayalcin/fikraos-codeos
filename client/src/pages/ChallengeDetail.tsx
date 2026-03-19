@@ -24,26 +24,28 @@ import {
   CheckCircle2,
   Lightbulb,
   MessageCircle,
-  Search,
-  Code,
   Rocket,
   MoreHorizontal,
   Trash2,
-  Copy,
   ExternalLink,
-  Sparkles,
   FileText,
-  Eye,
-  Edit
+  Upload,
+  Link,
+  Eye
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useLocation, useParams } from 'wouter';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { useBranding } from '@/contexts/BrandingContext';
 import { useTranslation } from 'react-i18next';
-import { buildIdeaInitialMessage } from '@/lib/buildIdeaMessage';
 import {
   Table,
   TableBody,
@@ -85,6 +87,7 @@ interface Project {
   createdAt: string;
   updatedAt: string;
   deploymentUrl?: string;
+  pitchDeckUrl?: string;
   createdBy: {
     id: string;
     username: string;
@@ -100,6 +103,8 @@ interface Submission {
   title: string;
   description: string;
   submissionUrl?: string;
+  pitchDeckUrl?: string | null;
+  prototypeUrl?: string | null;
   status: string;
   score?: number;
   feedback?: string;
@@ -111,29 +116,21 @@ interface Submission {
   };
 }
 
-const ALL_COUNTRIES = [
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'JO', name: 'Jordan' },
-  { code: 'LB', name: 'Lebanon' },
-  { code: 'KW', name: 'Kuwait' },
-  { code: 'BH', name: 'Bahrain' },
-  { code: 'QA', name: 'Qatar' },
-  { code: 'OM', name: 'Oman' },
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'AU', name: 'Australia' },
-];
+interface PitchDeck {
+  id: string;
+  projectId: string;
+  projectTitle?: string;
+  status: string;
+  downloadUrl?: string;
+  createdAt: string;
+}
 
 export default function ChallengeDetail() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { workspaceSlug } = useWorkspace();
-  const { aiBuilderEnabled, formSubmissionEnabled, manualBuildEnabled } = useBranding();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const challengeSlug = params.challengeSlug || params.slug;
@@ -200,25 +197,22 @@ export default function ChallengeDetail() {
     enabled: !!challenge?.id
   });
 
-  // State for creation dialog and quick submit form
-  const [showCreationDialog, setShowCreationDialog] = useState(false);
-  const [showQuickSubmitForm, setShowQuickSubmitForm] = useState(false);
-  const [formStep, setFormStep] = useState(1);
-  const [quickFormData, setQuickFormData] = useState({
-    title: '',
-    description: '',
-    submissionUrl: '',
+  const { data: myPitchDecks = [] } = useQuery<PitchDeck[]>({
+    queryKey: ['my-pitch-decks'],
+    queryFn: async () => {
+      const res = await fetch('/api/my-pitch-decks', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!isAuthenticated,
   });
 
-  // State for manual build form
-  const [showManualBuildForm, setShowManualBuildForm] = useState(false);
-  const [manualBuildStep, setManualBuildStep] = useState(1);
-  const [manualFormData, setManualFormData] = useState({
-    ideaDescription: '',
-    country: 'SA',
-    uniqueness: '',
-    ideaName: '',
-  });
+  // State for submit modal (per project)
+  const [submitModalProject, setSubmitModalProject] = useState<Project | null>(null);
+  const [submitPitchDeckUrl, setSubmitPitchDeckUrl] = useState('');
+  const [submitPrototypeUrl, setSubmitPrototypeUrl] = useState('');
+  const [pitchDeckMode, setPitchDeckMode] = useState<'select' | 'upload'>('select');
+  const [uploadingPitch, setUploadingPitch] = useState(false);
 
   // State for submission preview dialog
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
@@ -280,39 +274,15 @@ export default function ChallengeDetail() {
     }
   });
 
-  const duplicateProjectMutation = useMutation({
-    mutationFn: async (project: Project) => {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: `${project.title} (${t('common.copy')})`,
-          description: project.description,
-          orgId: challenge?.orgId,
-          challengeId: challenge?.id
-        }),
-        credentials: 'include'
-      });
-      
-      if (!response.ok) throw new Error('Failed to duplicate project');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['challenge'] });
-      toast.success(t('challenge.projectDuplicated'));
-    },
-    onError: () => {
-      toast.error(t('challenge.duplicateFailed'));
-    }
-  });
-
   const submitProjectMutation = useMutation({
-    mutationFn: async (projectId: string) => {
+    mutationFn: async ({ projectId, pitchDeckUrl, prototypeUrl }: { projectId: string; pitchDeckUrl: string; prototypeUrl: string }) => {
       const response = await fetch(
         `/api/challenges/${challenge.id}/submit-project/${projectId}`,
         {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
+          body: JSON.stringify({ pitchDeckUrl, prototypeUrl }),
         }
       );
       if (!response.ok) {
@@ -322,162 +292,17 @@ export default function ChallengeDetail() {
       return response.json();
     },
     onSuccess: () => {
-      // Refresh both projects and submissions
-      queryClient.invalidateQueries({
-        queryKey: [`/api/challenges/slug/${challengeSlug}`],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/challenges/${challenge.id}/submissions`],
-      });
+      queryClient.invalidateQueries({ queryKey: ['challenge'] });
+      queryClient.invalidateQueries({ queryKey: ['submissions', challenge?.id] });
+      setSubmitModalProject(null);
+      setSubmitPitchDeckUrl('');
+      setSubmitPrototypeUrl('');
       toast.success(t('challenge.projectSubmitted') || 'Project submitted successfully!');
     },
     onError: (error: Error) => {
       toast.error(error.message);
     },
   });
-
-  const handleSubmitProject = (projectId: string) => {
-    if (window.confirm(t('challenge.confirmSubmit') || 'Submit this project to the challenge? This action cannot be undone.')) {
-      submitProjectMutation.mutate(projectId);
-    }
-  };
-
-  const quickSubmitMutation = useMutation({
-    mutationFn: async (data: typeof quickFormData) => {
-      // Create a project instead of a direct submission
-      // This keeps the flow consistent: both "Build with AI" and "Submit via Form"
-      // create projects that appear in "My Challenge Ideas", then user clicks Submit
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          orgId: challenge.orgId,
-          challengeId: challenge.id,
-          title: data.title,
-          description: data.description,
-          deploymentUrl: data.submissionUrl || '',
-          type: 'LAUNCH'
-        }),
-      });
-      if (!response.ok) throw new Error('Failed to create idea');
-      return response.json();
-    },
-    onSuccess: () => {
-      // Refresh the challenge data to show new project in "My Challenge Ideas"
-      queryClient.invalidateQueries({
-        queryKey: [`/api/challenges/slug/${challengeSlug}`],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['challenge'],
-      });
-      setShowQuickSubmitForm(false);
-      setFormStep(1);
-      setQuickFormData({ title: '', description: '', submissionUrl: '' });
-      toast.success(t('challenge.ideaCreated') || 'Idea created successfully! Click Submit to enter the challenge.');
-    },
-    onError: () => {
-      toast.error(t('challenge.ideaCreationFailed') || 'Failed to create idea');
-    },
-  });
-
-  const handleQuickSubmit = () => {
-    quickSubmitMutation.mutate(quickFormData);
-  };
-
-  const manualBuildMutation = useMutation({
-    mutationFn: async (data: typeof manualFormData) => {
-      // Step 1: Create project
-      const projectResp = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          orgId: challenge.orgId,
-          challengeId: challenge.id,
-          title: data.ideaName || 'Untitled idea',
-          description: `${data.ideaDescription}\n\nCountry: ${data.country}\nUnique: ${data.uniqueness}`,
-          type: 'LAUNCH'
-        }),
-      });
-      if (!projectResp.ok) throw new Error('Failed to create project');
-      const project = await projectResp.json();
-
-      // Step 2: Create chat
-      const chatResp = await fetch('/api/chats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: project.id, title: 'Chat' }),
-        credentials: 'include'
-      });
-      if (!chatResp.ok) throw new Error('Failed to create chat');
-      const chat = await chatResp.json();
-
-      // Step 3: Build initial message
-      const countryObj = ALL_COUNTRIES.find(c => c.code === data.country) || { code: data.country, name: data.country };
-      const initialMessage = buildIdeaInitialMessage({
-        ideaName: data.ideaName,
-        ideaDescription: data.ideaDescription,
-        countryCode: countryObj.code,
-        countryName: countryObj.name,
-        uniqueness: data.uniqueness
-      });
-
-      // Step 4: Post first user message
-      await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: chat.id,
-          content: initialMessage,
-          role: 'user'
-        }),
-        credentials: 'include'
-      });
-
-      // Step 5: Trigger AI agent to respond
-      await fetch('/api/agent/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: initialMessage,
-          chatId: chat.id,
-          language: i18n.language || 'en'
-        }),
-        credentials: 'include'
-      });
-
-      return { project, chat };
-    },
-    onSuccess: (data) => {
-      // Refresh queries
-      queryClient.invalidateQueries({
-        queryKey: [`/api/challenges/slug/${challengeSlug}`],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['challenge'],
-      });
-
-      // Reset form
-      setShowManualBuildForm(false);
-      setManualBuildStep(1);
-      setManualFormData({ ideaDescription: '', country: 'SA', uniqueness: '', ideaName: '' });
-
-      // Navigate to chat
-      if (currentWorkspaceSlug) {
-        setLocation(`/w/${currentWorkspaceSlug}/chat/${data.chat.id}`);
-      } else {
-        setLocation(`/chat/${data.chat.id}`);
-      }
-    },
-    onError: () => {
-      toast.error(t('challenge.ideaCreationFailed') || 'Failed to create idea');
-    },
-  });
-
-  const handleManualBuildSubmit = () => {
-    manualBuildMutation.mutate(manualFormData);
-  };
 
   const handleProjectClick = async (project: Project) => {
     try {
@@ -513,101 +338,6 @@ export default function ChallengeDetail() {
       console.error("Error navigating to project:", error);
       toast.error(t('challenge.navigationFailed'));
     }
-  };
-
-  const createIdeaMutation = useMutation({
-    mutationFn: async () => {
-      if (!isAuthenticated) {
-        throw new Error(t('auth.signInRequired'));
-      }
-
-      const orgId = challenge?.orgId;
-      if (!orgId) {
-        throw new Error(t('challenge.noOrganization'));
-      }
-
-      const projectResponse = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          orgId,
-          challengeId: challenge?.id,
-          title: challenge?.title + " #" + ((challenge?.projects?.length || 0) + 1),
-          description: challenge?.description,
-          type: 'LAUNCH'
-        })
-      });
-
-      if (!projectResponse.ok) {
-        throw new Error(t('challenge.createProjectFailed'));
-      }
-
-      const project = await projectResponse.json();
-
-      const chatResponse = await fetch('/api/chats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          projectId: project.id,
-          title: t('chat.defaultTitle')
-        })
-      });
-
-      if (!chatResponse.ok) {
-        throw new Error(t('challenge.createChatFailed'));
-      }
-
-      const chat = await chatResponse.json();
-
-      // ✅ FIX: Send initial user message
-      const initialMessage = `I want to create an idea for the challenge: "${challenge.title}"\n\nChallenge Description: ${challenge.description}`;
-
-      await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: chat.id,
-          role: 'user',
-          text: initialMessage
-        }),
-        credentials: 'include'
-      });
-
-      // ✅ FIX: Trigger agent to start conversation
-      await fetch('/api/agent/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: '__AGENT_START__',
-          chatId: chat.id,
-          language: i18n.language || 'en',
-        }),
-        credentials: 'include'
-      });
-
-      return { project, chat };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['challenge'] });
-
-      const slug = currentWorkspaceSlug;
-      if (slug) {
-        setLocation(`/w/${slug}/chat/${data.chat.id}`);
-      } else {
-        setLocation(`/chat/${data.chat.id}`);
-      }
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || t('challenge.createIdeaFailed'), {
-        duration: 3000,
-      });
-    }
-  });
-
-  const handleCreateIdea = () => {
-    createIdeaMutation.mutate();
   };
 
   if (challengeLoading) {
@@ -772,352 +502,138 @@ export default function ChallengeDetail() {
                         <Lightbulb className="w-5 h-5 text-primary" />
                         {t('challenge.myIdeas', { count: projects.length })}
                       </h2>
-                      {!isMentor && <Dialog open={showCreationDialog} onOpenChange={setShowCreationDialog}>
-                        <DialogTrigger asChild>
-                          <Button size="lg" className="gap-2">
-                            <Lightbulb className="w-4 h-4" />
-                            {t('challenge.createIdea')}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
-                          <DialogHeader>
-                            <DialogTitle>{t('challenge.chooseCreationMethod')}</DialogTitle>
-                            <DialogDescription>
-                              {t('challenge.chooseMethodDescription')}
-                            </DialogDescription>
-                          </DialogHeader>
-
-                          <div className="grid gap-4 py-4">
-                            {/* Build with AI Option */}
-                            {aiBuilderEnabled && (
-                              <button
-                                onClick={() => {
-                                  setShowCreationDialog(false);
-                                  handleCreateIdea();
-                                }}
-                                className="flex flex-col items-start gap-2 rounded-lg border-2 border-border p-4 hover:border-primary hover:bg-accent transition-colors text-left"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="rounded-full bg-primary/10 p-2">
-                                    <Sparkles className="h-5 w-5 text-primary" />
-                                  </div>
-                                  <div className="font-semibold text-lg">{t('challenge.buildWithAI')}</div>
-                                </div>
-                                <p className="text-sm text-muted-foreground ltr:ml-11 rtl:mr-11">
-                                  {t('challenge.buildWithAIDescription')}
-                                </p>
-                              </button>
-                            )}
-
-                            {/* Submit via Form Option */}
-                            {formSubmissionEnabled && (
-                              <button
-                                onClick={() => {
-                                  setShowCreationDialog(false);
-                                  setShowQuickSubmitForm(true);
-                                }}
-                                className="flex flex-col items-start gap-2 rounded-lg border-2 border-border p-4 hover:border-primary hover:bg-accent transition-colors text-left"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="rounded-full bg-primary/10 p-2">
-                                    <FileText className="h-5 w-5 text-primary" />
-                                  </div>
-                                  <div className="font-semibold text-lg">{t('challenge.submitViaForm')}</div>
-                                </div>
-                                <p className="text-sm text-muted-foreground ltr:ml-11 rtl:mr-11">
-                                  {t('challenge.submitViaFormDescription')}
-                                </p>
-                              </button>
-                            )}
-
-                            {/* Build Manually Option */}
-                            {manualBuildEnabled && (
-                              <button
-                                onClick={() => {
-                                  setShowCreationDialog(false);
-                                  setShowManualBuildForm(true);
-                                }}
-                                className="flex flex-col items-start gap-2 rounded-lg border-2 border-border p-4 hover:border-primary hover:bg-accent transition-colors text-left"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="rounded-full bg-primary/10 p-2">
-                                    <Edit className="h-5 w-5 text-primary" />
-                                  </div>
-                                  <div className="font-semibold text-lg">{t('challenge.buildManually')}</div>
-                                </div>
-                                <p className="text-sm text-muted-foreground ltr:ml-11 rtl:mr-11">
-                                  {t('challenge.buildManuallyDescription')}
-                                </p>
-                              </button>
-                            )}
-
-                            {/* Show message if all options are disabled */}
-                            {!aiBuilderEnabled && !formSubmissionEnabled && !manualBuildEnabled && (
-                              <div className="text-center text-muted-foreground py-8">
-                                <p>{t('challenge.submissionDisabled') || 'Submission options are currently disabled for this workspace.'}</p>
-                              </div>
-                            )}
-                          </div>
-                        </DialogContent>
-                      </Dialog>}
                     </div>
 
-                    {/* 3-Step Quick Submit Form Dialog */}
-                    <Dialog open={showQuickSubmitForm} onOpenChange={setShowQuickSubmitForm}>
-                      <DialogContent className="sm:max-w-[600px]">
+                    {/* Submit Your Solution Modal */}
+                    <Dialog open={!!submitModalProject} onOpenChange={(open) => { if (!open) { setSubmitModalProject(null); setSubmitPitchDeckUrl(''); setSubmitPrototypeUrl(''); setPitchDeckMode('select'); } }}>
+                      <DialogContent className="sm:max-w-[560px]">
                         <DialogHeader>
-                          <DialogTitle>
-                            {t('challenge.createYourIdea')} - {t('challenge.step')} {formStep} {t('challenge.of')} 3
-                          </DialogTitle>
+                          <DialogTitle>{t('challenge.submitYourSolution')}</DialogTitle>
                           <DialogDescription>
-                            {formStep === 1 && t('challenge.step1Description')}
-                            {formStep === 2 && t('challenge.step2Description')}
-                            {formStep === 3 && t('challenge.reviewBeforeCreate')}
+                            {t('challenge.submitDescription') || 'Provide your pitch deck and prototype URL to submit your solution.'}
                           </DialogDescription>
                         </DialogHeader>
 
-                        <div className="py-4">
-                          {/* Step 1: Basic Info */}
-                          {formStep === 1 && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="title">{t('challenge.ideaTitle')} *</Label>
-                                <Input
-                                  id="title"
-                                  value={quickFormData.title}
-                                  onChange={(e) => setQuickFormData({ ...quickFormData, title: e.target.value })}
-                                  placeholder={t('challenge.ideaTitlePlaceholder')}
-                                  maxLength={100}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="description">{t('challenge.description')} *</Label>
-                                <Textarea
-                                  id="description"
-                                  value={quickFormData.description}
-                                  onChange={(e) => setQuickFormData({ ...quickFormData, description: e.target.value })}
-                                  placeholder={t('challenge.descriptionPlaceholder')}
-                                  rows={6}
-                                  maxLength={5000}
-                                />
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {quickFormData.description.length} / 5000 {t('challenge.characters')}
-                                </p>
-                              </div>
+                        <div className="space-y-6 py-2">
+                          {/* Pitch Deck Section */}
+                          <div className="space-y-3">
+                            <Label className="text-sm font-semibold">Pitch Deck <span className="text-destructive">*</span></Label>
+                            <div className="flex gap-2 mb-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={pitchDeckMode === 'select' ? 'default' : 'outline'}
+                                onClick={() => setPitchDeckMode('select')}
+                              >
+                                Select from my decks
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={pitchDeckMode === 'upload' ? 'default' : 'outline'}
+                                onClick={() => setPitchDeckMode('upload')}
+                              >
+                                <Upload className="w-3 h-3 mr-1" />
+                                Upload PPTX
+                              </Button>
                             </div>
-                          )}
 
-                          {/* Step 2: Additional Details */}
-                          {formStep === 2 && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="url">{t('challenge.projectUrl')} ({t('challenge.optional')})</Label>
-                                <Input
-                                  id="url"
-                                  type="url"
-                                  value={quickFormData.submissionUrl}
-                                  onChange={(e) => setQuickFormData({ ...quickFormData, submissionUrl: e.target.value })}
-                                  placeholder={t('challenge.appendixPlaceholder') || 'Add links to supporting documents, research papers, or related resources'}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Step 3: Review */}
-                          {formStep === 3 && (
-                            <div className="space-y-4">
-                              <div className="rounded-lg border p-4 space-y-3">
-                                <div>
-                                  <h4 className="font-semibold text-sm text-muted-foreground">{t('challenge.title')}</h4>
-                                  <p>{quickFormData.title}</p>
-                                </div>
-                                <div>
-                                  <h4 className="font-semibold text-sm text-muted-foreground">{t('challenge.description')}</h4>
-                                  <p className="whitespace-pre-wrap">{quickFormData.description}</p>
-                                </div>
-                                {quickFormData.submissionUrl && (
-                                  <div>
-                                    <h4 className="font-semibold text-sm text-muted-foreground">{t('challenge.url')}</h4>
-                                    <a href={quickFormData.submissionUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                                      {quickFormData.submissionUrl}
-                                    </a>
-                                  </div>
+                            {pitchDeckMode === 'select' && (
+                              <>
+                                {myPitchDecks.filter(d => d.status === 'COMPLETED' && d.downloadUrl).length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No completed pitch decks found. Generate one in the Pitch Deck section or upload a PPTX file.</p>
+                                ) : (
+                                  <Select value={submitPitchDeckUrl} onValueChange={setSubmitPitchDeckUrl}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select a pitch deck..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {myPitchDecks
+                                        .filter(d => d.status === 'COMPLETED' && d.downloadUrl)
+                                        .map(deck => (
+                                          <SelectItem key={deck.id} value={deck.downloadUrl!}>
+                                            {deck.projectTitle || 'Untitled'} — {format(new Date(deck.createdAt), 'MMM d, yyyy')}
+                                          </SelectItem>
+                                        ))
+                                      }
+                                    </SelectContent>
+                                  </Select>
                                 )}
+                              </>
+                            )}
+
+                            {pitchDeckMode === 'upload' && (
+                              <div className="space-y-2">
+                                <Input
+                                  type="file"
+                                  accept=".pptx"
+                                  disabled={uploadingPitch}
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setUploadingPitch(true);
+                                    try {
+                                      const formData = new FormData();
+                                      formData.append('file', file);
+                                      const res = await fetch('/api/uploads/pitch-deck', {
+                                        method: 'POST',
+                                        credentials: 'include',
+                                        body: formData,
+                                      });
+                                      if (!res.ok) throw new Error('Upload failed');
+                                      const { url } = await res.json();
+                                      setSubmitPitchDeckUrl(url);
+                                      toast.success('Pitch deck uploaded');
+                                    } catch {
+                                      toast.error('Failed to upload pitch deck');
+                                    } finally {
+                                      setUploadingPitch(false);
+                                    }
+                                  }}
+                                />
+                                {uploadingPitch && <p className="text-sm text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Uploading...</p>}
+                                {submitPitchDeckUrl && !uploadingPitch && <p className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Uploaded successfully</p>}
                               </div>
-                              <p className="text-sm text-muted-foreground">
-                                {t('challenge.reviewSubmissionNote')}
-                              </p>
-                            </div>
-                          )}
+                            )}
+                          </div>
+
+                          {/* Prototype URL Section */}
+                          <div className="space-y-2">
+                            <Label htmlFor="prototypeUrl" className="text-sm font-semibold">
+                              Prototype URL <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                              id="prototypeUrl"
+                              type="url"
+                              placeholder="https://..."
+                              value={submitPrototypeUrl}
+                              onChange={(e) => setSubmitPrototypeUrl(e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Link className="w-3 h-3" />
+                              You can create your prototype at{' '}
+                              <a href="https://ai.fikrahub.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                                ai.fikrahub.com
+                              </a>
+                            </p>
+                          </div>
                         </div>
 
                         <DialogFooter>
-                          {formStep > 1 && (
-                            <Button
-                              variant="outline"
-                              onClick={() => setFormStep(formStep - 1)}
-                            >
-                              {t('challenge.back')}
-                            </Button>
-                          )}
-                          {formStep < 3 ? (
-                            <Button
-                              onClick={() => {
-                                // Validation
-                                if (formStep === 1) {
-                                  if (!quickFormData.title.trim()) {
-                                    toast.error(t('challenge.titleRequired'));
-                                    return;
-                                  }
-                                  if (quickFormData.description.length < 50) {
-                                    toast.error(t('challenge.descriptionMinLength'));
-                                    return;
-                                  }
-                                }
-                                setFormStep(formStep + 1);
-                              }}
-                            >
-                              {t('challenge.next')}
-                            </Button>
-                          ) : (
-                            <Button
-                              onClick={() => handleQuickSubmit()}
-                              disabled={quickSubmitMutation.isPending}
-                            >
-                              {quickSubmitMutation.isPending ? t('challenge.creatingIdea') : t('challenge.createIdeaButton')}
-                            </Button>
-                          )}
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-
-                    {/* 4-Step Manual Build Form Dialog */}
-                    <Dialog open={showManualBuildForm} onOpenChange={setShowManualBuildForm}>
-                      <DialogContent className="sm:max-w-[600px]">
-                        <DialogHeader>
-                          <DialogTitle>
-                            {t('challenge.buildManually')} - {t('challenge.step')} {manualBuildStep} {t('challenge.of')} 4
-                          </DialogTitle>
-                        </DialogHeader>
-
-                        <div className="space-y-6">
-                          {/* Step 1: Idea Description */}
-                          {manualBuildStep === 1 && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="ideaDescription">{t('manual.step1.title') || 'What is your idea? Explain it comprehensively.'}</Label>
-                                <Textarea
-                                  id="ideaDescription"
-                                  value={manualFormData.ideaDescription}
-                                  onChange={(e) => setManualFormData({ ...manualFormData, ideaDescription: e.target.value })}
-                                  rows={5}
-                                  className="mt-2"
-                                  placeholder={t('manual.step1.placeholder') || 'Describe your idea...'}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Step 2: Country */}
-                          {manualBuildStep === 2 && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="country">{t('manual.step2.title') || 'Where are you launching your idea?'}</Label>
-                                <select
-                                  id="country"
-                                  value={manualFormData.country}
-                                  onChange={(e) => setManualFormData({ ...manualFormData, country: e.target.value })}
-                                  className="w-full mt-2 bg-transparent rounded-lg border px-4 py-3"
-                                >
-                                  <option value="SA">Saudi Arabia</option>
-                                  <option value="AE">United Arab Emirates</option>
-                                  <option value="EG">Egypt</option>
-                                  <option value="JO">Jordan</option>
-                                  <option value="LB">Lebanon</option>
-                                  <option value="KW">Kuwait</option>
-                                  <option value="BH">Bahrain</option>
-                                  <option value="QA">Qatar</option>
-                                  <option value="OM">Oman</option>
-                                  <option value="US">United States</option>
-                                  <option value="GB">United Kingdom</option>
-                                  <option value="CA">Canada</option>
-                                  <option value="AU">Australia</option>
-                                </select>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Step 3: Uniqueness */}
-                          {manualBuildStep === 3 && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="uniqueness">{t('manual.step3.title') || 'What makes your idea unique?'}</Label>
-                                <Input
-                                  id="uniqueness"
-                                  value={manualFormData.uniqueness}
-                                  onChange={(e) => setManualFormData({ ...manualFormData, uniqueness: e.target.value })}
-                                  className="mt-2"
-                                  placeholder={t('manual.step3.placeholder') || 'Enter what makes your idea stand out...'}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Step 4: Idea Name */}
-                          {manualBuildStep === 4 && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="ideaName">{t('manual.step5.title') || 'What\'s your idea name?'}</Label>
-                                <Input
-                                  id="ideaName"
-                                  value={manualFormData.ideaName}
-                                  onChange={(e) => setManualFormData({ ...manualFormData, ideaName: e.target.value })}
-                                  className="mt-2"
-                                  placeholder={t('manual.step4.placeholder') || 'Enter your idea name...'}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <DialogFooter>
-                          {manualBuildStep > 1 && (
-                            <Button
-                              variant="outline"
-                              onClick={() => setManualBuildStep(manualBuildStep - 1)}
-                            >
-                              {t('challenge.back')}
-                            </Button>
-                          )}
-                          {manualBuildStep < 4 ? (
-                            <Button
-                              onClick={() => {
-                                // Validation
-                                if (manualBuildStep === 1 && !manualFormData.ideaDescription.trim()) {
-                                  toast.error(t('challenge.ideaDescriptionRequired') || 'Please enter your idea description');
-                                  return;
-                                }
-                                if (manualBuildStep === 3 && !manualFormData.uniqueness.trim()) {
-                                  toast.error(t('challenge.uniquenessRequired') || 'Please enter what makes your idea unique');
-                                  return;
-                                }
-                                setManualBuildStep(manualBuildStep + 1);
-                              }}
-                              disabled={
-                                (manualBuildStep === 1 && !manualFormData.ideaDescription.trim()) ||
-                                (manualBuildStep === 3 && !manualFormData.uniqueness.trim())
+                          <Button variant="outline" onClick={() => { setSubmitModalProject(null); setSubmitPitchDeckUrl(''); setSubmitPrototypeUrl(''); }}>
+                            {t('common.cancel')}
+                          </Button>
+                          <Button
+                            disabled={!submitPitchDeckUrl || !submitPrototypeUrl || submitProjectMutation.isPending || uploadingPitch}
+                            onClick={() => {
+                              if (submitModalProject) {
+                                submitProjectMutation.mutate({ projectId: submitModalProject.id, pitchDeckUrl: submitPitchDeckUrl, prototypeUrl: submitPrototypeUrl });
                               }
-                            >
-                              {t('challenge.next')}
-                            </Button>
-                          ) : (
-                            <Button
-                              onClick={handleManualBuildSubmit}
-                              disabled={manualBuildMutation.isPending || !manualFormData.ideaName.trim()}
-                            >
-                              {manualBuildMutation.isPending ? t('challenge.creatingIdea') : t('challenge.createIdeaButton')}
-                            </Button>
-                          )}
+                            }}
+                          >
+                            {submitProjectMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            {t('challenge.submitSolutionButton') || 'Submit Your Solution'}
+                          </Button>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
@@ -1126,16 +642,16 @@ export default function ChallengeDetail() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="min-w-[150px]">{t('challenge.table.title')}</TableHead>
-                            <TableHead className="hidden sm:table-cell">{t('challenge.table.type')}</TableHead>
-                            <TableHead className="hidden lg:table-cell">{t('challenge.table.created')}</TableHead>
+                            <TableHead className="min-w-[180px]">Idea</TableHead>
+                            <TableHead className="hidden sm:table-cell">Submission Checklist</TableHead>
+                            <TableHead className="hidden md:table-cell">Status</TableHead>
                             <TableHead className="ltr:text-right rtl:text-left min-w-[80px]">{t('challenge.table.actions')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {projects.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center py-8">
+                              <TableCell colSpan={4} className="text-center py-8">
                                 <div className="text-text-secondary">
                                   <Lightbulb className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                   <p>{t('challenge.noIdeasYet')}</p>
@@ -1148,51 +664,45 @@ export default function ChallengeDetail() {
                                 <TableCell className="font-medium">
                                   <div
                                     onClick={() => handleProjectClick(project)}
-                                    className="cursor-pointer hover:text-primary transition-colors"
+                                    className="cursor-pointer hover:text-primary transition-colors font-semibold"
                                   >
                                     {project.title}
                                   </div>
+                                  <div className="text-xs text-muted-foreground mt-0.5">
+                                    Last Edited: {format(new Date(project.updatedAt), 'MMM d, yyyy')}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="hidden sm:table-cell">
-                                  <div className="flex items-center gap-2">
-                                    {project.type === 'RESEARCH' && (
-                                      <>
-                                        <Search className="w-4 h-4 text-blue-500" />
-                                        <span className="text-blue-500 text-sm font-medium">{t('project.type.research')}</span>
-                                      </>
-                                    )}
-                                    {project.type === 'DEVELOP' && (
-                                      <>
-                                        <Code className="w-4 h-4 text-green-500" />
-                                        <span className="text-green-500 text-sm font-medium">{t('project.type.develop')}</span>
-                                      </>
-                                    )}
-                                    {project.type === 'LAUNCH' && (
-                                      <>
-                                        <Rocket className="w-4 h-4 text-orange-500" />
-                                        <span className="text-orange-500 text-sm font-medium">{t('project.type.launch')}</span>
-                                      </>
-                                    )}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-xs gap-1">
+                                      <CheckCircle2 className="w-3 h-3" /> AI Built
+                                    </Badge>
+                                    <Badge className={project.pitchDeckUrl ? "bg-green-500/10 text-green-600 border-green-500/20 text-xs gap-1" : "bg-muted text-muted-foreground text-xs gap-1"}>
+                                      <FileText className="w-3 h-3" /> Pitch Deck
+                                    </Badge>
+                                    <Badge className={project.deploymentUrl ? "bg-green-500/10 text-green-600 border-green-500/20 text-xs gap-1" : "bg-muted text-muted-foreground text-xs gap-1"}>
+                                      <Rocket className="w-3 h-3" /> Prototype
+                                    </Badge>
                                   </div>
                                 </TableCell>
-                                <TableCell className="hidden lg:table-cell">
-                                  <div className="flex items-center gap-2 text-text-secondary">
-                                    <Calendar className="w-4 h-4" />
-                                    {format(new Date(project.createdAt), 'MMM d, yyyy')}
-                                  </div>
+                                <TableCell className="hidden md:table-cell">
+                                  <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 text-xs">
+                                    Pending Submission
+                                  </Badge>
                                 </TableCell>
                                 <TableCell className="ltr:text-right rtl:text-left">
                                   <div className="flex items-center gap-2 ltr:justify-end rtl:justify-start">
-                                    <Button
-                                      variant="default"
-                                      size="sm"
-                                      onClick={() => handleSubmitProject(project.id)}
-                                      disabled={submitProjectMutation.isPending}
-                                      className="h-8"
-                                    >
-                                      <Send className="w-3 h-3 ltr:mr-1 rtl:ml-1" />
-                                      {t('challenge.submit')}
-                                    </Button>
+                                    {canSubmit && !isMentor && (
+                                      <Button
+                                        variant="default"
+                                        size="sm"
+                                        onClick={() => { setSubmitModalProject(project); setSubmitPitchDeckUrl(''); setSubmitPrototypeUrl(''); setPitchDeckMode('select'); }}
+                                        className="h-8"
+                                      >
+                                        <Send className="w-3 h-3 ltr:mr-1 rtl:ml-1" />
+                                        Submit
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -1217,13 +727,6 @@ export default function ChallengeDetail() {
                                             <span>{t('challenge.openInNewTab')}</span>
                                           </DropdownMenuItem>
                                         )}
-                                        <DropdownMenuItem
-                                          onClick={() => duplicateProjectMutation.mutate(project)}
-                                          className="flex items-center gap-2"
-                                        >
-                                          <Copy className="w-4 h-4" />
-                                          <span>{t('common.duplicate')}</span>
-                                        </DropdownMenuItem>
                                         <DropdownMenuItem
                                           onClick={() => {
                                             if (confirm(t('challenge.confirmDelete'))) {
@@ -1362,6 +865,34 @@ export default function ChallengeDetail() {
                     className="text-primary underline hover:text-primary/80 break-all"
                   >
                     {selectedSubmission.submissionUrl}
+                  </a>
+                </div>
+              )}
+
+              {selectedSubmission.pitchDeckUrl && (
+                <div>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-2">Pitch Deck</h4>
+                  <a
+                    href={selectedSubmission.pitchDeckUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline hover:text-primary/80 break-all"
+                  >
+                    Download Pitch Deck ↗
+                  </a>
+                </div>
+              )}
+
+              {selectedSubmission.prototypeUrl && (
+                <div>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-2">Prototype</h4>
+                  <a
+                    href={selectedSubmission.prototypeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline hover:text-primary/80 break-all"
+                  >
+                    {selectedSubmission.prototypeUrl}
                   </a>
                 </div>
               )}

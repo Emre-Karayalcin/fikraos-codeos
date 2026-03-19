@@ -96,6 +96,7 @@ export function registerChallengeRoutes(app: Express) {
           createdAt: projects.createdAt,
           updatedAt: projects.updatedAt,
           deploymentUrl: projects.deploymentUrl,
+          pitchDeckUrl: projects.pitchDeckUrl,
           createdBy: {
             id: users.id,
             username: users.username,
@@ -560,6 +561,11 @@ export function registerChallengeRoutes(app: Express) {
     try {
       const { id: challengeId, projectId } = req.params;
       const userId = req.user.id;
+      const { pitchDeckUrl, prototypeUrl } = req.body;
+
+      if (!pitchDeckUrl || !prototypeUrl) {
+        return res.status(400).json({ error: 'Pitch deck and prototype URL are required' });
+      }
 
       // Verify challenge exists and is active
       const [challenge] = await db
@@ -629,16 +635,18 @@ export function registerChallengeRoutes(app: Express) {
           description: project.description && project.description.trim() !== ''
             ? project.description
             : `Challenge submission for: ${challenge.title}`,
-          submissionUrl: project.deploymentUrl || '',
+          submissionUrl: prototypeUrl,
+          pitchDeckUrl: pitchDeckUrl,
+          prototypeUrl: prototypeUrl,
           status: 'submitted',
           attachments: [],
         })
         .returning();
 
-      // Mark project as submitted to hide it from "My Challenge Ideas"
+      // Mark project as submitted and store final pitchDeckUrl/deploymentUrl
       await db
         .update(projects)
-        .set({ submitted: true })
+        .set({ submitted: true, pitchDeckUrl: pitchDeckUrl, deploymentUrl: prototypeUrl })
         .where(eq(projects.id, projectId));
 
       // Increment challenge submission count

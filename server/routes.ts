@@ -167,6 +167,51 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ✅ Multer storage for PPTX pitch deck uploads
+  const pitchStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(process.cwd(), 'uploads', 'pitch');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${randomBytes(8).toString('hex')}`;
+      const ext = path.extname(file.originalname);
+      const nameWithoutExt = path.basename(file.originalname, ext);
+      const sanitized = nameWithoutExt
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9_-]/gi, '_')
+        .toLowerCase()
+        .slice(0, 100) || 'upload';
+      cb(null, `${sanitized}-${uniqueSuffix}${ext}`);
+    }
+  });
+
+  const uploadPitch = multer({
+    storage: pitchStorage,
+    limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+    fileFilter: (req, file, cb) => {
+      const allowed = ['application/vnd.openxmlformats-officedocument.presentationml.presentation'];
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (allowed.includes(file.mimetype) && ext === '.pptx') {
+        cb(null, true);
+      } else {
+        cb(new Error('Only .pptx files are allowed.'));
+      }
+    }
+  });
+
+  app.post('/api/uploads/pitch-deck', isAuthenticated, uploadPitch.single('file'), (req: any, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const url = `/uploads/pitch/${req.file.filename}`;
+    res.json({ url, name: req.file.originalname });
+  });
+
   // User info endpoint with organization memberships
   app.get('/api/user', isAuthenticated, async (req: any, res) => {
     try {
