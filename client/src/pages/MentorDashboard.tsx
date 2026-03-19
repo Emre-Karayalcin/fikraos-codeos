@@ -116,7 +116,7 @@ function IdeaViewDialog({ booking, open, onClose }: { booking: Booking; open: bo
 export default function MentorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"overview" | "calendar" | "feedback" | "profile">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "calendar" | "feedback" | "profile" | "participants">("overview");
   const [setupOpen, setSetupOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
@@ -140,6 +140,16 @@ export default function MentorDashboard() {
     queryKey: ["/api/mentor-profile/my-bookings"],
     queryFn: async () => {
       const res = await fetch("/api/mentor-profile/my-bookings", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const { data: participants = [] } = useQuery<any[]>({
+    queryKey: ["/api/mentor-profile/my-participants"],
+    queryFn: async () => {
+      const res = await fetch("/api/mentor-profile/my-participants", { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -184,6 +194,7 @@ export default function MentorDashboard() {
     { key: "calendar", label: "Calendar" },
     { key: "feedback", label: "Feedback" },
     { key: "profile", label: "Profile" },
+    { key: "participants", label: "Participants" },
   ] as const;
 
   const stats = [
@@ -397,6 +408,92 @@ export default function MentorDashboard() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* ── PARTICIPANTS TAB ── */}
+          {activeTab === "participants" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Users size={18} className="text-primary" />
+                <h2 className="font-semibold text-text-primary">My Participants</h2>
+                <span className="text-xs text-text-secondary ml-1">({participants.length} assigned)</span>
+              </div>
+
+              {participants.length === 0 ? (
+                <div className="bg-card border border-border rounded-lg p-6 text-center">
+                  <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-text-secondary text-sm">
+                    No participants assigned yet. Ask your PMO to assign members to you.
+                  </p>
+                </div>
+              ) : (
+                participants.map((p: any) => (
+                  <div key={p.user.id} className="bg-card border border-border rounded-lg overflow-hidden">
+                    {/* Member header */}
+                    <div className="flex items-center gap-3 p-4 border-b border-border">
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
+                        {getInitials(p.user.firstName, p.user.lastName)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-text-primary text-sm">
+                          {p.user.firstName} {p.user.lastName}
+                        </p>
+                        <p className="text-xs text-text-secondary">{p.user.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Ideas */}
+                      <div>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                          Ideas ({p.ideas?.length ?? 0})
+                        </p>
+                        {p.ideas?.length === 0 && (
+                          <p className="text-xs text-text-secondary italic">No ideas yet</p>
+                        )}
+                        {p.ideas?.map((idea: any) => (
+                          <div key={idea.id} className="flex items-center gap-2 py-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                            <span className="text-sm text-text-primary truncate">{idea.title}</span>
+                            <span className="text-xs text-text-secondary capitalize ml-auto">
+                              {idea.status?.replace(/_/g, " ").toLowerCase()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Pitch Decks */}
+                      <div>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                          Pitch Decks ({p.pitchDecks?.length ?? 0})
+                        </p>
+                        {p.pitchDecks?.length === 0 && (
+                          <p className="text-xs text-text-secondary italic">No pitch decks yet</p>
+                        )}
+                        {p.pitchDecks?.map((deck: any) => (
+                          <div key={deck.id} className="flex items-center gap-2 py-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0" />
+                            <span className="text-sm text-text-primary truncate">
+                              {deck.projectTitle || "Pitch deck"}
+                            </span>
+                            {deck.downloadUrl && (
+                              <a
+                                href={deck.downloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-auto text-primary hover:underline text-xs flex items-center gap-1"
+                              >
+                                <ExternalLink size={11} /> View
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           )}
 
           {/* ── CALENDAR TAB ── */}
