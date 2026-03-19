@@ -5,10 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import toast from 'react-hot-toast';
 
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -207,12 +205,16 @@ export default function ChallengeDetail() {
     enabled: !!isAuthenticated,
   });
 
-  // State for submit modal (per project)
-  const [submitModalProject, setSubmitModalProject] = useState<Project | null>(null);
-  const [submitPitchDeckUrl, setSubmitPitchDeckUrl] = useState('');
-  const [submitPrototypeUrl, setSubmitPrototypeUrl] = useState('');
+  // Submit confirmation dialog
+  const [submitConfirmProject, setSubmitConfirmProject] = useState<Project | null>(null);
+  // Pitch deck edit dialog
+  const [editPitchDeckProject, setEditPitchDeckProject] = useState<Project | null>(null);
+  const [localPitchDeckUrl, setLocalPitchDeckUrl] = useState('');
   const [pitchDeckMode, setPitchDeckMode] = useState<'select' | 'upload'>('select');
   const [uploadingPitch, setUploadingPitch] = useState(false);
+  // Prototype URL edit dialog
+  const [editPrototypeProject, setEditPrototypeProject] = useState<Project | null>(null);
+  const [localPrototypeUrl, setLocalPrototypeUrl] = useState('');
 
   // State for submission preview dialog
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
@@ -274,6 +276,22 @@ export default function ChallengeDetail() {
     }
   });
 
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({ projectId, data }: { projectId: string; data: { pitchDeckUrl?: string; deploymentUrl?: string } }) => {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update project');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['challenge', challengeSlug] });
+    },
+  });
+
   const submitProjectMutation = useMutation({
     mutationFn: async ({ projectId, pitchDeckUrl, prototypeUrl }: { projectId: string; pitchDeckUrl: string; prototypeUrl: string }) => {
       const response = await fetch(
@@ -294,9 +312,7 @@ export default function ChallengeDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['challenge'] });
       queryClient.invalidateQueries({ queryKey: ['submissions', challenge?.id] });
-      setSubmitModalProject(null);
-      setSubmitPitchDeckUrl('');
-      setSubmitPrototypeUrl('');
+      setSubmitConfirmProject(null);
       toast.success(t('challenge.projectSubmitted') || 'Project submitted successfully!');
     },
     onError: (error: Error) => {
@@ -478,9 +494,6 @@ export default function ChallengeDetail() {
               </div>
 
               <div className="flex gap-3">
-                {canSubmit && (
-                  <SubmitDialog challengeId={challenge.id} onSuccess={() => {}} />
-                )}
               </div>
             </div>
 
@@ -500,139 +513,143 @@ export default function ChallengeDetail() {
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Lightbulb className="w-5 h-5 text-primary" />
-                        {t('challenge.myIdeas', { count: projects.length })}
+                        {projects.length === 1 ? projects[0].title : t('challenge.myIdeas', { count: projects.length })}
                       </h2>
                     </div>
 
-                    {/* Submit Your Solution Modal */}
-                    <Dialog open={!!submitModalProject} onOpenChange={(open) => { if (!open) { setSubmitModalProject(null); setSubmitPitchDeckUrl(''); setSubmitPrototypeUrl(''); setPitchDeckMode('select'); } }}>
-                      <DialogContent className="sm:max-w-[560px]">
+                    {/* Pitch Deck Edit Dialog */}
+                    <Dialog open={!!editPitchDeckProject} onOpenChange={(open) => { if (!open) { setEditPitchDeckProject(null); setLocalPitchDeckUrl(''); setPitchDeckMode('select'); } }}>
+                      <DialogContent className="sm:max-w-[480px]">
                         <DialogHeader>
-                          <DialogTitle>{t('challenge.submitYourSolution')}</DialogTitle>
+                          <DialogTitle>Add Pitch Deck</DialogTitle>
+                          <DialogDescription>Select a generated pitch deck or upload a PPTX file.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-2">
+                          <div className="flex gap-2">
+                            <Button type="button" size="sm" variant={pitchDeckMode === 'select' ? 'default' : 'outline'} onClick={() => setPitchDeckMode('select')}>Select from my decks</Button>
+                            <Button type="button" size="sm" variant={pitchDeckMode === 'upload' ? 'default' : 'outline'} onClick={() => setPitchDeckMode('upload')}>
+                              <Upload className="w-3 h-3 mr-1" />Upload PPTX
+                            </Button>
+                          </div>
+                          {pitchDeckMode === 'select' && (
+                            myPitchDecks.filter(d => d.status === 'COMPLETED' && d.downloadUrl).length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No completed pitch decks found. Generate one in the Pitch Deck section or upload a PPTX.</p>
+                            ) : (
+                              <Select value={localPitchDeckUrl} onValueChange={setLocalPitchDeckUrl}>
+                                <SelectTrigger><SelectValue placeholder="Select a pitch deck..." /></SelectTrigger>
+                                <SelectContent>
+                                  {myPitchDecks.filter(d => d.status === 'COMPLETED' && d.downloadUrl).map(deck => (
+                                    <SelectItem key={deck.id} value={deck.downloadUrl!}>
+                                      {deck.projectTitle || 'Untitled'} — {format(new Date(deck.createdAt), 'MMM d, yyyy')}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )
+                          )}
+                          {pitchDeckMode === 'upload' && (
+                            <div className="space-y-2">
+                              <Input type="file" accept=".pptx" disabled={uploadingPitch} onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setUploadingPitch(true);
+                                try {
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  const res = await fetch('/api/uploads/pitch-deck', { method: 'POST', credentials: 'include', body: formData });
+                                  if (!res.ok) throw new Error('Upload failed');
+                                  const { url } = await res.json();
+                                  setLocalPitchDeckUrl(url);
+                                  toast.success('Pitch deck uploaded');
+                                } catch { toast.error('Failed to upload pitch deck'); }
+                                finally { setUploadingPitch(false); }
+                              }} />
+                              {uploadingPitch && <p className="text-sm text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Uploading...</p>}
+                              {localPitchDeckUrl && !uploadingPitch && <p className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Uploaded</p>}
+                            </div>
+                          )}
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setEditPitchDeckProject(null)}>{t('common.cancel')}</Button>
+                          <Button
+                            disabled={!localPitchDeckUrl || uploadingPitch || updateProjectMutation.isPending}
+                            onClick={() => {
+                              if (!editPitchDeckProject) return;
+                              updateProjectMutation.mutate(
+                                { projectId: editPitchDeckProject.id, data: { pitchDeckUrl: localPitchDeckUrl } },
+                                { onSuccess: () => { setEditPitchDeckProject(null); setLocalPitchDeckUrl(''); toast.success('Pitch deck saved'); } }
+                              );
+                            }}
+                          >
+                            {updateProjectMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}Save
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Prototype URL Edit Dialog */}
+                    <Dialog open={!!editPrototypeProject} onOpenChange={(open) => { if (!open) { setEditPrototypeProject(null); setLocalPrototypeUrl(''); } }}>
+                      <DialogContent className="sm:max-w-[440px]">
+                        <DialogHeader>
+                          <DialogTitle>Add Prototype URL</DialogTitle>
+                          <DialogDescription>Enter the URL of your working prototype.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3 py-2">
+                          <Input
+                            type="url"
+                            placeholder="https://..."
+                            value={localPrototypeUrl}
+                            onChange={(e) => setLocalPrototypeUrl(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Link className="w-3 h-3" />
+                            You can create your prototype at{' '}
+                            <a href="https://ai.fikrahub.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">ai.fikrahub.com</a>
+                          </p>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setEditPrototypeProject(null)}>{t('common.cancel')}</Button>
+                          <Button
+                            disabled={!localPrototypeUrl.trim() || updateProjectMutation.isPending}
+                            onClick={() => {
+                              if (!editPrototypeProject) return;
+                              updateProjectMutation.mutate(
+                                { projectId: editPrototypeProject.id, data: { deploymentUrl: localPrototypeUrl } },
+                                { onSuccess: () => { setEditPrototypeProject(null); setLocalPrototypeUrl(''); toast.success('Prototype URL saved'); } }
+                              );
+                            }}
+                          >
+                            {updateProjectMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}Save
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Submit Confirmation Dialog */}
+                    <Dialog open={!!submitConfirmProject} onOpenChange={(open) => { if (!open) setSubmitConfirmProject(null); }}>
+                      <DialogContent className="sm:max-w-[420px]">
+                        <DialogHeader>
+                          <DialogTitle>Submit Your Solution</DialogTitle>
                           <DialogDescription>
-                            {t('challenge.submitDescription') || 'Provide your pitch deck and prototype URL to submit your solution.'}
+                            Once submitted, you cannot make any changes to your idea. Are you sure you want to proceed?
                           </DialogDescription>
                         </DialogHeader>
-
-                        <div className="space-y-6 py-2">
-                          {/* Pitch Deck Section */}
-                          <div className="space-y-3">
-                            <Label className="text-sm font-semibold">Pitch Deck <span className="text-destructive">*</span></Label>
-                            <div className="flex gap-2 mb-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={pitchDeckMode === 'select' ? 'default' : 'outline'}
-                                onClick={() => setPitchDeckMode('select')}
-                              >
-                                Select from my decks
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={pitchDeckMode === 'upload' ? 'default' : 'outline'}
-                                onClick={() => setPitchDeckMode('upload')}
-                              >
-                                <Upload className="w-3 h-3 mr-1" />
-                                Upload PPTX
-                              </Button>
-                            </div>
-
-                            {pitchDeckMode === 'select' && (
-                              <>
-                                {myPitchDecks.filter(d => d.status === 'COMPLETED' && d.downloadUrl).length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">No completed pitch decks found. Generate one in the Pitch Deck section or upload a PPTX file.</p>
-                                ) : (
-                                  <Select value={submitPitchDeckUrl} onValueChange={setSubmitPitchDeckUrl}>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a pitch deck..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {myPitchDecks
-                                        .filter(d => d.status === 'COMPLETED' && d.downloadUrl)
-                                        .map(deck => (
-                                          <SelectItem key={deck.id} value={deck.downloadUrl!}>
-                                            {deck.projectTitle || 'Untitled'} — {format(new Date(deck.createdAt), 'MMM d, yyyy')}
-                                          </SelectItem>
-                                        ))
-                                      }
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              </>
-                            )}
-
-                            {pitchDeckMode === 'upload' && (
-                              <div className="space-y-2">
-                                <Input
-                                  type="file"
-                                  accept=".pptx"
-                                  disabled={uploadingPitch}
-                                  onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-                                    setUploadingPitch(true);
-                                    try {
-                                      const formData = new FormData();
-                                      formData.append('file', file);
-                                      const res = await fetch('/api/uploads/pitch-deck', {
-                                        method: 'POST',
-                                        credentials: 'include',
-                                        body: formData,
-                                      });
-                                      if (!res.ok) throw new Error('Upload failed');
-                                      const { url } = await res.json();
-                                      setSubmitPitchDeckUrl(url);
-                                      toast.success('Pitch deck uploaded');
-                                    } catch {
-                                      toast.error('Failed to upload pitch deck');
-                                    } finally {
-                                      setUploadingPitch(false);
-                                    }
-                                  }}
-                                />
-                                {uploadingPitch && <p className="text-sm text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Uploading...</p>}
-                                {submitPitchDeckUrl && !uploadingPitch && <p className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Uploaded successfully</p>}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Prototype URL Section */}
-                          <div className="space-y-2">
-                            <Label htmlFor="prototypeUrl" className="text-sm font-semibold">
-                              Prototype URL <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                              id="prototypeUrl"
-                              type="url"
-                              placeholder="https://..."
-                              value={submitPrototypeUrl}
-                              onChange={(e) => setSubmitPrototypeUrl(e.target.value)}
-                            />
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Link className="w-3 h-3" />
-                              You can create your prototype at{' '}
-                              <a href="https://ai.fikrahub.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                                ai.fikrahub.com
-                              </a>
-                            </p>
-                          </div>
-                        </div>
-
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => { setSubmitModalProject(null); setSubmitPitchDeckUrl(''); setSubmitPrototypeUrl(''); }}>
-                            {t('common.cancel')}
-                          </Button>
+                        <DialogFooter className="mt-4">
+                          <Button variant="outline" onClick={() => setSubmitConfirmProject(null)}>{t('common.cancel')}</Button>
                           <Button
-                            disabled={!submitPitchDeckUrl || !submitPrototypeUrl || submitProjectMutation.isPending || uploadingPitch}
+                            disabled={submitProjectMutation.isPending}
                             onClick={() => {
-                              if (submitModalProject) {
-                                submitProjectMutation.mutate({ projectId: submitModalProject.id, pitchDeckUrl: submitPitchDeckUrl, prototypeUrl: submitPrototypeUrl });
+                              if (submitConfirmProject) {
+                                submitProjectMutation.mutate({
+                                  projectId: submitConfirmProject.id,
+                                  pitchDeckUrl: submitConfirmProject.pitchDeckUrl!,
+                                  prototypeUrl: submitConfirmProject.deploymentUrl!,
+                                });
                               }
                             }}
                           >
                             {submitProjectMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            {t('challenge.submitSolutionButton') || 'Submit Your Solution'}
+                            Yes, Submit
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -673,16 +690,30 @@ export default function ChallengeDetail() {
                                   </div>
                                 </TableCell>
                                 <TableCell className="hidden sm:table-cell">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-xs gap-1">
-                                      <CheckCircle2 className="w-3 h-3" /> AI Built
-                                    </Badge>
-                                    <Badge className={project.pitchDeckUrl ? "bg-green-500/10 text-green-600 border-green-500/20 text-xs gap-1" : "bg-muted text-muted-foreground text-xs gap-1"}>
-                                      <FileText className="w-3 h-3" /> Pitch Deck
-                                    </Badge>
-                                    <Badge className={project.deploymentUrl ? "bg-green-500/10 text-green-600 border-green-500/20 text-xs gap-1" : "bg-muted text-muted-foreground text-xs gap-1"}>
-                                      <Rocket className="w-3 h-3" /> Prototype
-                                    </Badge>
+                                  <div className="flex flex-col gap-1.5">
+                                    {/* 1: View Idea Outputs */}
+                                    <button
+                                      onClick={() => handleProjectClick(project)}
+                                      className="flex items-center gap-1.5 text-xs font-medium bg-green-500/10 text-green-600 border border-green-500/20 rounded-full px-2 py-0.5 w-fit hover:bg-green-500/20 transition-colors"
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" /> View Idea Outputs
+                                    </button>
+                                    {/* 2: Pitch Deck */}
+                                    <button
+                                      onClick={() => { setEditPitchDeckProject(project); setLocalPitchDeckUrl(project.pitchDeckUrl || ''); setPitchDeckMode('select'); }}
+                                      className={`flex items-center gap-1.5 text-xs font-medium border rounded-full px-2 py-0.5 w-fit transition-colors ${project.pitchDeckUrl ? 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20' : 'bg-muted text-muted-foreground border-border hover:bg-accent'}`}
+                                    >
+                                      <FileText className="w-3 h-3" />
+                                      {project.pitchDeckUrl ? 'Pitch Deck ✓' : 'Add Pitch Deck'}
+                                    </button>
+                                    {/* 3: Prototype URL */}
+                                    <button
+                                      onClick={() => { setEditPrototypeProject(project); setLocalPrototypeUrl(project.deploymentUrl || ''); }}
+                                      className={`flex items-center gap-1.5 text-xs font-medium border rounded-full px-2 py-0.5 w-fit transition-colors ${project.deploymentUrl ? 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20' : 'bg-muted text-muted-foreground border-border hover:bg-accent'}`}
+                                    >
+                                      <Rocket className="w-3 h-3" />
+                                      {project.deploymentUrl ? 'Prototype ✓' : 'Add Prototype URL'}
+                                    </button>
                                   </div>
                                 </TableCell>
                                 <TableCell className="hidden md:table-cell">
@@ -696,8 +727,10 @@ export default function ChallengeDetail() {
                                       <Button
                                         variant="default"
                                         size="sm"
-                                        onClick={() => { setSubmitModalProject(project); setSubmitPitchDeckUrl(''); setSubmitPrototypeUrl(''); setPitchDeckMode('select'); }}
+                                        disabled={!project.pitchDeckUrl || !project.deploymentUrl}
+                                        onClick={() => setSubmitConfirmProject(project)}
                                         className="h-8"
+                                        title={!project.pitchDeckUrl || !project.deploymentUrl ? 'Add pitch deck and prototype URL first' : ''}
                                       >
                                         <Send className="w-3 h-3 ltr:mr-1 rtl:ml-1" />
                                         Submit
@@ -946,126 +979,6 @@ export default function ChallengeDetail() {
   );
 }
 
-function SubmitDialog({ challengeId, onSuccess }: { challengeId: string; onSuccess: () => void }) {
-  const [open, setOpen] = useState(false);
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
-
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    submissionUrl: ''
-  });
-
-  const submitMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const response = await fetch(`/api/challenges/${challengeId}/submissions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data)
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || t('challenge.submitFailed'));
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      toast.success(t('challenge.submitSuccess'), {
-        duration: 3000,
-      });
-      queryClient.invalidateQueries({ queryKey: ['challenge'] });
-      queryClient.invalidateQueries({ queryKey: ['submissions'] });
-      setOpen(false);
-      setFormData({ title: '', description: '', submissionUrl: '' });
-      onSuccess();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || t('challenge.submitFailed'), {
-        duration: 3000,
-      });
-    }
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title || !formData.description) {
-      toast.error(t('challenge.fillRequired'), {
-        duration: 3000,
-      });
-      return;
-    }
-    submitMutation.mutate(formData);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="lg" className="gap-2">
-          <Send className="w-4 h-4" />
-          {t('challenge.submitSolution')}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{t('challenge.submitYourSolution')}</DialogTitle>
-          <DialogDescription>
-            {t('challenge.submitDescription')}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">{t('challenge.form.title')}</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder={t('challenge.form.titlePlaceholder')}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">{t('challenge.form.description')}</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder={t('challenge.form.descriptionPlaceholder')}
-              rows={6}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="submissionUrl">{t('challenge.form.demoUrl')}</Label>
-            <Input
-              id="submissionUrl"
-              type="url"
-              value={formData.submissionUrl}
-              onChange={(e) => setFormData({ ...formData, submissionUrl: e.target.value })}
-              placeholder="https://..."
-            />
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" disabled={submitMutation.isPending}>
-              {submitMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {t('challenge.submitSolutionButton')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function SubmissionCard({ submission, onViewDetails }: { submission: Submission; onViewDetails: () => void }) {
   const { t } = useTranslation();

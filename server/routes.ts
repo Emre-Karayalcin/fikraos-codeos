@@ -900,7 +900,7 @@ export function registerRoutes(app: Express): Server {
       const updateData = req.body;
 
       // Whitelist allowed update fields to prevent mass assignment
-      const allowedFields = ['title', 'description', 'status', 'tags', 'type', 'deploymentUrl', 'verscale_chat_id'];
+      const allowedFields = ['title', 'description', 'status', 'tags', 'type', 'deploymentUrl', 'pitchDeckUrl', 'verscale_chat_id'];
       const safeUpdateData: any = {};
 
       for (const field of allowedFields) {
