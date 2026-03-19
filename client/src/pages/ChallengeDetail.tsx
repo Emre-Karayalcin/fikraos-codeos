@@ -173,6 +173,7 @@ export default function ChallengeDetail() {
     retry: false,
   });
   const isMentor = userRole?.role === 'MENTOR';
+  const isAdminOrMentor = ['OWNER', 'ADMIN', 'MENTOR'].includes(userRole?.role || '');
 
   const { data: submissions = [], isLoading: submissionsLoading } = useQuery<Submission[]>({
     queryKey: ['submissions', challenge?.id],
@@ -508,7 +509,7 @@ export default function ChallengeDetail() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                {!isAdminOrMentor && <Card>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -782,13 +783,40 @@ export default function ChallengeDetail() {
                       </Table>
                     </div>
                   </CardContent>
-                </Card>
+                </Card>}
 
+                {/* Admin/Mentor stats summary */}
+                {isAdminOrMentor && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold">{challenge.submissionCount}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Total Submissions</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold">{submissions.filter(s => s.pitchDeckUrl).length}</p>
+                        <p className="text-xs text-muted-foreground mt-1">With Pitch Deck</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold">{submissions.filter(s => s.prototypeUrl).length}</p>
+                        <p className="text-xs text-muted-foreground mt-1">With Prototype</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Admin/Mentor: full submissions table; Member: own submission only */}
                 <Card>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-xl font-semibold">
-                        {t('challenge.submissionsTitle', { count: challenge.submissionCount })}
+                        {isAdminOrMentor
+                          ? `All Submissions (${challenge.submissionCount})`
+                          : t('challenge.submissionsTitle', { count: challenge.submissionCount })}
                       </h2>
                     </div>
 
@@ -798,21 +826,74 @@ export default function ChallengeDetail() {
                       </div>
                     )}
 
-                    <div className="space-y-4">
-                      {submissions.length === 0 && !submissionsLoading && (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <p>{t('challenge.noSubmissionsYet')}</p>
+                    {isAdminOrMentor ? (
+                      // Admin/Mentor: rich table view
+                      submissions.length === 0 && !submissionsLoading ? (
+                        <p className="text-center py-8 text-muted-foreground">{t('challenge.noSubmissionsYet')}</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Submitter</TableHead>
+                                <TableHead>Idea</TableHead>
+                                <TableHead>Pitch Deck</TableHead>
+                                <TableHead>Prototype</TableHead>
+                                <TableHead>Submitted</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {submissions.map(submission => {
+                                const name = submission.user
+                                  ? `${submission.user.firstName || ''} ${submission.user.lastName || ''}`.trim() || submission.user.username
+                                  : 'Anonymous';
+                                return (
+                                  <TableRow key={submission.id}>
+                                    <TableCell className="font-medium">{name}</TableCell>
+                                    <TableCell>{submission.title}</TableCell>
+                                    <TableCell>
+                                      {submission.pitchDeckUrl
+                                        ? <a href={submission.pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm flex items-center gap-1"><ExternalLink className="w-3 h-3" />View</a>
+                                        : <span className="text-muted-foreground text-sm">—</span>}
+                                    </TableCell>
+                                    <TableCell>
+                                      {submission.prototypeUrl
+                                        ? <a href={submission.prototypeUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm flex items-center gap-1"><ExternalLink className="w-3 h-3" />View</a>
+                                        : <span className="text-muted-foreground text-sm">—</span>}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">
+                                      {format(new Date(submission.createdAt), 'MMM d, yyyy')}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(submission)}>
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
                         </div>
-                      )}
-
-                      {submissions.map(submission => (
-                        <SubmissionCard
-                          key={submission.id}
-                          submission={submission}
-                          onViewDetails={() => setSelectedSubmission(submission)}
-                        />
-                      ))}
-                    </div>
+                      )
+                    ) : (
+                      // Member: own submission as card
+                      <div className="space-y-4">
+                        {submissions.length === 0 && !submissionsLoading && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <p>{t('challenge.noSubmissionsYet')}</p>
+                          </div>
+                        )}
+                        {submissions.map(submission => (
+                          <SubmissionCard
+                            key={submission.id}
+                            submission={submission}
+                            onViewDetails={() => setSelectedSubmission(submission)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

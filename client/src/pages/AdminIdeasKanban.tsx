@@ -41,6 +41,11 @@ interface Idea {
     tags: string[];
     createdAt: string;
     updatedAt: string;
+    // Challenge project fields (present when filtering by challenge)
+    pitchDeckUrl?: string | null;
+    deploymentUrl?: string | null;
+    submitted?: boolean;
+    challengeId?: string | null;
   };
   owner: {
     id: string;
@@ -127,6 +132,22 @@ function DraggableIdeaCard({ item, onClick, onDelete }: { item: Idea; onClick: (
           <p className="text-xs text-muted-foreground line-clamp-2 ltr:text-left rtl:text-right">
             {item.idea.summary}
           </p>
+          {/* Show submission assets if this is a challenge project */}
+          {item.idea.challengeId && (
+            <div className="flex gap-1 flex-wrap pt-1">
+              {item.idea.submitted && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium bg-green-500/10 text-green-700 border border-green-500/20 rounded-full px-2 py-0.5">
+                  ✓ Submitted
+                </span>
+              )}
+              <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium border rounded-full px-2 py-0.5 ${item.idea.pitchDeckUrl ? 'bg-blue-500/10 text-blue-700 border-blue-500/20' : 'bg-muted text-muted-foreground border-border'}`}>
+                📊 Pitch Deck
+              </span>
+              <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium border rounded-full px-2 py-0.5 ${item.idea.deploymentUrl ? 'bg-purple-500/10 text-purple-700 border-purple-500/20' : 'bg-muted text-muted-foreground border-border'}`}>
+                🚀 Prototype
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
             <div className="flex items-center gap-1 flex-row">
               <User className="w-3 h-3" />

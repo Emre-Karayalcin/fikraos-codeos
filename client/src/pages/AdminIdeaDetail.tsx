@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AllAIOutputsView } from '@/components/idea/AllAIOutputsView';
 import {
@@ -588,6 +588,37 @@ export default function AdminIdeaDetail() {
                             @{owner.username}
                           </div>
                         </div>
+                        {(idea.pitchDeckUrl || idea.deploymentUrl) && (
+                          <div className="pt-2 border-t space-y-3">
+                            <div className="text-sm font-medium">Submission Assets</div>
+                            {idea.pitchDeckUrl && (
+                              <div>
+                                <div className="text-xs text-muted-foreground mb-1">Pitch Deck</div>
+                                <a
+                                  href={idea.pitchDeckUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary underline hover:text-primary/80 flex items-center gap-1"
+                                >
+                                  <ExternalLink className="w-3 h-3" /> Download ↗
+                                </a>
+                              </div>
+                            )}
+                            {idea.deploymentUrl && (
+                              <div>
+                                <div className="text-xs text-muted-foreground mb-1">Prototype URL</div>
+                                <a
+                                  href={idea.deploymentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary underline hover:text-primary/80 break-all flex items-center gap-1"
+                                >
+                                  <ExternalLink className="w-3 h-3" /> View Prototype ↗
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
 

@@ -414,7 +414,12 @@ export function registerChallengeRoutes(app: Express) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Get submissions
+      // Members only see their own submission; admins/owners/mentors see all
+      const isPrivileged = ['OWNER', 'ADMIN', 'MENTOR'].includes(member.role);
+      const submissionFilter = isPrivileged
+        ? eq(challengeSubmissions.challengeId, id)
+        : and(eq(challengeSubmissions.challengeId, id), eq(challengeSubmissions.userId, req.user.id));
+
       const submissions = await db
         .select({
           submission: challengeSubmissions,
@@ -428,7 +433,7 @@ export function registerChallengeRoutes(app: Express) {
         })
         .from(challengeSubmissions)
         .leftJoin(users, eq(challengeSubmissions.userId, users.id))
-        .where(eq(challengeSubmissions.challengeId, id))
+        .where(submissionFilter)
         .orderBy(desc(challengeSubmissions.createdAt));
 
       res.json(submissions);
