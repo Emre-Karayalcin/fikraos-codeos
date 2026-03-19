@@ -1,28 +1,41 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 
+interface PublicWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  primaryColor?: string;
+}
+
 export default function WorkspaceEntry() {
-  const [workspaceSlug, setWorkspaceSlug] = useState("");
+  const [selectedSlug, setSelectedSlug] = useState("");
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
 
+  const { data: workspaces = [], isLoading } = useQuery<PublicWorkspace[]>({
+    queryKey: ["/api/public/workspaces"],
+    queryFn: async () => {
+      const response = await fetch("/api/public/workspaces");
+      if (!response.ok) throw new Error("Failed to fetch workspaces");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const slug = workspaceSlug.trim().toLowerCase();
-    const slugPattern = /^[a-z0-9-]+$/;
-    if (!slug) return;
-    if (!slugPattern.test(slug)) {
-      alert(t('workspace.invalidWorkspaceName'));
-      return;
-    }
-    setLocation(`/w/${slug}`);
+    if (!selectedSlug) return;
+    setLocation(`/w/${selectedSlug}`);
   };
 
   return (
@@ -49,30 +62,37 @@ export default function WorkspaceEntry() {
                 <span className="text-3xl font-bold text-foreground">OS</span>
               </div>
             </div>
-
           </CardHeader>
 
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="workspace">{t('workspace.workspaceNameLabel')}</Label>
-                <Input
-                  id="workspace"
-                  type="text"
-                  placeholder={t('workspace.yourWorkspacePlaceholder')}
-                  value={workspaceSlug}
-                  onChange={(e) => setWorkspaceSlug(e.target.value)}
-                  autoFocus
-                  required
-                  title={t('workspace.workspaceSlugDesc')}
-                />
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-10">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <Select value={selectedSlug} onValueChange={setSelectedSlug}>
+                    <SelectTrigger id="workspace" className="w-full">
+                      <SelectValue placeholder={t('workspace.yourWorkspacePlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workspaces.map((ws) => (
+                        <SelectItem key={ws.id} value={ws.slug}>
+                          {ws.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <Button
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={!workspaceSlug.trim()}
+                disabled={!selectedSlug || isLoading}
               >
                 {t('workspace.continueToWorkspace')}
                 <ArrowRight className="ml-2 w-4 h-4" />

@@ -5292,6 +5292,27 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
       }
   });
 
+  // ── Public Workspace Discovery ────────────────────────────────────────────
+
+  // GET /api/public/workspaces — public, returns all workspaces for the entry page dropdown
+  app.get('/api/public/workspaces', async (_req, res) => {
+    try {
+      const result = await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+          slug: organizations.slug,
+          logoUrl: organizations.logoUrl,
+          primaryColor: organizations.primaryColor,
+        })
+        .from(organizations)
+        .orderBy(organizations.name);
+      return res.json(result);
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to fetch workspaces' });
+    }
+  });
+
   // ── Member Application Routes ─────────────────────────────────────────────
 
   // GET /api/workspaces/:slug/active-challenges — public, for onboarding form
