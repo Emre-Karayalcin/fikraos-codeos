@@ -883,6 +883,93 @@ export function registerSuperAdminRoutes(app: Express) {
     }
   });
 
+  // GET /api/super-admin/activity-insights — cross-workspace activity stats
+  app.get("/api/super-admin/activity-insights", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { workspaceId, challengeId } = req.query as { workspaceId?: string; challengeId?: string };
+
+      // Build WHERE clauses for optional filters
+      const wsFilter = workspaceId ? sql`AND o.id = ${workspaceId}` : sql``;
+      const challengeFilter = challengeId ? sql`AND cs.challenge_id = ${challengeId}` : sql``;
+      const challengeFilterApps = challengeId ? sql`AND 1=0` : sql``; // applications not linked to specific challenges
+
+      // Submissions aggregated by workspace
+      const submissionsResult = await db.execute(sql`
+        SELECT
+          o.id            AS "workspaceId",
+          o.name          AS "workspaceName",
+          o.slug          AS "workspaceSlug",
+          c.id            AS "challengeId",
+          c.title         AS "challengeTitle",
+          COUNT(cs.id)::int                                                       AS "totalSubmissions",
+          COUNT(cs.pitch_deck_url)::int                                           AS "withPitchDeck",
+          COUNT(cs.prototype_url)::int                                            AS "withPrototype",
+          MIN(cs.submitted_at)                                                    AS "firstSubmissionAt",
+          MAX(cs.submitted_at)                                                    AS "lastSubmissionAt"
+        FROM   challenge_submissions cs
+        JOIN   challenges            c  ON c.id  = cs.challenge_id
+        JOIN   organizations         o  ON o.id  = c.org_id
+        WHERE  1=1 ${wsFilter} ${challengeFilter}
+        GROUP BY o.id, o.name, o.slug, c.id, c.title
+        ORDER BY MAX(cs.submitted_at) DESC NULLS LAST
+      `);
+
+      // Member applications (invites, approvals, rejections) aggregated by workspace
+      const applicationsResult = await db.execute(sql`
+        SELECT
+          o.id            AS "workspaceId",
+          o.name          AS "workspaceName",
+          o.slug          AS "workspaceSlug",
+          COUNT(*)::int                                                              AS "total",
+          COUNT(*) FILTER (WHERE ma.status = 'approved')::int                      AS "approved",
+          COUNT(*) FILTER (WHERE ma.status = 'rejected')::int                      AS "rejected",
+          COUNT(*) FILTER (WHERE ma.status = 'PENDING_REVIEW')::int                AS "pending"
+        FROM   member_applications ma
+        JOIN   organizations        o ON o.id = ma.org_id
+        WHERE  1=1 ${wsFilter} ${challengeFilterApps}
+        GROUP BY o.id, o.name, o.slug
+        ORDER BY COUNT(*) DESC
+      `);
+
+      // User invites (organization members joined via invite, i.e. non-owner) by workspace
+      const invitesResult = await db.execute(sql`
+        SELECT
+          o.id            AS "workspaceId",
+          o.name          AS "workspaceName",
+          o.slug          AS "workspaceSlug",
+          COUNT(*)::int   AS "totalInvited",
+          COUNT(*) FILTER (WHERE om.role = 'MEMBER')::int   AS "members",
+          COUNT(*) FILTER (WHERE om.role = 'MENTOR')::int   AS "mentors",
+          COUNT(*) FILTER (WHERE om.role = 'ADMIN')::int    AS "admins"
+        FROM   organization_members om
+        JOIN   organizations         o ON o.id = om.org_id
+        WHERE  om.role != 'OWNER' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``}
+        GROUP BY o.id, o.name, o.slug
+        ORDER BY COUNT(*) DESC
+      `);
+
+      // High-level totals
+      const totalsResult = await db.execute(sql`
+        SELECT
+          (SELECT COUNT(*)::int FROM challenge_submissions cs JOIN challenges c ON c.id = cs.challenge_id JOIN organizations o ON o.id = c.org_id WHERE 1=1 ${wsFilter} ${challengeFilter})  AS "totalSubmissions",
+          (SELECT COUNT(*)::int FROM member_applications  ma JOIN organizations o ON o.id = ma.org_id WHERE 1=1 ${wsFilter})                                                               AS "totalApplications",
+          (SELECT COUNT(*)::int FROM member_applications  ma JOIN organizations o ON o.id = ma.org_id WHERE ma.status = 'approved' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``})  AS "approvedApplications",
+          (SELECT COUNT(*)::int FROM member_applications  ma JOIN organizations o ON o.id = ma.org_id WHERE ma.status = 'rejected' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``})  AS "rejectedApplications",
+          (SELECT COUNT(*)::int FROM organization_members om JOIN organizations o ON o.id = om.org_id WHERE om.role != 'OWNER' ${wsFilter ? sql`AND o.id = ${workspaceId}` : sql``})        AS "totalInvites"
+      `);
+
+      res.json({
+        totals: totalsResult.rows[0] || {},
+        submissions: submissionsResult.rows,
+        applications: applicationsResult.rows,
+        invites: invitesResult.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching activity insights:", error);
+      res.status(500).json({ error: "Failed to fetch activity insights" });
+    }
+  });
+
   // PATCH /api/super-admin/kanban/ideas/:id/status — update idea status
   app.patch("/api/super-admin/kanban/ideas/:id/status", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
     try {

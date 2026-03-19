@@ -585,6 +585,26 @@ export default function AdminIdeasKanban() {
                         )}
                       </div>
                     </SortableContext>
+
+                    {/* Submission summary row — shown when filtering by a specific challenge */}
+                    {selectedChallengeId !== 'all' && statusIdeas.length > 0 && (() => {
+                      const submittedCount = statusIdeas.filter((item: Idea) => item.idea.submitted).length;
+                      const pendingCount = statusIdeas.length - submittedCount;
+                      return (
+                        <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
+                          {submittedCount > 0 && (
+                            <span className="inline-flex items-center gap-1 bg-green-500/10 text-green-700 border border-green-500/20 rounded-full px-2 py-0.5 font-medium">
+                              ✓ {submittedCount} submitted
+                            </span>
+                          )}
+                          {pendingCount > 0 && (
+                            <span className="inline-flex items-center gap-1 bg-yellow-500/10 text-yellow-700 border border-yellow-500/20 rounded-full px-2 py-0.5 font-medium">
+                              ⏳ {pendingCount} pending
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </DroppableColumn>
                 );
               })}

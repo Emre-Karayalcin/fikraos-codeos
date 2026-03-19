@@ -18,6 +18,14 @@ import {
   reorderChallengesSchema,
   validateRequest,
 } from "@shared/validation-schemas";
+import { Resend } from "resend";
+import mustache from "mustache";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __crFilename = fileURLToPath(import.meta.url);
+const __crDir = path.dirname(__crFilename);
 
 export function registerChallengeRoutes(app: Express) {
 
@@ -662,6 +670,58 @@ export function registerChallengeRoutes(app: Express) {
           updatedAt: new Date(),
         })
         .where(eq(challenges.id, challengeId));
+
+      // Send submission confirmation email (non-blocking)
+      setImmediate(async () => {
+        try {
+          const resendApiKey = process.env.RESEND_API_KEY;
+          if (resendApiKey) {
+            const resendClient = new Resend(resendApiKey);
+            const [submitter] = await db.select().from(users).where(eq(users.id, userId));
+            const [org] = await db.select().from(organizations).where(eq(organizations.id, challenge.orgId));
+
+            const userName = submitter?.firstName || submitter?.username || submitter?.email || 'there';
+            const orgName = org?.name || 'FikraHub';
+            const hostUrl = process.env.HOST_URL || 'https://app.fikrahub.com';
+            const orgSlug = org?.slug || '';
+            const dashboardUrl = `${hostUrl}/w/${orgSlug}/challenges`;
+
+            const templateCandidates = [
+              path.join(__crDir, 'email-templates', 'challenge-submission-confirmation.html'),
+              path.join(process.cwd(), 'server', 'email-templates', 'challenge-submission-confirmation.html'),
+              path.join(process.cwd(), 'dist', 'email-templates', 'challenge-submission-confirmation.html'),
+            ];
+
+            let html = '';
+            const found = templateCandidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+            if (found) {
+              try {
+                const tpl = fs.readFileSync(found, 'utf8');
+                html = mustache.render(tpl, {
+                  userName,
+                  orgName,
+                  challengeTitle: challenge.title,
+                  ideaTitle: project.title,
+                  pitchDeckUrl: pitchDeckUrl || '',
+                  prototypeUrl: prototypeUrl || '',
+                  dashboardUrl,
+                });
+              } catch { /* ignore template errors */ }
+            }
+
+            if (html && submitter?.email) {
+              await resendClient.emails.send({
+                from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+                to: submitter.email,
+                subject: `Your submission to "${challenge.title}" is confirmed!`,
+                html,
+              });
+            }
+          }
+        } catch (emailErr) {
+          console.error('Failed to send submission confirmation email:', emailErr);
+        }
+      });
 
       // Trigger auto-evaluation in background (non-blocking)
       // Import will be added at the top of the file
