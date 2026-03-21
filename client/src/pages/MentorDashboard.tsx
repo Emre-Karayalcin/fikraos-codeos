@@ -255,31 +255,31 @@ export default function MentorDashboard() {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 pb-20 sm:pb-0">
-        <div className="absolute top-4 sm:top-6 ltr:right-4 ltr:sm:right-6 rtl:left-4 rtl:sm:left-6 flex items-center gap-2 sm:gap-3 z-10">
-          <LanguageSwitcher />
-        </div>
 
         {/* Page Header */}
         <div className="p-4 sm:p-6 border-b border-border">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-semibold text-text-primary">Mentor Dashboard</h1>
               <p className="text-text-secondary mt-1 text-sm sm:text-base">Manage your sessions and bookings</p>
             </div>
-            <div className="flex gap-1 p-1 rounded-lg bg-muted mt-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    activeTab === tab.key
-                      ? "bg-background text-text-primary shadow-sm"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex gap-1 p-1 rounded-lg bg-muted">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      activeTab === tab.key
+                        ? "bg-background text-text-primary shadow-sm"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <LanguageSwitcher />
             </div>
           </div>
         </div>
