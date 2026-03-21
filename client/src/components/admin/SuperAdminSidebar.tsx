@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Kanban, BarChart2 } from "lucide-react";
+import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Kanban, BarChart2, Building2, Users, Target, CalendarDays, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
@@ -17,9 +17,34 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
+    title: "Workspaces",
+    href: "/admin/workspaces",
+    icon: Building2,
+  },
+  {
+    title: "Users",
+    href: "/admin/users",
+    icon: Users,
+  },
+  {
     title: "Idea Management",
     href: "/admin/ideas",
     icon: Kanban,
+  },
+  {
+    title: "Challenges",
+    href: "/admin/challenges",
+    icon: Target,
+  },
+  {
+    title: "Events",
+    href: "/admin/events",
+    icon: CalendarDays,
+  },
+  {
+    title: "Applications",
+    href: "/admin/applications",
+    icon: ClipboardList,
   },
   {
     title: "Activity Insights",

@@ -54,6 +54,11 @@ import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 import SuperAdminIdeasPage from "@/pages/SuperAdminIdeasPage";
 import SuperAdminActivityInsights from "@/pages/SuperAdminActivityInsights";
 import SuperAdminLogin from "@/pages/SuperAdminLogin";
+import SuperAdminWorkspaces from "@/pages/SuperAdminWorkspaces";
+import SuperAdminUsers from "@/pages/SuperAdminUsers";
+import SuperAdminChallenges from "@/pages/SuperAdminChallenges";
+import SuperAdminEvents from "@/pages/SuperAdminEvents";
+import SuperAdminApplicationsList from "@/pages/SuperAdminApplicationsList";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -301,6 +306,36 @@ function Router() {
       <Route path="/admin/ideas" component={() => (
         <PageTransition>
           <SuperAdminGuard><SuperAdminIdeasPage /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/workspaces" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminWorkspaces /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/users" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminUsers /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/challenges" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminChallenges /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/events" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminEvents /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/applications" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminApplicationsList /></SuperAdminGuard>
         </PageTransition>
       )} />
 
