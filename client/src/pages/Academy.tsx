@@ -3,7 +3,7 @@ import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, ArrowLeft, PlayCircle, BookOpen, CheckCircle2 } from "lucide-react";
+import { GraduationCap, ArrowLeft, PlayCircle, BookOpen, CheckCircle2, Lock } from "lucide-react";
 import { useRoute, useLocation, useParams } from "wouter";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -330,40 +330,70 @@ function CourseContents({ courseSlug }: { courseSlug: string }) {
             const prog = progressBySlug[video.slug];
             const totalSec = parseDuration(video.duration);
             const watchPct = prog && totalSec > 0 ? Math.min(100, Math.round((prog.watchedSeconds / totalSec) * 100)) : 0;
+
+            // First video always unlocked; each subsequent video requires previous to be 100% complete
+            const prevVideo = index > 0 ? course.videos[index - 1] : null;
+            const prevProg = prevVideo ? progressBySlug[prevVideo.slug] : null;
+            const isLocked = index > 0 && !prevProg?.completed;
+
             return (
               <Card
                 key={video.id}
-                className="overflow-hidden border border-border/50 hover:border-border hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => setLocation(`/w/${currentSlug}/academy/${courseSlug}/${video.slug}`)}
+                className={`overflow-hidden border transition-all ${
+                  isLocked
+                    ? "border-border/30 opacity-60 cursor-not-allowed"
+                    : "border-border/50 hover:border-border hover:shadow-md cursor-pointer group"
+                }`}
+                onClick={() => !isLocked && setLocation(`/w/${currentSlug}/academy/${courseSlug}/${video.slug}`)}
               >
                 <div className="flex items-center gap-4 p-4">
-                  <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold ${prog?.completed ? 'bg-green-500/10' : 'bg-primary/10'}`}>
+                  {/* Number / status icon */}
+                  <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold ${
+                    prog?.completed ? 'bg-green-500/10' : isLocked ? 'bg-muted' : 'bg-primary/10'
+                  }`}>
                     {prog?.completed ? (
                       <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    ) : isLocked ? (
+                      <Lock className="w-5 h-5 text-muted-foreground" />
                     ) : (
                       <span className="text-primary">{index + 1}</span>
                     )}
                   </div>
+
+                  {/* Title + description + progress bar */}
                   <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold group-hover:text-primary transition-colors truncate ${prog?.completed ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    <h3 className={`font-semibold truncate transition-colors ${
+                      prog?.completed
+                        ? 'text-muted-foreground'
+                        : isLocked
+                        ? 'text-muted-foreground'
+                        : 'text-foreground group-hover:text-primary'
+                    }`}>
                       {video.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                    <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
                       {video.description}
                     </p>
-                    {prog && !prog.completed && watchPct > 0 && (
-                      <div className="mt-1.5 w-28 bg-muted rounded-full h-1">
-                        <div
-                          className="bg-primary rounded-full h-1 transition-all"
-                          style={{ width: `${watchPct}%` }}
-                        />
-                      </div>
-                    )}
+
+                    {/* Always-visible progress bar (full width) */}
+                    <div className="mt-2 w-full bg-muted rounded-full h-1.5">
+                      <div
+                        className={`rounded-full h-1.5 transition-all ${prog?.completed ? 'bg-green-500' : 'bg-primary'}`}
+                        style={{ width: `${prog?.completed ? 100 : watchPct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {prog?.completed ? "Completed" : watchPct > 0 ? `${watchPct}% watched` : isLocked ? "Complete previous video to unlock" : "Not started"}
+                    </p>
                   </div>
-                  <div className="flex-shrink-0 flex items-center gap-3">
+
+                  {/* Duration + action icon */}
+                  <div className="flex-shrink-0 flex items-center gap-3 ml-2">
                     <span className="text-xs text-muted-foreground">{video.duration}</span>
                     {prog?.completed ? (
                       <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    ) : isLocked ? (
+                      <Lock className="w-5 h-5 text-muted-foreground" />
                     ) : (
                       <PlayCircle className="w-5 h-5 text-primary" />
                     )}
