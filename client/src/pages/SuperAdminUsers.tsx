@@ -36,7 +36,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Users, Pencil, Trash2, UserPlus, Plus, X } from "lucide-react";
+import { Users, Pencil, Trash2, UserPlus, Plus, X, Search, Filter } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
 import toast from "react-hot-toast";
 
@@ -115,6 +116,10 @@ export default function SuperAdminUsers() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [userModalId, setUserModalId] = useState<string | null>(null);
   const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterWorkspace, setFilterWorkspace] = useState("all");
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterDateRange, setFilterDateRange] = useState("all");
 
   const { data: users = [], isLoading: usersLoading } = useQuery<SuperAdminUser[]>({
     queryKey: ["/api/super-admin/users"],
@@ -130,6 +135,45 @@ export default function SuperAdminUsers() {
     if (!users) return [];
     return [...users].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    let list = sortedUsers;
+
+    // Search by name, email, username
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((u) =>
+        u.email?.toLowerCase().includes(q) ||
+        u.username?.toLowerCase().includes(q) ||
+        `${u.firstName ?? ""} ${u.lastName ?? ""}`.toLowerCase().includes(q)
+      );
+    }
+
+    // Filter by workspace
+    if (filterWorkspace !== "all") {
+      list = list.filter((u) => u.workspaces.some((w) => w.slug === filterWorkspace));
+    }
+
+    // Filter by role (only relevant when workspace is also selected, but apply globally)
+    if (filterRole !== "all") {
+      list = list.filter((u) => u.workspaces.some((w) => w.role === filterRole));
+    }
+
+    // Filter by join date
+    if (filterDateRange !== "all") {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - parseInt(filterDateRange));
+      list = list.filter((u) => new Date(u.createdAt) >= cutoff);
+    }
+
+    return list;
+  }, [sortedUsers, search, filterWorkspace, filterRole, filterDateRange]);
+
+  const activeFiltersCount = [
+    filterWorkspace !== "all",
+    filterRole !== "all",
+    filterDateRange !== "all",
+  ].filter(Boolean).length;
 
   const updateUser = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, string> }) =>
@@ -234,10 +278,88 @@ export default function SuperAdminUsers() {
             </Button>
           </div>
 
+          {/* Search + Filters */}
+          <Card className="border border-border/50">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Search by name, email or username…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                  <Filter className="w-4 h-4" />
+                  {activeFiltersCount > 0 && (
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">{activeFiltersCount}</Badge>
+                  )}
+                </div>
+
+                {/* Workspace filter */}
+                <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
+                  <SelectTrigger className="w-44 h-9 text-sm">
+                    <SelectValue placeholder="All Workspaces" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Workspaces</SelectItem>
+                    {workspaces.map((w) => (
+                      <SelectItem key={w.slug} value={w.slug}>{w.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Role filter */}
+                <Select value={filterRole} onValueChange={setFilterRole}>
+                  <SelectTrigger className="w-36 h-9 text-sm">
+                    <SelectValue placeholder="All Roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {VALID_ROLES.map((r) => (
+                      <SelectItem key={r} value={r}>{ROLE_DISPLAY[r] ?? r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Date joined filter */}
+                <Select value={filterDateRange} onValueChange={setFilterDateRange}>
+                  <SelectTrigger className="w-36 h-9 text-sm">
+                    <SelectValue placeholder="Any time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any time</SelectItem>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
+                    <SelectItem value="365">Last year</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Clear filters */}
+                {(activeFiltersCount > 0 || search) && (
+                  <button
+                    onClick={() => { setSearch(""); setFilterWorkspace("all"); setFilterRole("all"); setFilterDateRange("all"); }}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="w-3 h-3" /> Clear
+                  </button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Users Table */}
           <Card className="border border-border/50">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">All Users</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold">All Users</CardTitle>
+                <span className="text-sm text-muted-foreground">{filteredUsers.length} of {sortedUsers.length}</span>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {usersLoading ? (
@@ -254,14 +376,14 @@ export default function SuperAdminUsers() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedUsers.length === 0 ? (
+                    {filteredUsers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                          No users found
+                          No users match your filters
                         </TableCell>
                       </TableRow>
                     ) : (
-                      sortedUsers.map((u) => (
+                      filteredUsers.map((u) => (
                         <TableRow key={u.id}>
                           <TableCell>
                             <div className="font-medium">
