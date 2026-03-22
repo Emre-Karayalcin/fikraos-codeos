@@ -313,7 +313,9 @@ export default function Dashboard() {
             </div>
             <div className="text-sm hidden sm:block">
               <p className="font-medium text-gray-900">{getUserDisplayName()}</p>
-              <p className="text-xs text-gray-500 capitalize">{(user as any).role || 'Member'}</p>
+              <p className="text-xs text-gray-500 capitalize">
+                {userRole?.role === 'ADMIN' ? 'PMO' : (userRole?.role?.toLowerCase() || 'member')}
+              </p>
             </div>
           </div>
 
