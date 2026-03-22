@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Kanban, Plus, User, Trash2, GraduationCap, Trophy } from 'lucide-react';
+import { Kanban, Plus, User, Trash2, GraduationCap, Trophy, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -221,6 +221,9 @@ export default function AdminIdeasKanban() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   // leaderboard modal state
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  // judge leaderboard modal state
+  const [judgeLeaderboardOpen, setJudgeLeaderboardOpen] = useState(false);
+  const [expandedJudgeRow, setExpandedJudgeRow] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const sensors = useSensors(
@@ -303,6 +306,22 @@ export default function AdminIdeasKanban() {
       return response.json();
     },
     enabled: !!workspace?.id && leaderboardOpen,
+  });
+
+  // Fetch judge leaderboard (only when modal is open)
+  const { data: judgeLeaderboardData = [] } = useQuery<{
+    projectId: string; title: string; ownerName: string;
+    totalCombined: number; avgScore: number | null; judgeCount: number;
+    deckSum: number; pitchSum: number; evalSum: number;
+    judges: { judgeName: string; score: number; deckScore: number; pitchScore: number; evalScore: number }[];
+  }[]>({
+    queryKey: ['/api/workspaces/admin/judge-leaderboard', workspace?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/workspaces/${workspace!.id}/admin/judge-leaderboard`, { credentials: 'include' });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!workspace?.id && judgeLeaderboardOpen,
   });
 
   // Fetch ideas (all or filtered by challenge)
@@ -630,6 +649,12 @@ export default function AdminIdeasKanban() {
                             Leaderboard
                           </Button>
                         )}
+                        {status.id === 'IN_INCUBATION' && (
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setJudgeLeaderboardOpen(true)}>
+                            <Trophy className="w-3 h-3 mr-1" />
+                            Judge Scores
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -765,6 +790,101 @@ export default function AdminIdeasKanban() {
                 {updateStatus.isPending ? 'Moving...' : 'Confirm'}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Judge leaderboard dialog */}
+        <Dialog open={judgeLeaderboardOpen} onOpenChange={(v) => { setJudgeLeaderboardOpen(v); if (!v) setExpandedJudgeRow(null); }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                Demo Day Judge Leaderboard
+              </DialogTitle>
+              <DialogDescription>IN_INCUBATION ideas ranked by combined judge score — click a row to see per-judge breakdown</DialogDescription>
+            </DialogHeader>
+            <div className="overflow-auto max-h-[65vh]">
+              {judgeLeaderboardData.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8 text-sm">No judge evaluations yet. Judges can score ideas from their dashboard.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead className="w-10">Rank</TableHead>
+                      <TableHead>Idea</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Avg</TableHead>
+                      <TableHead className="text-right">Deck</TableHead>
+                      <TableHead className="text-right">Pitch</TableHead>
+                      <TableHead className="text-right">Eval</TableHead>
+                      <TableHead className="text-right"># Judges</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {judgeLeaderboardData.map((row, idx) => (
+                      <React.Fragment key={row.projectId}>
+                        <TableRow
+                          className={`cursor-pointer ${idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : ''}`}
+                          onClick={() => setExpandedJudgeRow(expandedJudgeRow === row.projectId ? null : row.projectId)}
+                        >
+                          <TableCell className="text-muted-foreground">
+                            {expandedJudgeRow === row.projectId ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </TableCell>
+                          <TableCell className="font-bold text-center">
+                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                          </TableCell>
+                          <TableCell className="font-medium max-w-[160px] truncate">{row.title}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{row.ownerName}</TableCell>
+                          <TableCell className="text-right font-bold text-primary">{row.totalCombined}</TableCell>
+                          <TableCell className="text-right text-sm">{row.avgScore ?? '—'}</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">{row.deckSum}</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">{row.pitchSum}</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">{row.evalSum}</TableCell>
+                          <TableCell className="text-right text-sm">{row.judgeCount}</TableCell>
+                        </TableRow>
+                        {expandedJudgeRow === row.projectId && (
+                          <TableRow className="bg-muted/30">
+                            <TableCell colSpan={10} className="p-0">
+                              <div className="px-8 py-3 space-y-1">
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Per-Judge Breakdown</p>
+                                {row.judges.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">No evaluations yet.</p>
+                                ) : (
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-muted-foreground">
+                                        <th className="text-left pb-1 font-medium">Judge</th>
+                                        <th className="text-right pb-1 font-medium">Score</th>
+                                        <th className="text-right pb-1 font-medium">Deck (40%)</th>
+                                        <th className="text-right pb-1 font-medium">Pitch (30%)</th>
+                                        <th className="text-right pb-1 font-medium">Eval (30%)</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {row.judges.map((j, ji) => (
+                                        <tr key={ji} className="border-t border-border/50">
+                                          <td className="py-1 font-medium">{j.judgeName}</td>
+                                          <td className="py-1 text-right font-bold">{j.score}</td>
+                                          <td className="py-1 text-right text-muted-foreground">{j.deckScore}</td>
+                                          <td className="py-1 text-right text-muted-foreground">{j.pitchScore}</td>
+                                          <td className="py-1 text-right text-muted-foreground">{j.evalScore}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
 

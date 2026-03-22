@@ -32,7 +32,7 @@ import {
 
 const inviteUserSchema = z.object({
   email: z.string().email("Must be a valid email address"),
-  role: z.enum(["MEMBER", "MENTOR", "ADMIN"])
+  role: z.enum(["MEMBER", "MENTOR", "ADMIN", "JUDGE"])
 });
 
 type InviteUserForm = z.infer<typeof inviteUserSchema>;
@@ -259,6 +259,7 @@ export default function UserManagement({ orgId }: UserManagementProps) {
                               <SelectItem value="ADMIN">
                                 {t('admin.userManagement.roles.admin')}
                               </SelectItem>
+                              <SelectItem value="JUDGE">Judge</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />

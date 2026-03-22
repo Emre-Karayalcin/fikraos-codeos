@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import MentorDashboard from "./MentorDashboard";
+import JudgeDashboard from "./JudgeDashboard";
 
 import { useState } from "react";
 import {
@@ -254,6 +255,11 @@ export default function Dashboard() {
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  const isJudge = userRole?.role === 'JUDGE';
+  if (isJudge) {
+    return <JudgeDashboard />;
   }
 
   if (isMentor) {

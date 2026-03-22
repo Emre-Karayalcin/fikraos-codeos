@@ -152,7 +152,7 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const roleEnum = pgEnum("role", ["OWNER", "MEMBER", "MENTOR", "ADMIN"]);
+export const roleEnum = pgEnum("role", ["OWNER", "MEMBER", "MENTOR", "ADMIN", "JUDGE"]);
 
 // Idea Management Enums
 export const ideaStatusEnum = pgEnum('idea_status', [
@@ -864,6 +864,26 @@ export const ideaEvaluations = pgTable("idea_evaluations", {
 }));
 
 export type IdeaEvaluation = typeof ideaEvaluations.$inferSelect;
+
+export const judgeEvaluations = pgTable("judge_evaluations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  judgeId: varchar("judge_id").notNull().references(() => users.id),
+  // Demo Deck Slides (40%): d1–d5 = 8% each
+  d1: integer("d1"), d2: integer("d2"), d3: integer("d3"), d4: integer("d4"), d5: integer("d5"),
+  // Pitching Quality (30%): p1–p3 = 8%, p4 = 6%
+  p1: integer("p1"), p2: integer("p2"), p3: integer("p3"), p4: integer("p4"),
+  // Project Evaluation (30%): e1–e3 = 10% each
+  e1: integer("e1"), e2: integer("e2"), e3: integer("e3"),
+  totalScore: integer("total_score"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  uniqueJudgeProject: uniqueIndex("idx_judge_eval_judge_project").on(t.judgeId, t.projectId),
+}));
+
+export type JudgeEvaluation = typeof judgeEvaluations.$inferSelect;
 
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);

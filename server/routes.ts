@@ -58,11 +58,11 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, avg, sql as drizzleSql } from "drizzle-orm";
 import { canAccessProject, canModifyProject, canAccessChat, canAccessAssets } from "./middleware/authorization";
 import { requireApiKey } from "./middleware/api-key-auth";
 import { passwordResetLimiter, authRateLimiter, orgCreationLimiter, fileUploadLimiter, aiRateLimiter, dataExportLimiter } from "./middleware/security";
@@ -1530,6 +1530,261 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: 'Failed to fetch leaderboard' });
     }
   });
+
+  // ─── Judge endpoints ────────────────────────────────────────────────────────
+
+  // Helper: verify caller is JUDGE in the org
+  async function requireOrgJudge(req: any, orgId: string): Promise<boolean> {
+    const userId = req.user?.id;
+    if (!userId) return false;
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    return membership?.role === 'JUDGE';
+  }
+
+  // GET /api/workspaces/:orgId/judge/ideas — IN_INCUBATION ideas for judge dashboard
+  app.get('/api/workspaces/:orgId/judge/ideas', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgJudge(req, orgId))) return res.status(403).json({ error: 'Judge access required' });
+
+      const judgeId = req.user.id;
+      const rows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          status: projects.status,
+          tags: projects.tags,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerUsername: users.username,
+          evalId: judgeEvaluations.id,
+          totalScore: judgeEvaluations.totalScore,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(judgeEvaluations, and(
+          eq(judgeEvaluations.projectId, projects.id),
+          eq(judgeEvaluations.judgeId, judgeId)
+        ))
+        .where(and(eq(projects.orgId, orgId), eq(projects.status, 'IN_INCUBATION')));
+
+      const ideas = rows.map((r) => ({
+        projectId: r.projectId,
+        title: r.title,
+        tags: r.tags,
+        ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
+        scored: !!r.evalId,
+        totalScore: r.totalScore,
+      }));
+
+      res.json(ideas);
+    } catch (error) {
+      console.error('Error fetching judge ideas:', error);
+      res.status(500).json({ error: 'Failed to fetch ideas' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/judge/evaluations/:projectId
+  app.get('/api/workspaces/:orgId/judge/evaluations/:projectId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, projectId } = req.params;
+      if (!(await requireOrgJudge(req, orgId))) return res.status(403).json({ error: 'Judge access required' });
+
+      const judgeId = req.user.id;
+      const [evaluation] = await db
+        .select()
+        .from(judgeEvaluations)
+        .where(and(eq(judgeEvaluations.projectId, projectId), eq(judgeEvaluations.judgeId, judgeId)));
+
+      if (!evaluation) return res.status(404).json({ error: 'No evaluation found' });
+      res.json(evaluation);
+    } catch (error) {
+      console.error('Error fetching judge evaluation:', error);
+      res.status(500).json({ error: 'Failed to fetch evaluation' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/judge/evaluations/:projectId — upsert
+  app.post('/api/workspaces/:orgId/judge/evaluations/:projectId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, projectId } = req.params;
+      if (!(await requireOrgJudge(req, orgId))) return res.status(403).json({ error: 'Judge access required' });
+
+      const judgeId = req.user.id;
+      const { d1, d2, d3, d4, d5, p1, p2, p3, p4, e1, e2, e3 } = req.body;
+      const toNum = (v: any) => (v != null ? Number(v) : null);
+
+      const dn1=toNum(d1), dn2=toNum(d2), dn3=toNum(d3), dn4=toNum(d4), dn5=toNum(d5);
+      const pn1=toNum(p1), pn2=toNum(p2), pn3=toNum(p3), pn4=toNum(p4);
+      const en1=toNum(e1), en2=toNum(e2), en3=toNum(e3);
+
+      const safe = (v: number | null, weight: number) => v != null ? (v / 5) * weight : 0;
+      const totalScore = Math.round(
+        safe(dn1,8) + safe(dn2,8) + safe(dn3,8) + safe(dn4,8) + safe(dn5,8) +
+        safe(pn1,8) + safe(pn2,8) + safe(pn3,8) + safe(pn4,6) +
+        safe(en1,10) + safe(en2,10) + safe(en3,10)
+      );
+
+      const [existing] = await db
+        .select({ id: judgeEvaluations.id })
+        .from(judgeEvaluations)
+        .where(and(eq(judgeEvaluations.projectId, projectId), eq(judgeEvaluations.judgeId, judgeId)));
+
+      let result;
+      if (existing) {
+        [result] = await db.update(judgeEvaluations)
+          .set({ d1:dn1, d2:dn2, d3:dn3, d4:dn4, d5:dn5, p1:pn1, p2:pn2, p3:pn3, p4:pn4, e1:en1, e2:en2, e3:en3, totalScore, updatedAt: new Date() })
+          .where(and(eq(judgeEvaluations.projectId, projectId), eq(judgeEvaluations.judgeId, judgeId)))
+          .returning();
+      } else {
+        [result] = await db.insert(judgeEvaluations)
+          .values({ projectId, orgId, judgeId, d1:dn1, d2:dn2, d3:dn3, d4:dn4, d5:dn5, p1:pn1, p2:pn2, p3:pn3, p4:pn4, e1:en1, e2:en2, e3:en3, totalScore })
+          .returning();
+      }
+      res.json(result);
+
+      // Fire-and-forget: notify org admins
+      setImmediate(async () => {
+        try {
+          const resendApiKey = process.env.RESEND_API_KEY;
+          if (!resendApiKey) return;
+          const resendClient = new Resend(resendApiKey);
+          const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
+
+          const adminRows = await db
+            .select({ email: users.email, firstName: users.firstName })
+            .from(organizationMembers)
+            .innerJoin(users, eq(organizationMembers.userId, users.id))
+            .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role as any, ['ADMIN', 'OWNER'])));
+          if (!adminRows.length) return;
+
+          const [project] = await db.select({ title: projects.title }).from(projects).where(eq(projects.id, projectId));
+          const ideaTitle = project?.title || projectId;
+          const [judge] = await db.select({ firstName: users.firstName, email: users.email }).from(users).where(eq(users.id, judgeId));
+          const judgeName = judge?.firstName || judge?.email || 'Unknown';
+          const [orgRecord] = await db.select({ name: organizations.name, slug: organizations.slug }).from(organizations).where(eq(organizations.id, orgId));
+
+          for (const admin of adminRows) {
+            if (!admin.email) continue;
+            await resendClient.emails.send({
+              from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+              to: admin.email,
+              subject: `⚖️ Judge Evaluation Submitted — ${ideaTitle}`,
+              html: `<p>Hi ${admin.firstName || admin.email},</p><p>Judge <strong>${judgeName}</strong> submitted an evaluation for <strong>${ideaTitle}</strong> with a score of <strong>${totalScore}/100</strong>.</p><p><a href="${hostUrl}/w/${orgRecord?.slug || orgId}/admin/ideas">View in Dashboard</a></p>`,
+            });
+          }
+        } catch (emailErr) {
+          console.error('Failed to send judge evaluation email:', emailErr);
+        }
+      });
+    } catch (error) {
+      console.error('Error saving judge evaluation:', error);
+      res.status(500).json({ error: 'Failed to save evaluation' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/admin/judge-leaderboard — IN_INCUBATION ideas ranked by total judge score
+  app.get('/api/workspaces/:orgId/admin/judge-leaderboard', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      // 1. Aggregate per project: sum / avg / count of judge scores
+      const aggregateRows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerUsername: users.username,
+          totalCombined: drizzleSql<number>`coalesce(sum(${judgeEvaluations.totalScore}), 0)`,
+          avgScore: avg(judgeEvaluations.totalScore),
+          judgeCount: drizzleSql<number>`count(${judgeEvaluations.id})`,
+          // Category sub-scores (sum across judges, weighted)
+          deckSum: drizzleSql<number>`coalesce(sum(
+            (coalesce(${judgeEvaluations.d1},0)::numeric/5)*8 +
+            (coalesce(${judgeEvaluations.d2},0)::numeric/5)*8 +
+            (coalesce(${judgeEvaluations.d3},0)::numeric/5)*8 +
+            (coalesce(${judgeEvaluations.d4},0)::numeric/5)*8 +
+            (coalesce(${judgeEvaluations.d5},0)::numeric/5)*8
+          ), 0)`,
+          pitchSum: drizzleSql<number>`coalesce(sum(
+            (coalesce(${judgeEvaluations.p1},0)::numeric/5)*8 +
+            (coalesce(${judgeEvaluations.p2},0)::numeric/5)*8 +
+            (coalesce(${judgeEvaluations.p3},0)::numeric/5)*8 +
+            (coalesce(${judgeEvaluations.p4},0)::numeric/5)*6
+          ), 0)`,
+          evalSum: drizzleSql<number>`coalesce(sum(
+            (coalesce(${judgeEvaluations.e1},0)::numeric/5)*10 +
+            (coalesce(${judgeEvaluations.e2},0)::numeric/5)*10 +
+            (coalesce(${judgeEvaluations.e3},0)::numeric/5)*10
+          ), 0)`,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(judgeEvaluations, eq(judgeEvaluations.projectId, projects.id))
+        .where(and(eq(projects.orgId, orgId), eq(projects.status, 'IN_INCUBATION')))
+        .groupBy(projects.id, users.firstName, users.lastName, users.username)
+        .orderBy(drizzleSql`coalesce(sum(${judgeEvaluations.totalScore}), 0) desc`);
+
+      // 2. All individual judge evals with judge name for per-judge breakdown
+      const judgeAlias = db.select({
+        projectId: judgeEvaluations.projectId,
+        judgeId: judgeEvaluations.judgeId,
+        judgeFirstName: users.firstName,
+        judgeLastName: users.lastName,
+        judgeEmail: users.email,
+        totalScore: judgeEvaluations.totalScore,
+        d1: judgeEvaluations.d1, d2: judgeEvaluations.d2, d3: judgeEvaluations.d3,
+        d4: judgeEvaluations.d4, d5: judgeEvaluations.d5,
+        p1: judgeEvaluations.p1, p2: judgeEvaluations.p2, p3: judgeEvaluations.p3, p4: judgeEvaluations.p4,
+        e1: judgeEvaluations.e1, e2: judgeEvaluations.e2, e3: judgeEvaluations.e3,
+      })
+      .from(judgeEvaluations)
+      .innerJoin(users, eq(judgeEvaluations.judgeId, users.id))
+      .where(eq(judgeEvaluations.orgId, orgId));
+
+      const evalRows = await judgeAlias;
+
+      // Group evals by projectId
+      const evalsByProject: Record<string, { judgeName: string; score: number; deckScore: number; pitchScore: number; evalScore: number }[]> = {};
+      for (const e of evalRows) {
+        if (!evalsByProject[e.projectId]) evalsByProject[e.projectId] = [];
+        const n = (v: number | null) => v ?? 0;
+        const deckScore = Math.round((n(e.d1)/5)*8 + (n(e.d2)/5)*8 + (n(e.d3)/5)*8 + (n(e.d4)/5)*8 + (n(e.d5)/5)*8);
+        const pitchScore = Math.round((n(e.p1)/5)*8 + (n(e.p2)/5)*8 + (n(e.p3)/5)*8 + (n(e.p4)/5)*6);
+        const evalScore = Math.round((n(e.e1)/5)*10 + (n(e.e2)/5)*10 + (n(e.e3)/5)*10);
+        evalsByProject[e.projectId].push({
+          judgeName: [e.judgeFirstName, e.judgeLastName].filter(Boolean).join(' ') || e.judgeEmail || e.judgeId,
+          score: e.totalScore ?? 0,
+          deckScore, pitchScore, evalScore,
+        });
+      }
+
+      const leaderboard = aggregateRows.map((r) => ({
+        projectId: r.projectId,
+        title: r.title,
+        ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
+        totalCombined: Number(r.totalCombined),
+        avgScore: r.avgScore != null ? Math.round(Number(r.avgScore)) : null,
+        judgeCount: Number(r.judgeCount),
+        deckSum: Math.round(Number(r.deckSum)),
+        pitchSum: Math.round(Number(r.pitchSum)),
+        evalSum: Math.round(Number(r.evalSum)),
+        judges: evalsByProject[r.projectId] ?? [],
+      }));
+
+      res.json(leaderboard);
+    } catch (error) {
+      console.error('Error fetching judge leaderboard:', error);
+      res.status(500).json({ error: 'Failed to fetch judge leaderboard' });
+    }
+  });
+
+  // ─── End judge endpoints ─────────────────────────────────────────────────────
 
   // Chat routes
   app.get('/api/projects/:projectId/chats', isAuthenticated, canAccessProject, async (req, res) => {

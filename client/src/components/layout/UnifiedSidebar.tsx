@@ -316,6 +316,7 @@ export function UnifiedSidebar() {
 
   const isAdmin = userRole && (userRole.role === 'OWNER' || userRole.role === 'ADMIN');
   const isMentor = userRole?.role === 'MENTOR';
+  const isJudge = userRole?.role === 'JUDGE';
 
   const createProjectAndChat = async (payload?: { title?: string; description?: string }) => {
     if (!isAuthenticated) {
@@ -643,8 +644,8 @@ export function UnifiedSidebar() {
           </button>
         </div>
 
-        {/* New Idea Button - Only show when authenticated and expanded */}
-        {isAuthenticated && !isCollapsed && (
+        {/* New Idea Button - Only show when authenticated and expanded, not for mentors or judges */}
+        {isAuthenticated && !isCollapsed && !isMentor && !isJudge && (
           <div className="px-3 sm:px-4 pb-3 sm:pb-4">
             <button
               onClick={handleNewConversation}
@@ -683,7 +684,7 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
-                  {!isMentor && (
+                  {!isMentor && !isJudge && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -702,7 +703,7 @@ export function UnifiedSidebar() {
                   </Tooltip>
                   )}
 
-                  {!isMentor && (
+                  {!isMentor && !isJudge && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -742,7 +743,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Radar - Only show if enabled */}
-                  {radarEnabled && !isMentor && (
+                  {radarEnabled && !isMentor && !isJudge && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -819,7 +820,7 @@ export function UnifiedSidebar() {
                     </TooltipContent>
                   </Tooltip>
 
-                  {handleNewConversation && !isMentor && (
+                  {handleNewConversation && !isMentor && !isJudge && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -852,7 +853,7 @@ export function UnifiedSidebar() {
                     </div>
                   )}
 
-                  {!isMentor && (
+                  {!isMentor && !isJudge && (
                   <div
                     className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                       location.includes("/my-ideas") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -865,7 +866,7 @@ export function UnifiedSidebar() {
                   </div>
                   )}
 
-                  {!isMentor && (
+                  {!isMentor && !isJudge && (
                   <div
                     className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                       location.includes("/pitch") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -893,7 +894,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Radar - Only show if enabled */}
-                  {radarEnabled && !isMentor && (
+                  {radarEnabled && !isMentor && !isJudge && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/radar") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
