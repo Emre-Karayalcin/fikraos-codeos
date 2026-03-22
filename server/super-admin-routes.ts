@@ -1079,7 +1079,7 @@ export function registerSuperAdminRoutes(app: Express) {
 
           -- Platform events (role updates, member removes, idea status, program progress, etc.)
           SELECT
-            pe.event_type      AS "type",
+            pe.event_type::text AS "type",
             pe.id              AS "id",
             pe.created_at      AS "eventAt",
             actor.first_name   AS "firstName",
