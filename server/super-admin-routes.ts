@@ -1065,7 +1065,7 @@ export function registerSuperAdminRoutes(app: Express) {
             u.first_name       AS "firstName",
             u.last_name        AS "lastName",
             u.email            AS "email",
-            om.role            AS "detail",
+            om.role::text      AS "detail",
             o.name             AS "subDetail",
             o.name             AS "workspaceName",
             o.slug             AS "workspaceSlug",
@@ -1073,7 +1073,7 @@ export function registerSuperAdminRoutes(app: Express) {
           FROM organization_members om
           JOIN organizations o ON o.id = om.org_id
           JOIN users u ON u.id = om.user_id
-          WHERE om.role != 'OWNER' ${wsFilterDirect}
+          WHERE om.role::text != 'OWNER' ${wsFilterDirect}
 
           UNION ALL
 
