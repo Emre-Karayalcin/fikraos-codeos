@@ -819,6 +819,31 @@ export const mentorAssignments = pgTable("mentor_assignments", {
 
 export type MentorAssignment = typeof mentorAssignments.$inferSelect;
 
+// ── Platform Activity Events ─────────────────────────────────────────────────
+export const platformEventTypeEnum = pgEnum('platform_event_type', [
+  'ROLE_UPDATED',
+  'MEMBER_ADDED',
+  'MEMBER_REMOVED',
+  'PROGRAM_PROGRESS_UPDATED',
+  'IDEA_STATUS_CHANGED',
+  'CHALLENGE_STATUS_CHANGED',
+  'APPLICATION_STATUS_CHANGED',
+]);
+
+export const platformEvents = pgTable("platform_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  actorId: varchar("actor_id").references(() => users.id, { onDelete: 'set null' }),
+  eventType: platformEventTypeEnum("event_type").notNull(),
+  targetUserId: varchar("target_user_id").references(() => users.id, { onDelete: 'set null' }),
+  targetEntityId: varchar("target_entity_id"),
+  targetEntityLabel: varchar("target_entity_label"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type PlatformEvent = typeof platformEvents.$inferSelect;
+
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
 export const insertCourseProgressSchema = createInsertSchema(courseProgress).omit({ id: true, lastWatchedAt: true });

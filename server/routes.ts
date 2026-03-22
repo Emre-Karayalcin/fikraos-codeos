@@ -58,7 +58,7 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
@@ -694,6 +694,14 @@ export function registerRoutes(app: Express): Server {
       const { role } = req.body;
       
       await storage.updateMemberRole(orgId, userId, role);
+      // Log platform event
+      db.insert(platformEvents).values({
+        orgId,
+        actorId: req.user.id,
+        eventType: 'ROLE_UPDATED',
+        targetUserId: userId,
+        metadata: { newRole: role },
+      }).catch(console.error);
       res.json({ message: "Member role updated successfully" });
     } catch (error) {
       console.error("Error updating member role:", error);
@@ -1065,6 +1073,13 @@ export function registerRoutes(app: Express): Server {
         { titleEn: 'Pitching & Presentation', titleAr: 'العرض التقديمي' },
       ];
       const updated = await storage.upsertProgramProgress(orgId, newStep, newSteps, userId);
+      // Log platform event
+      db.insert(platformEvents).values({
+        orgId,
+        actorId: userId,
+        eventType: 'PROGRAM_PROGRESS_UPDATED',
+        metadata: { currentStep: newStep, previousStep: existing?.currentStep ?? null },
+      }).catch(console.error);
       res.json(updated);
     } catch (error) {
       console.error('Error updating program progress:', error);

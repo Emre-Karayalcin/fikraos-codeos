@@ -5,7 +5,7 @@ import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, desc, inArray } from "drizzle-orm";
-import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events, memberApplications } from "../shared/schema";
+import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events, memberApplications, platformEvents } from "../shared/schema";
 import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
 import { Resend } from "resend";
 import mustache from "mustache";
@@ -468,6 +468,14 @@ export function registerSuperAdminRoutes(app: Express) {
       if (!role || !validRoles.includes(role)) return res.status(400).json({ message: "Invalid role" });
 
       await storage.updateMemberRole(id, userId, role);
+      // Log platform event
+      db.insert(platformEvents).values({
+        orgId: id,
+        actorId: (req as any).user?.id,
+        eventType: 'ROLE_UPDATED',
+        targetUserId: userId,
+        metadata: { newRole: role, source: 'super_admin' },
+      }).catch(console.error);
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating member role:", error);
@@ -479,7 +487,17 @@ export function registerSuperAdminRoutes(app: Express) {
   app.delete("/api/super-admin/workspaces/:id/members/:userId", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
     try {
       const { id, userId } = req.params;
+      const [targetUser] = await db.select({ email: users.email, firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, userId));
       await storage.removeMemberFromOrganization(id, userId);
+      // Log platform event
+      db.insert(platformEvents).values({
+        orgId: id,
+        actorId: (req as any).user?.id,
+        eventType: 'MEMBER_REMOVED',
+        targetUserId: userId,
+        targetEntityLabel: targetUser ? (targetUser.firstName ? `${targetUser.firstName} ${targetUser.lastName || ''}`.trim() : targetUser.email) : undefined,
+        metadata: { source: 'super_admin' },
+      }).catch(console.error);
       res.json({ success: true });
     } catch (error) {
       console.error("Error removing member:", error);
@@ -1056,6 +1074,39 @@ export function registerSuperAdminRoutes(app: Express) {
           JOIN organizations o ON o.id = om.org_id
           JOIN users u ON u.id = om.user_id
           WHERE om.role != 'OWNER' ${wsFilterDirect}
+
+          UNION ALL
+
+          -- Platform events (role updates, member removes, idea status, program progress, etc.)
+          SELECT
+            pe.event_type      AS "type",
+            pe.id              AS "id",
+            pe.created_at      AS "eventAt",
+            actor.first_name   AS "firstName",
+            actor.last_name    AS "lastName",
+            COALESCE(actor.email, '')  AS "email",
+            CASE
+              WHEN pe.event_type = 'ROLE_UPDATED'               THEN COALESCE(target.email, pe.target_entity_label, 'Unknown user')
+              WHEN pe.event_type = 'MEMBER_REMOVED'             THEN COALESCE(pe.target_entity_label, target.email, 'Unknown user')
+              WHEN pe.event_type = 'IDEA_STATUS_CHANGED'        THEN pe.target_entity_label
+              WHEN pe.event_type = 'PROGRAM_PROGRESS_UPDATED'   THEN 'Step ' || COALESCE((pe.metadata->>'currentStep'), '?')
+              ELSE pe.target_entity_label
+            END                AS "detail",
+            CASE
+              WHEN pe.event_type = 'ROLE_UPDATED'               THEN COALESCE((pe.metadata->>'newRole'), '')
+              WHEN pe.event_type = 'MEMBER_REMOVED'             THEN ''
+              WHEN pe.event_type = 'IDEA_STATUS_CHANGED'        THEN COALESCE((pe.metadata->>'previousStatus'), '') || ' → ' || COALESCE((pe.metadata->>'newStatus'), '')
+              WHEN pe.event_type = 'PROGRAM_PROGRESS_UPDATED'   THEN 'Step ' || COALESCE((pe.metadata->>'previousStep'), '?') || ' → Step ' || COALESCE((pe.metadata->>'currentStep'), '?')
+              ELSE ''
+            END                AS "subDetail",
+            o.name             AS "workspaceName",
+            o.slug             AS "workspaceSlug",
+            NULL               AS "status"
+          FROM platform_events pe
+          JOIN organizations o ON o.id = pe.org_id
+          LEFT JOIN users actor  ON actor.id  = pe.actor_id
+          LEFT JOIN users target ON target.id = pe.target_user_id
+          WHERE 1=1 ${wsFilter}
         ) events
         ORDER BY "eventAt" DESC NULLS LAST
         LIMIT 200
@@ -1093,6 +1144,16 @@ export function registerSuperAdminRoutes(app: Express) {
         .set({ status: status as any, updatedAt: new Date() })
         .where(eq(projects.id, id))
         .returning();
+
+      // Log platform event
+      db.insert(platformEvents).values({
+        orgId: project.orgId,
+        actorId: (req as any).user?.id,
+        eventType: 'IDEA_STATUS_CHANGED',
+        targetEntityId: id,
+        targetEntityLabel: project.name,
+        metadata: { previousStatus: project.status, newStatus: status },
+      }).catch(console.error);
 
       res.json(updated);
     } catch (error) {

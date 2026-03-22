@@ -4,7 +4,7 @@ import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart2, Users, Trophy, CheckCircle, XCircle, FileText, Activity } from "lucide-react";
+import { BarChart2, Users, Trophy, CheckCircle, XCircle, FileText, Activity, UserCog, UserMinus, Layers, CalendarClock } from "lucide-react";
 
 interface Totals {
   totalSubmissions: number;
@@ -46,7 +46,7 @@ interface InviteRow {
 }
 
 interface ActivityLogEntry {
-  type: "submission" | "application" | "invite";
+  type: "submission" | "application" | "invite" | "ROLE_UPDATED" | "MEMBER_REMOVED" | "IDEA_STATUS_CHANGED" | "PROGRAM_PROGRESS_UPDATED";
   id: string;
   eventAt: string | null;
   firstName: string | null;
@@ -144,6 +144,26 @@ export default function SuperAdminActivityInsights() {
       if (entry.status === "AI_REVIEWED") return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-purple-500/10 text-purple-600 border border-purple-200 rounded-full px-2 py-0.5">🤖 AI Reviewed</span>;
       return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-yellow-500/10 text-yellow-600 border border-yellow-200 rounded-full px-2 py-0.5">⏳ Applied</span>;
     }
+    if (entry.type === "ROLE_UPDATED") return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-violet-500/10 text-violet-600 border border-violet-200 rounded-full px-2 py-0.5">
+        <UserCog className="w-3 h-3" /> Role Updated
+      </span>
+    );
+    if (entry.type === "MEMBER_REMOVED") return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-red-500/10 text-red-600 border border-red-200 rounded-full px-2 py-0.5">
+        <UserMinus className="w-3 h-3" /> Removed
+      </span>
+    );
+    if (entry.type === "IDEA_STATUS_CHANGED") return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-cyan-500/10 text-cyan-600 border border-cyan-200 rounded-full px-2 py-0.5">
+        <Layers className="w-3 h-3" /> Idea Status
+      </span>
+    );
+    if (entry.type === "PROGRAM_PROGRESS_UPDATED") return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-amber-500/10 text-amber-600 border border-amber-200 rounded-full px-2 py-0.5">
+        <CalendarClock className="w-3 h-3" /> Program Updated
+      </span>
+    );
     return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-orange-500/10 text-orange-600 border border-orange-200 rounded-full px-2 py-0.5">👤 Joined</span>;
   };
 
