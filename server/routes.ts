@@ -1498,7 +1498,7 @@ export function registerRoutes(app: Express): Server {
         .from(projects)
         .innerJoin(users, eq(projects.createdById, users.id))
         .leftJoin(ideaEvaluations, eq(projects.id, ideaEvaluations.projectId))
-        .where(and(eq(projects.orgId, orgId), eq(projects.status, 'SHORTLISTED')))
+        .where(and(eq(projects.orgId, orgId), inArray(projects.status, ['SHORTLISTED', 'IN_INCUBATION'])))
         .orderBy(desc(ideaEvaluations.totalScore));
 
       // Compute sub-scores for display
@@ -1555,13 +1555,19 @@ export function registerRoutes(app: Express): Server {
         .select({
           projectId: projects.id,
           title: projects.title,
-          status: projects.status,
+          description: projects.description,
           tags: projects.tags,
+          pitchDeckUrl: projects.pitchDeckUrl,
+          submitted: projects.submitted,
+          deploymentUrl: projects.deploymentUrl,
           ownerFirstName: users.firstName,
           ownerLastName: users.lastName,
           ownerUsername: users.username,
           evalId: judgeEvaluations.id,
           totalScore: judgeEvaluations.totalScore,
+          pmoScore: ideaEvaluations.totalScore,
+          aiScore: memberApplications.aiScore,
+          aiInsights: memberApplications.aiInsights,
         })
         .from(projects)
         .innerJoin(users, eq(projects.createdById, users.id))
@@ -1569,21 +1575,95 @@ export function registerRoutes(app: Express): Server {
           eq(judgeEvaluations.projectId, projects.id),
           eq(judgeEvaluations.judgeId, judgeId)
         ))
+        .leftJoin(ideaEvaluations, eq(ideaEvaluations.projectId, projects.id))
+        .leftJoin(memberApplications, eq(memberApplications.userId, projects.createdById))
         .where(and(eq(projects.orgId, orgId), eq(projects.status, 'IN_INCUBATION')));
 
       const ideas = rows.map((r) => ({
         projectId: r.projectId,
         title: r.title,
+        description: r.description,
         tags: r.tags,
+        pitchDeckUrl: r.pitchDeckUrl,
+        submitted: r.submitted,
+        deploymentUrl: r.deploymentUrl,
         ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
         scored: !!r.evalId,
         totalScore: r.totalScore,
+        pmoScore: r.pmoScore,
+        aiScore: r.aiScore,
       }));
 
       res.json(ideas);
     } catch (error) {
       console.error('Error fetching judge ideas:', error);
       res.status(500).json({ error: 'Failed to fetch ideas' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/judge/program-leaderboard — AI + PMO scores visible to judges
+  app.get('/api/workspaces/:orgId/judge/program-leaderboard', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgJudge(req, orgId))) return res.status(403).json({ error: 'Judge access required' });
+
+      const rows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          tags: projects.tags,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerUsername: users.username,
+          status: projects.status,
+          pmoScore: ideaEvaluations.totalScore,
+          pmoB1: ideaEvaluations.b1, pmoB2: ideaEvaluations.b2, pmoB3: ideaEvaluations.b3,
+          pmoB4: ideaEvaluations.b4, pmoB5: ideaEvaluations.b5,
+          pmoT1: ideaEvaluations.t1, pmoT2: ideaEvaluations.t2,
+          pmoT3: ideaEvaluations.t3, pmoT4: ideaEvaluations.t4,
+          pmoS1: ideaEvaluations.s1, pmoS2: ideaEvaluations.s2, pmoS3: ideaEvaluations.s3,
+          aiScore: memberApplications.aiScore,
+          aiInsights: memberApplications.aiInsights,
+          aiStrengths: memberApplications.aiStrengths,
+          aiRecommendations: memberApplications.aiRecommendations,
+          aiMetrics: memberApplications.aiMetrics,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(ideaEvaluations, eq(ideaEvaluations.projectId, projects.id))
+        .leftJoin(memberApplications, eq(memberApplications.userId, projects.createdById))
+        .where(and(eq(projects.orgId, orgId), inArray(projects.status, ['SHORTLISTED', 'IN_INCUBATION'])))
+        .orderBy(desc(memberApplications.aiScore));
+
+      const toNum = (v: number | null | undefined) => v ?? 0;
+      const result = rows.map((r) => ({
+        projectId: r.projectId,
+        title: r.title,
+        tags: r.tags,
+        status: r.status,
+        ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
+        aiScore: r.aiScore,
+        aiInsights: r.aiInsights,
+        aiStrengths: r.aiStrengths,
+        aiRecommendations: r.aiRecommendations,
+        aiMetrics: r.aiMetrics,
+        pmoScore: r.pmoScore,
+        pmoBusinessScore: r.pmoScore != null ? Math.round(
+          (toNum(r.pmoB1)/5)*10 + (toNum(r.pmoB2)/5)*8 + (toNum(r.pmoB3)/5)*8 +
+          (toNum(r.pmoB4)/5)*8 + (toNum(r.pmoB5)/5)*6
+        ) : null,
+        pmoTechnicalScore: r.pmoScore != null ? Math.round(
+          (toNum(r.pmoT1)/5)*10 + (toNum(r.pmoT2)/5)*8 + (toNum(r.pmoT3)/5)*6 + (toNum(r.pmoT4)/5)*6
+        ) : null,
+        pmoStrategicScore: r.pmoScore != null ? Math.round(
+          (toNum(r.pmoS1)/5)*12 + (toNum(r.pmoS2)/5)*10 + (toNum(r.pmoS3)/5)*8
+        ) : null,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching judge program leaderboard:', error);
+      res.status(500).json({ error: 'Failed to fetch leaderboard' });
     }
   });
 

@@ -723,7 +723,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Challenges - Only show if enabled */}
-                  {challengesEnabled && (
+                  {challengesEnabled && !isJudge && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -763,7 +763,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Experts - Only show if enabled */}
-                  {expertsEnabled && (
+                  {expertsEnabled && !isJudge && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -783,7 +783,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Academy - Only show if enabled */}
-                  {academyEnabled && (
+                  {academyEnabled && !isJudge && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -819,6 +819,25 @@ export function UnifiedSidebar() {
                       <p>{t('navigation.events')}</p>
                     </TooltipContent>
                   </Tooltip>
+
+                  {isJudge && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={`flex items-center justify-center p-3 rounded-md cursor-pointer transition-all duration-200 ${
+                            location.includes("/dashboard") && new URLSearchParams(window.location.search).get('tab') === 'leaderboard' ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                          }`}
+                          onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/dashboard?tab=leaderboard`)}
+                          data-testid="nav-judge-leaderboard"
+                        >
+                          <BarChart3 className="w-5 h-5" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>Leaderboard</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
 
                   {handleNewConversation && !isMentor && !isJudge && (
                     <Tooltip>
@@ -880,7 +899,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Challenges - Only show if enabled */}
-                  {challengesEnabled && (
+                  {challengesEnabled && !isJudge && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/challenges") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -908,7 +927,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Experts - Only show if enabled */}
-                  {expertsEnabled && (
+                  {expertsEnabled && !isJudge && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/experts") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -922,7 +941,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Academy - Only show if enabled */}
-                  {academyEnabled && (
+                  {academyEnabled && !isJudge && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/academy") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -946,6 +965,19 @@ export function UnifiedSidebar() {
                     <CalendarDays className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
                     <span className="text-sm font-medium">{t('navigation.events')}</span>
                   </div>
+
+                  {isJudge && (
+                    <div
+                      className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
+                        location.includes("/dashboard") && new URLSearchParams(window.location.search).get('tab') === 'leaderboard' ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      }`}
+                      onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/dashboard?tab=leaderboard`)}
+                      data-testid="nav-judge-leaderboard"
+                    >
+                      <BarChart3 className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
+                      <span className="text-sm font-medium">Leaderboard</span>
+                    </div>
+                  )}
                 </>
               )
             ) : (
