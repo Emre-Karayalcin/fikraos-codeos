@@ -135,9 +135,9 @@ export default function AdminChallengeIdeas() {
   const STATUSES = [
     { id: 'BACKLOG', labelKey: 'admin.ideas.statuses.backlog', color: 'bg-gray-500' },
     { id: 'UNDER_REVIEW', labelKey: 'admin.ideas.statuses.underReview', color: 'bg-blue-500' },
-    { id: 'SHORTLISTED', labelKey: 'admin.ideas.statuses.shortlisted', color: 'bg-yellow-500' },
+    { id: 'SHORTLISTED', labelKey: 'admin.ideas.statuses.shortlisted', color: 'bg-amber-500' },
     { id: 'IN_INCUBATION', labelKey: 'admin.ideas.statuses.inIncubation', color: 'bg-purple-500' },
-    { id: 'ARCHIVED', labelKey: 'admin.ideas.statuses.archived', color: 'bg-red-500' }
+    { id: 'ARCHIVED', labelKey: 'admin.ideas.statuses.archived', color: 'bg-teal-500' }
   ];
 
   // Fetch challenge details

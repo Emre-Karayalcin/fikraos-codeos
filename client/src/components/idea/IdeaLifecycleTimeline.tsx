@@ -11,17 +11,17 @@ interface IdeaLifecycleTimelineProps {
 const STATUS_COLORS: Record<string, string> = {
   BACKLOG: 'bg-gray-500',
   UNDER_REVIEW: 'bg-blue-500',
-  SHORTLISTED: 'bg-yellow-500',
+  SHORTLISTED: 'bg-amber-500',
   IN_INCUBATION: 'bg-purple-500',
-  ARCHIVED: 'bg-red-500'
+  ARCHIVED: 'bg-teal-500'
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  BACKLOG: 'Backlog',
-  UNDER_REVIEW: 'Under Review',
-  SHORTLISTED: 'Shortlisted',
-  IN_INCUBATION: 'In Incubation',
-  ARCHIVED: 'Archived'
+  BACKLOG: 'Registration & Idea Evaluation',
+  UNDER_REVIEW: 'Program Participation',
+  SHORTLISTED: 'Pre-Demo Evaluation & Qualification',
+  IN_INCUBATION: 'Demo Day & Final Selection',
+  ARCHIVED: 'Results Published'
 };
 
 export function IdeaLifecycleTimeline({ ideaId }: IdeaLifecycleTimelineProps) {

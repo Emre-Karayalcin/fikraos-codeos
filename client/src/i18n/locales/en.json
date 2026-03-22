@@ -1663,11 +1663,11 @@
       },
       "newIdea": "New Idea",
       "statuses": {
-        "backlog": "Backlog",
-        "underReview": "Under Review",
-        "shortlisted": "Shortlisted",
-        "inIncubation": "In Incubation",
-        "archived": "Archived"
+        "backlog": "Registration & Idea Evaluation",
+        "underReview": "Program Participation",
+        "shortlisted": "Pre-Demo Evaluation & Qualification",
+        "inIncubation": "Demo Day & Final Selection",
+        "archived": "Results Published"
       },
       "dropHere": "Drop ideas here",
       "opening": "Opening chat...",

@@ -844,6 +844,27 @@ export const platformEvents = pgTable("platform_events", {
 
 export type PlatformEvent = typeof platformEvents.$inferSelect;
 
+// ── PMO Idea Evaluations ─────────────────────────────────────────────────────
+export const ideaEvaluations = pgTable("idea_evaluations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  evaluatedBy: varchar("evaluated_by").notNull().references(() => users.id),
+  // Business Maturity (40%): b1=10%, b2=8%, b3=8%, b4=8%, b5=6%
+  b1: integer("b1"), b2: integer("b2"), b3: integer("b3"), b4: integer("b4"), b5: integer("b5"),
+  // Technical Maturity (30%): t1=10%, t2=8%, t3=6%, t4=6%
+  t1: integer("t1"), t2: integer("t2"), t3: integer("t3"), t4: integer("t4"),
+  // Strategic Alignment (30%): s1=12%, s2=10%, s3=8%
+  s1: integer("s1"), s2: integer("s2"), s3: integer("s3"),
+  totalScore: integer("total_score"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  uniqueProject: uniqueIndex("idx_idea_eval_project").on(t.projectId),
+}));
+
+export type IdeaEvaluation = typeof ideaEvaluations.$inferSelect;
+
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
 export const insertCourseProgressSchema = createInsertSchema(courseProgress).omit({ id: true, lastWatchedAt: true });

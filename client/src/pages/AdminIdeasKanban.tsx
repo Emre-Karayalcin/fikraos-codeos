@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Kanban, Plus, MoreVertical, User, Trash2, GraduationCap } from 'lucide-react';
+import { Kanban, Plus, User, Trash2, GraduationCap, Trophy } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -31,6 +31,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import toast from 'react-hot-toast';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface Idea {
   idea: {
@@ -73,7 +81,7 @@ function DroppableColumn({ status, children }: { status: { id: string; label: st
 }
 
 // Draggable Card Component
-function DraggableIdeaCard({ item, onClick, onDelete, academyPct }: { item: Idea; onClick: () => void; onDelete: () => void; academyPct?: number }) {
+function DraggableIdeaCard({ item, onClick, onDelete, academyPct, aiScore }: { item: Idea; onClick: () => void; onDelete: () => void; academyPct?: number; aiScore?: number | null }) {
   const {
     attributes,
     listeners,
@@ -166,6 +174,21 @@ function DraggableIdeaCard({ item, onClick, onDelete, academyPct }: { item: Idea
               </div>
             </div>
           )}
+          {/* AI screening score */}
+          {aiScore !== undefined && (
+            <div className="pt-1 flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">AI Score:</span>
+              {aiScore != null ? (
+                <span className={`inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 ${
+                  aiScore >= 70 ? 'bg-green-500/15 text-green-700' :
+                  aiScore >= 50 ? 'bg-amber-500/15 text-amber-700' :
+                  'bg-red-500/15 text-red-700'
+                }`}>{aiScore}</span>
+              ) : (
+                <span className="text-[10px] text-muted-foreground italic">Not screened</span>
+              )}
+            </div>
+          )}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
             <div className="flex items-center gap-1 flex-row">
               <User className="w-3 h-3" />
@@ -193,10 +216,11 @@ export default function AdminIdeasKanban() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmIdea, setConfirmIdea] = useState<Idea | null>(null);
   const [confirmTargetStatus, setConfirmTargetStatus] = useState<string | null>(null);
-  const [statusComment, setStatusComment] = useState('');
   // delete confirmation state
   const [deleteIdeaId, setDeleteIdeaId] = useState<string | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  // leaderboard modal state
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const sensors = useSensors(
@@ -211,9 +235,9 @@ export default function AdminIdeasKanban() {
   const STATUSES = [
     { id: 'BACKLOG', labelKey: 'admin.ideas.statuses.backlog', color: 'bg-gray-500' },
     { id: 'UNDER_REVIEW', labelKey: 'admin.ideas.statuses.underReview', color: 'bg-blue-500' },
-    { id: 'SHORTLISTED', labelKey: 'admin.ideas.statuses.shortlisted', color: 'bg-yellow-500' },
+    { id: 'SHORTLISTED', labelKey: 'admin.ideas.statuses.shortlisted', color: 'bg-amber-500' },
     { id: 'IN_INCUBATION', labelKey: 'admin.ideas.statuses.inIncubation', color: 'bg-purple-500' },
-    { id: 'ARCHIVED', labelKey: 'admin.ideas.statuses.archived', color: 'bg-red-500' }
+    { id: 'ARCHIVED', labelKey: 'admin.ideas.statuses.archived', color: 'bg-teal-500' }
   ];
 
   // Get workspace by slug to get its ID
@@ -246,6 +270,39 @@ export default function AdminIdeasKanban() {
       return response.json();
     },
     enabled: !!workspace?.id,
+  });
+
+  // Fetch AI screening scores for all workspace members
+  const { data: aiScores = {} } = useQuery<Record<string, { aiScore: number | null; appStatus: string }>>({
+    queryKey: ['/api/workspaces/admin/member-ai-scores', workspace?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/workspaces/${workspace!.id}/admin/member-ai-scores`, { credentials: 'include' });
+      if (!response.ok) return {};
+      return response.json();
+    },
+    enabled: !!workspace?.id,
+  });
+
+  // Fetch rejected applications for ghost cards in Registration column
+  const { data: rejectedApps = [] } = useQuery<{ id: string; ideaName: string | null; sector: string | null; firstName: string | null; lastName: string | null; email: string | null; submittedAt: string }[]>({
+    queryKey: ['/api/workspaces/admin/rejected-applications', workspace?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/workspaces/${workspace!.id}/admin/rejected-applications`, { credentials: 'include' });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!workspace?.id,
+  });
+
+  // Fetch leaderboard (only when modal is open)
+  const { data: leaderboardData = [] } = useQuery<{ projectId: string; title: string; ownerName: string; totalScore: number | null; businessScore: number; technicalScore: number; strategicScore: number }[]>({
+    queryKey: ['/api/workspaces/admin/leaderboard', workspace?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/workspaces/${workspace!.id}/admin/leaderboard`, { credentials: 'include' });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!workspace?.id && leaderboardOpen,
   });
 
   // Fetch ideas (all or filtered by challenge)
@@ -328,7 +385,6 @@ export default function AdminIdeasKanban() {
     },
     onSuccess: () => {
       setConfirmOpen(false);
-      setStatusComment('');
       queryClient.invalidateQueries({ queryKey: ['/api/ideas/management', workspace?.id] });
     },
     onError: () => {
@@ -381,10 +437,8 @@ export default function AdminIdeasKanban() {
     }
 
     if (activeIdea.idea.status !== targetStatus && STATUSES.find(s => s.id === targetStatus)) {
-      // open confirmation modal and require admin comment for the change
       setConfirmIdea(activeIdea);
       setConfirmTargetStatus(targetStatus);
-      setStatusComment('');
       setConfirmOpen(true);
     }
   };
@@ -394,48 +448,13 @@ export default function AdminIdeasKanban() {
       setConfirmOpen(false);
       return;
     }
-
-    if (!statusComment.trim()) {
-      toast({
-        title: t('admin.ideas.move.validation.title') ?? 'Comment required',
-        description: t('admin.ideas.move.validation.description') ?? 'Please add a comment explaining the status change.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
     try {
-      // 1) Post comment (include status + body in the comment payload)
-      const commentPayload = {
-        bodyMd: `${statusComment.trim()}`,
-        status: confirmTargetStatus
-      };
-
-      const commentRes = await fetch(`/api/projects/${confirmIdea.idea.id}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(commentPayload)
-      });
-
-      if (!commentRes.ok) {
-        const errText = await commentRes.text().catch(() => 'Failed to post comment');
-        throw new Error(errText || 'Failed to post comment');
-      }
-
-      // invalidate comments cache for this project/idea
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', confirmIdea.idea.id, 'comments'] });
-
-      // 2) Update status (separate API call)
       await updateStatus.mutateAsync({ id: confirmIdea.idea.id, status: confirmTargetStatus });
-
-      toast.success(`${t('admin.ideas.move.success.title') ?? 'Status updated'} — ${t('admin.ideas.move.success.description') ?? 'Idea status and comment saved.'}`);
+      toast.success(t('admin.ideas.move.success.title') ?? 'Status updated');
     } catch (e: any) {
-      console.error('Error during status change + comment:', e);
       toast.error(`${t('admin.ideas.move.error.title') ?? 'Update failed'} — ${e?.message ?? (t('admin.ideas.move.error.description') ?? 'Failed to change status')}`);
     } finally {
       setConfirmOpen(false);
-      setStatusComment('');
       setConfirmIdea(null);
       setConfirmTargetStatus(null);
     }
@@ -586,6 +605,12 @@ export default function AdminIdeasKanban() {
                           {statusIdeas.length}
                         </Badge>
                       </div>
+                      {status.id === 'SHORTLISTED' && (
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setLeaderboardOpen(true)}>
+                          <Trophy className="w-3 h-3 mr-1" />
+                          Leaderboard
+                        </Button>
+                      )}
                     </div>
 
                     {/* Droppable Area */}
@@ -610,6 +635,7 @@ export default function AdminIdeasKanban() {
                               onClick={() => handleIdeaClick(item.idea.id)}
                               onDelete={() => { setDeleteIdeaId(item.idea.id); setIsDeleteOpen(true); }}
                               academyPct={academyProgress[item.owner.id]?.pct}
+                              aiScore={aiScores[item.owner.id]?.aiScore}
                             />
                           ))
                         )}
@@ -635,6 +661,32 @@ export default function AdminIdeasKanban() {
                         </div>
                       );
                     })()}
+
+                    {/* Rejected ghost cards — shown only in Registration & Idea Evaluation column */}
+                    {status.id === 'BACKLOG' && rejectedApps.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-dashed border-border space-y-2">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Rejected ({rejectedApps.length})</p>
+                        {rejectedApps.map((app) => (
+                          <div key={app.id} className="opacity-50 border-dashed cursor-default">
+                            <Card className="border-dashed">
+                              <CardContent className="p-3 space-y-1">
+                                <p className="text-xs font-medium line-clamp-1">{app.ideaName || 'Unnamed Idea'}</p>
+                                {app.sector && <p className="text-[10px] text-muted-foreground">{app.sector}</p>}
+                                <div className="flex items-center justify-between">
+                                  <span className="inline-flex items-center text-[10px] font-medium bg-red-500/15 text-red-700 rounded-full px-2 py-0.5">✗ Rejected</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {[app.firstName, app.lastName].filter(Boolean).join(' ') || app.email || '—'}
+                                  </span>
+                                </div>
+                                {app.submittedAt && (
+                                  <p className="text-[10px] text-muted-foreground">{new Date(app.submittedAt).toLocaleDateString()}</p>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </DroppableColumn>
                 );
               })}
@@ -675,41 +727,74 @@ export default function AdminIdeasKanban() {
         </Dialog>
 
         {/* Confirmation dialog for status change */}
-        <Dialog open={confirmOpen} onOpenChange={(v) => { setConfirmOpen(v); if (!v) { setConfirmIdea(null); setConfirmTargetStatus(null); setStatusComment(''); } }}>
+        <Dialog open={confirmOpen} onOpenChange={(v) => { setConfirmOpen(v); if (!v) { setConfirmIdea(null); setConfirmTargetStatus(null); } }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t('admin.ideas.move.title') ?? 'Move idea status'}</DialogTitle>
               <DialogDescription>
-                {confirmIdea ? (
-                  <>
-                    {t('admin.ideas.move.confirm', { status: confirmTargetStatus }) ?? `Are you sure you want to move the idea to "${confirmTargetStatus}"?`}
-                    <div className="mt-3 text-sm text-muted-foreground">
-                      {t('admin.ideas.move.instruction') ?? 'Add a comment explaining why this idea is being moved to this status.'}
-                    </div>
-                  </>
-                ) : null}
+                {confirmIdea
+                  ? `Move "${confirmIdea.idea.title}" to ${STATUSES.find(s => s.id === confirmTargetStatus)?.labelKey ? t(STATUSES.find(s => s.id === confirmTargetStatus)!.labelKey) : confirmTargetStatus}?`
+                  : null}
               </DialogDescription>
             </DialogHeader>
-
-            <div className="mt-4">
-              <Label htmlFor="status-comment">{t('admin.ideas.move.commentLabel') ?? 'Comment'}</Label>
-              <Textarea
-                id="status-comment"
-                value={statusComment}
-                onChange={(e) => setStatusComment(e.target.value)}
-                rows={4}
-                placeholder={t('admin.ideas.move.commentPlaceholder') ?? 'Explain the reason for this status change...'}
-              />
-            </div>
-
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setConfirmOpen(false); setStatusComment(''); }}>
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>
                 {t('common.cancel') ?? 'Cancel'}
               </Button>
-              <Button onClick={confirmChange} disabled={updateStatus.isLoading}>
-                {updateStatus.isLoading ? t('admin.ideas.move.saving') ?? 'Saving...' : t('admin.ideas.move.confirmButton') ?? 'Confirm and Comment'}
+              <Button onClick={confirmChange} disabled={updateStatus.isPending}>
+                {updateStatus.isPending ? 'Moving...' : 'Confirm'}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Leaderboard dialog */}
+        <Dialog open={leaderboardOpen} onOpenChange={setLeaderboardOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                Pre-Demo Evaluation Leaderboard
+              </DialogTitle>
+              <DialogDescription>SHORTLISTED ideas ranked by PMO evaluation score</DialogDescription>
+            </DialogHeader>
+            <div className="overflow-auto max-h-[60vh]">
+              {leaderboardData.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8 text-sm">No evaluated ideas yet. Use PMO Evaluation tab on each idea to score them.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">Rank</TableHead>
+                      <TableHead>Idea</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead className="text-right">Score</TableHead>
+                      <TableHead className="text-right">Business</TableHead>
+                      <TableHead className="text-right">Technical</TableHead>
+                      <TableHead className="text-right">Strategic</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leaderboardData.map((row, idx) => (
+                      <TableRow
+                        key={row.projectId}
+                        className={idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : ''}
+                      >
+                        <TableCell className="font-bold text-center">
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                        </TableCell>
+                        <TableCell className="font-medium max-w-[180px] truncate">{row.title}</TableCell>
+                        <TableCell className="text-muted-foreground">{row.ownerName}</TableCell>
+                        <TableCell className="text-right font-bold">{row.totalScore ?? '—'}</TableCell>
+                        <TableCell className="text-right text-sm">{row.businessScore}</TableCell>
+                        <TableCell className="text-right text-sm">{row.technicalScore}</TableCell>
+                        <TableCell className="text-right text-sm">{row.strategicScore}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
       </div>

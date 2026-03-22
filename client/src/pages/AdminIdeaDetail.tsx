@@ -30,11 +30,11 @@ import {
 } from '@/components/ui/select';
 
 const STATUSES = [
-  { id: 'BACKLOG', label: 'Backlog', color: 'bg-gray-500' },
-  { id: 'UNDER_REVIEW', label: 'Under Review', color: 'bg-blue-500' },
-  { id: 'SHORTLISTED', label: 'Shortlisted', color: 'bg-yellow-500' },
-  { id: 'IN_INCUBATION', label: 'In Incubation', color: 'bg-purple-500' },
-  { id: 'ARCHIVED', label: 'Archived', color: 'bg-red-500' }
+  { id: 'BACKLOG', label: 'Registration & Idea Evaluation', color: 'bg-gray-500' },
+  { id: 'UNDER_REVIEW', label: 'Program Participation', color: 'bg-blue-500' },
+  { id: 'SHORTLISTED', label: 'Pre-Demo Evaluation & Qualification', color: 'bg-amber-500' },
+  { id: 'IN_INCUBATION', label: 'Demo Day & Final Selection', color: 'bg-purple-500' },
+  { id: 'ARCHIVED', label: 'Results Published', color: 'bg-teal-500' }
 ];
 
 interface CommentItem {
@@ -65,6 +65,13 @@ export default function AdminIdeaDetail() {
   });
   const [activeTab, setActiveTab] = useState('overview');
   const queryClient = useQueryClient();
+
+  // PMO evaluation form state
+  const [pmoScores, setPmoScores] = useState<Record<string, number | null>>({
+    b1: null, b2: null, b3: null, b4: null, b5: null,
+    t1: null, t2: null, t3: null, t4: null,
+    s1: null, s2: null, s3: null,
+  });
 
   // Fetch idea details (from projects API since ideas are stored as projects)
   const { data: ideaData, isLoading } = useQuery({
@@ -238,6 +245,65 @@ export default function AdminIdeaDetail() {
     }
   });
 
+  // PMO Evaluation query
+  const { data: pmoEvalData } = useQuery({
+    queryKey: ['/api/workspaces', slug, 'idea-evaluations', ideaId],
+    queryFn: async () => {
+      const wsRes = await fetch(`/api/workspaces/${slug}`, { credentials: 'include' });
+      if (!wsRes.ok) return null;
+      const ws = await wsRes.json();
+      const res = await fetch(`/api/workspaces/${ws.id}/admin/idea-evaluations/${ideaId}`, { credentials: 'include' });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!ideaId && !!slug && activeTab === 'pmo-evaluation',
+  });
+
+  // Pre-fill form when data loads
+  React.useEffect(() => {
+    if (pmoEvalData) {
+      setPmoScores({
+        b1: pmoEvalData.b1 ?? null, b2: pmoEvalData.b2 ?? null, b3: pmoEvalData.b3 ?? null,
+        b4: pmoEvalData.b4 ?? null, b5: pmoEvalData.b5 ?? null,
+        t1: pmoEvalData.t1 ?? null, t2: pmoEvalData.t2 ?? null, t3: pmoEvalData.t3 ?? null, t4: pmoEvalData.t4 ?? null,
+        s1: pmoEvalData.s1 ?? null, s2: pmoEvalData.s2 ?? null, s3: pmoEvalData.s3 ?? null,
+      });
+    }
+  }, [pmoEvalData]);
+
+  // PMO Evaluation save mutation
+  const savePmoEval = useMutation({
+    mutationFn: async () => {
+      const wsRes = await fetch(`/api/workspaces/${slug}`, { credentials: 'include' });
+      if (!wsRes.ok) throw new Error('Failed to get workspace');
+      const ws = await wsRes.json();
+      const res = await fetch(`/api/workspaces/${ws.id}/admin/idea-evaluations/${ideaId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(pmoScores),
+      });
+      if (!res.ok) throw new Error('Failed to save evaluation');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success('PMO Evaluation saved');
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces', slug, 'idea-evaluations', ideaId] });
+    },
+    onError: () => toast.error('Failed to save PMO Evaluation'),
+  });
+
+  // Compute live PMO total score from current pmoScores
+  const computePmoTotal = () => {
+    const get = (k: string) => pmoScores[k] ?? 0;
+    const raw =
+      (get('b1')/5)*10 + (get('b2')/5)*8 + (get('b3')/5)*8 + (get('b4')/5)*8 + (get('b5')/5)*6 +
+      (get('t1')/5)*10 + (get('t2')/5)*8 + (get('t3')/5)*6 + (get('t4')/5)*6 +
+      (get('s1')/5)*12 + (get('s2')/5)*10 + (get('s3')/5)*8;
+    return Math.round(raw);
+  };
+
   // DEFINE MISSING VARIABLES
   // Extract evaluation data from response
   const evaluation = evaluationData?.evaluation || null;
@@ -384,7 +450,7 @@ export default function AdminIdeaDetail() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className={`grid w-full ${idea?.status === 'SHORTLISTED' ? 'grid-cols-5' : 'grid-cols-4'}`}>
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <Info className="w-4 h-4" />
                 Overview
@@ -401,6 +467,12 @@ export default function AdminIdeaDetail() {
                 <MessageSquare className="w-4 h-4" />
                 Comments ({comments.length})
               </TabsTrigger>
+              {idea?.status === 'SHORTLISTED' && (
+                <TabsTrigger value="pmo-evaluation" className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  PMO Evaluation
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Overview Tab */}
@@ -952,6 +1024,131 @@ export default function AdminIdeaDetail() {
             <TabsContent value="ai-outputs" className="mt-6">
               <AllAIOutputsView ideaId={ideaId!} />
             </TabsContent>
+
+            {/* PMO Evaluation Tab */}
+            {idea?.status === 'SHORTLISTED' && (
+              <TabsContent value="pmo-evaluation" className="mt-6">
+                <div className="space-y-6">
+                  {/* Live score banner */}
+                  <Card className="border-amber-500/30 bg-amber-500/5">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Live PMO Total Score</p>
+                        <p className="text-4xl font-bold">{computePmoTotal()}<span className="text-lg text-muted-foreground">/100</span></p>
+                      </div>
+                      <Button onClick={() => savePmoEval.mutate()} disabled={savePmoEval.isPending}>
+                        {savePmoEval.isPending ? 'Saving...' : 'Save Evaluation'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Business Maturity */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Business Maturity <span className="text-muted-foreground font-normal text-sm">(40%)</span></CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {[
+                        { key: 'b1', label: 'Problem clearly defined', weight: '10%' },
+                        { key: 'b2', label: 'Target customer identified', weight: '8%' },
+                        { key: 'b3', label: 'Revenue model established', weight: '8%' },
+                        { key: 'b4', label: 'Traction / early validation', weight: '8%' },
+                        { key: 'b5', label: 'Scalability plan', weight: '6%' },
+                      ].map(({ key, label, weight }) => (
+                        <div key={key} className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{label}</p>
+                            <span className="text-xs text-muted-foreground">{weight}</span>
+                          </div>
+                          <div className="flex gap-1">
+                            {[1,2,3,4,5].map((v) => (
+                              <button
+                                key={v}
+                                onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                  pmoScores[key] === v
+                                    ? 'bg-amber-500 text-white border-amber-500'
+                                    : 'border-border hover:border-amber-400 hover:bg-amber-50'
+                                }`}
+                              >{v}</button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Technical Maturity */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Technical Maturity <span className="text-muted-foreground font-normal text-sm">(30%)</span></CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {[
+                        { key: 't1', label: 'Working prototype exists', weight: '10%' },
+                        { key: 't2', label: 'Technical feasibility demonstrated', weight: '8%' },
+                        { key: 't3', label: 'Scalability considered', weight: '6%' },
+                        { key: 't4', label: 'Risk mitigation planned', weight: '6%' },
+                      ].map(({ key, label, weight }) => (
+                        <div key={key} className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{label}</p>
+                            <span className="text-xs text-muted-foreground">{weight}</span>
+                          </div>
+                          <div className="flex gap-1">
+                            {[1,2,3,4,5].map((v) => (
+                              <button
+                                key={v}
+                                onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                  pmoScores[key] === v
+                                    ? 'bg-blue-500 text-white border-blue-500'
+                                    : 'border-border hover:border-blue-400 hover:bg-blue-50'
+                                }`}
+                              >{v}</button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Strategic Alignment */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Strategic Alignment <span className="text-muted-foreground font-normal text-sm">(30%)</span></CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {[
+                        { key: 's1', label: 'Program alignment', weight: '12%' },
+                        { key: 's2', label: 'Impact is measurable', weight: '10%' },
+                        { key: 's3', label: 'National / sector priorities', weight: '8%' },
+                      ].map(({ key, label, weight }) => (
+                        <div key={key} className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{label}</p>
+                            <span className="text-xs text-muted-foreground">{weight}</span>
+                          </div>
+                          <div className="flex gap-1">
+                            {[1,2,3,4,5].map((v) => (
+                              <button
+                                key={v}
+                                onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                  pmoScores[key] === v
+                                    ? 'bg-purple-500 text-white border-purple-500'
+                                    : 'border-border hover:border-purple-400 hover:bg-purple-50'
+                                }`}
+                              >{v}</button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            )}
 
             {/* Comments Tab */}
             <TabsContent value="comments" className="mt-6">

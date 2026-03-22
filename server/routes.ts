@@ -58,7 +58,7 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
@@ -1288,6 +1288,180 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching academy progress:', error);
       res.status(500).json({ error: 'Failed to fetch academy progress' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/admin/member-ai-scores
+  // Returns { [userId]: { aiScore: number | null, appStatus: string } }
+  app.get('/api/workspaces/:orgId/admin/member-ai-scores', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const rows = await db
+        .select({
+          userId: memberApplications.userId,
+          aiScore: memberApplications.aiScore,
+          appStatus: memberApplications.status,
+        })
+        .from(memberApplications)
+        .innerJoin(organizationMembers, and(
+          eq(memberApplications.userId, organizationMembers.userId),
+          eq(memberApplications.orgId, organizationMembers.orgId)
+        ))
+        .where(eq(memberApplications.orgId, orgId));
+
+      const result: Record<string, { aiScore: number | null; appStatus: string }> = {};
+      for (const row of rows) {
+        result[row.userId] = { aiScore: row.aiScore ?? null, appStatus: row.appStatus };
+      }
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching member AI scores:', error);
+      res.status(500).json({ error: 'Failed to fetch member AI scores' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/admin/rejected-applications
+  app.get('/api/workspaces/:orgId/admin/rejected-applications', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const rows = await db
+        .select({
+          id: memberApplications.id,
+          ideaName: memberApplications.ideaName,
+          sector: memberApplications.sector,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          submittedAt: memberApplications.submittedAt,
+        })
+        .from(memberApplications)
+        .innerJoin(users, eq(memberApplications.userId, users.id))
+        .where(and(
+          eq(memberApplications.orgId, orgId),
+          eq(memberApplications.status, 'REJECTED')
+        ));
+
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching rejected applications:', error);
+      res.status(500).json({ error: 'Failed to fetch rejected applications' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/admin/idea-evaluations/:projectId
+  app.get('/api/workspaces/:orgId/admin/idea-evaluations/:projectId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, projectId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const [evaluation] = await db.select().from(ideaEvaluations).where(eq(ideaEvaluations.projectId, projectId));
+      if (!evaluation) return res.status(404).json({ error: 'No evaluation found' });
+      res.json(evaluation);
+    } catch (error) {
+      console.error('Error fetching idea evaluation:', error);
+      res.status(500).json({ error: 'Failed to fetch evaluation' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/admin/idea-evaluations/:projectId — upsert
+  app.post('/api/workspaces/:orgId/admin/idea-evaluations/:projectId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, projectId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const { b1, b2, b3, b4, b5, t1, t2, t3, t4, s1, s2, s3 } = req.body;
+      const toNum = (v: any) => (v != null ? Number(v) : null);
+
+      const bn1 = toNum(b1), bn2 = toNum(b2), bn3 = toNum(b3), bn4 = toNum(b4), bn5 = toNum(b5);
+      const tn1 = toNum(t1), tn2 = toNum(t2), tn3 = toNum(t3), tn4 = toNum(t4);
+      const sn1 = toNum(s1), sn2 = toNum(s2), sn3 = toNum(s3);
+
+      const computeScore = (vals: (number | null)[], weights: number[]) => {
+        let score = 0;
+        for (let i = 0; i < vals.length; i++) {
+          if (vals[i] != null) score += (vals[i]! / 5) * weights[i];
+        }
+        return score;
+      };
+      const raw = computeScore(
+        [bn1, bn2, bn3, bn4, bn5, tn1, tn2, tn3, tn4, sn1, sn2, sn3],
+        [10, 8, 8, 8, 6, 10, 8, 6, 6, 12, 10, 8]
+      );
+      const totalScore = Math.round(raw);
+
+      const [existing] = await db.select().from(ideaEvaluations).where(eq(ideaEvaluations.projectId, projectId));
+      let result;
+      if (existing) {
+        [result] = await db.update(ideaEvaluations)
+          .set({ b1: bn1, b2: bn2, b3: bn3, b4: bn4, b5: bn5, t1: tn1, t2: tn2, t3: tn3, t4: tn4, s1: sn1, s2: sn2, s3: sn3, totalScore, updatedAt: new Date() })
+          .where(eq(ideaEvaluations.projectId, projectId))
+          .returning();
+      } else {
+        [result] = await db.insert(ideaEvaluations)
+          .values({ projectId, orgId, evaluatedBy: req.user.id, b1: bn1, b2: bn2, b3: bn3, b4: bn4, b5: bn5, t1: tn1, t2: tn2, t3: tn3, t4: tn4, s1: sn1, s2: sn2, s3: sn3, totalScore })
+          .returning();
+      }
+      res.json(result);
+    } catch (error) {
+      console.error('Error saving idea evaluation:', error);
+      res.status(500).json({ error: 'Failed to save evaluation' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/admin/leaderboard — SHORTLISTED ideas ranked by PMO score
+  app.get('/api/workspaces/:orgId/admin/leaderboard', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const rows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerUsername: users.username,
+          totalScore: ideaEvaluations.totalScore,
+          b1: ideaEvaluations.b1, b2: ideaEvaluations.b2, b3: ideaEvaluations.b3, b4: ideaEvaluations.b4, b5: ideaEvaluations.b5,
+          t1: ideaEvaluations.t1, t2: ideaEvaluations.t2, t3: ideaEvaluations.t3, t4: ideaEvaluations.t4,
+          s1: ideaEvaluations.s1, s2: ideaEvaluations.s2, s3: ideaEvaluations.s3,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(ideaEvaluations, eq(projects.id, ideaEvaluations.projectId))
+        .where(and(eq(projects.orgId, orgId), eq(projects.status, 'SHORTLISTED')))
+        .orderBy(desc(ideaEvaluations.totalScore));
+
+      // Compute sub-scores for display
+      const leaderboard = rows.map((r) => {
+        const toNum = (v: number | null | undefined) => v ?? 0;
+        const businessScore = Math.round(
+          (toNum(r.b1)/5)*10 + (toNum(r.b2)/5)*8 + (toNum(r.b3)/5)*8 + (toNum(r.b4)/5)*8 + (toNum(r.b5)/5)*6
+        );
+        const technicalScore = Math.round(
+          (toNum(r.t1)/5)*10 + (toNum(r.t2)/5)*8 + (toNum(r.t3)/5)*6 + (toNum(r.t4)/5)*6
+        );
+        const strategicScore = Math.round(
+          (toNum(r.s1)/5)*12 + (toNum(r.s2)/5)*10 + (toNum(r.s3)/5)*8
+        );
+        return {
+          projectId: r.projectId,
+          title: r.title,
+          ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
+          totalScore: r.totalScore,
+          businessScore,
+          technicalScore,
+          strategicScore,
+        };
+      });
+
+      res.json(leaderboard);
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      res.status(500).json({ error: 'Failed to fetch leaderboard' });
     }
   });
 
@@ -5698,6 +5872,14 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
 
           if (status === 'APPROVED') {
             await db.update(users).set({ status: 'ACTIVE' }).where(eq(users.id, application.userId));
+            // Auto-move all BACKLOG projects from this user in this workspace to UNDER_REVIEW
+            await db.update(projects)
+              .set({ status: 'UNDER_REVIEW' })
+              .where(and(
+                eq(projects.createdById, application.userId),
+                eq(projects.orgId, orgId),
+                eq(projects.status, 'BACKLOG')
+              ));
             const html = loadTpl('application-approved', { userName, orgName, loginUrl: `${hostUrl}/w/${org.slug}` });
             if (html) resendClient.emails.send({ from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com', to: appUser.email, subject: `🎉 You've been accepted to ${orgName}!`, html }).catch(console.error);
           } else if (status === 'REJECTED') {

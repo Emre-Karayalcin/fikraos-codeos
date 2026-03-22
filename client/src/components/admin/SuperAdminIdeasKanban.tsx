@@ -74,11 +74,11 @@ interface IdeaItem {
 }
 
 const STATUSES = [
-  { id: "BACKLOG", label: "Backlog", color: "bg-gray-500" },
-  { id: "UNDER_REVIEW", label: "Under Review", color: "bg-blue-500" },
-  { id: "SHORTLISTED", label: "Shortlisted", color: "bg-yellow-500" },
-  { id: "IN_INCUBATION", label: "In Incubation", color: "bg-purple-500" },
-  { id: "ARCHIVED", label: "Archived", color: "bg-red-500" },
+  { id: "BACKLOG", label: "Registration & Idea Evaluation", color: "bg-gray-500" },
+  { id: "UNDER_REVIEW", label: "Program Participation", color: "bg-blue-500" },
+  { id: "SHORTLISTED", label: "Pre-Demo Evaluation & Qualification", color: "bg-amber-500" },
+  { id: "IN_INCUBATION", label: "Demo Day & Final Selection", color: "bg-purple-500" },
+  { id: "ARCHIVED", label: "Results Published", color: "bg-teal-500" },
 ];
 
 // ─── Droppable Column ───────────────────────────────────────────────────────

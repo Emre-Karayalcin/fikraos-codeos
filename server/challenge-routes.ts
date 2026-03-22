@@ -656,10 +656,10 @@ export function registerChallengeRoutes(app: Express) {
         })
         .returning();
 
-      // Mark project as submitted and store final pitchDeckUrl/deploymentUrl
+      // Mark project as submitted, store final pitchDeckUrl/deploymentUrl, and move to SHORTLISTED
       await db
         .update(projects)
-        .set({ submitted: true, pitchDeckUrl: pitchDeckUrl, deploymentUrl: prototypeUrl })
+        .set({ submitted: true, pitchDeckUrl: pitchDeckUrl, deploymentUrl: prototypeUrl, status: 'SHORTLISTED' })
         .where(eq(projects.id, projectId));
 
       // Increment challenge submission count

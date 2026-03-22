@@ -266,11 +266,11 @@ export default function AnalyticsDashboard({ orgId }: AnalyticsDashboardProps) {
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             {[
-              { label: "Backlog", key: "BACKLOG", color: "bg-slate-500", text: "text-slate-600" },
-              { label: "Under Review", key: "UNDER_REVIEW", color: "bg-amber-500", text: "text-amber-600" },
-              { label: "Shortlisted", key: "SHORTLISTED", color: "bg-blue-500", text: "text-blue-600" },
-              { label: "In Incubation", key: "IN_INCUBATION", color: "bg-green-500", text: "text-green-600" },
-              { label: "Archived", key: "ARCHIVED", color: "bg-gray-400", text: "text-gray-500" },
+              { label: "Registration & Idea Evaluation", key: "BACKLOG", color: "bg-gray-500", text: "text-gray-600" },
+              { label: "Program Participation", key: "UNDER_REVIEW", color: "bg-blue-500", text: "text-blue-600" },
+              { label: "Pre-Demo Evaluation & Qualification", key: "SHORTLISTED", color: "bg-amber-500", text: "text-amber-600" },
+              { label: "Demo Day & Final Selection", key: "IN_INCUBATION", color: "bg-purple-500", text: "text-purple-600" },
+              { label: "Results Published", key: "ARCHIVED", color: "bg-teal-500", text: "text-teal-600" },
             ].map(({ label, key, color, text }) => {
               const count = stats?.ideaStatusBreakdown?.[key as keyof typeof stats.ideaStatusBreakdown] || 0;
               const total = stats?.totalIdeas || 0;
