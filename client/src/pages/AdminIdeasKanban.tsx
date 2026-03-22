@@ -392,6 +392,26 @@ export default function AdminIdeasKanban() {
     }
   });
 
+  // Move a single idea to Demo Day & Final Selection (IN_INCUBATION)
+  const moveToFinal = useMutation({
+    mutationFn: async (projectId: string) => {
+      const response = await fetch(`/api/ideas/management/${projectId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'IN_INCUBATION' })
+      });
+      if (!response.ok) throw new Error('Failed to move idea');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ideas/management', workspace?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces/admin/leaderboard', workspace?.id] });
+      toast.success('Idea moved to Demo Day & Final Selection');
+    },
+    onError: () => toast.error('Failed to move idea'),
+  });
+
   const getIdeasByStatus = (status: string) => {
     if (!ideas) return [];
     return ideas.filter((item: Idea) => item.idea.status === status);
@@ -772,6 +792,7 @@ export default function AdminIdeasKanban() {
                       <TableHead className="text-right">Business</TableHead>
                       <TableHead className="text-right">Technical</TableHead>
                       <TableHead className="text-right">Strategic</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -789,6 +810,17 @@ export default function AdminIdeasKanban() {
                         <TableCell className="text-right text-sm">{row.businessScore}</TableCell>
                         <TableCell className="text-right text-sm">{row.technicalScore}</TableCell>
                         <TableCell className="text-right text-sm">{row.strategicScore}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-7 whitespace-nowrap"
+                            disabled={moveToFinal.isPending}
+                            onClick={() => moveToFinal.mutate(row.projectId)}
+                          >
+                            → Demo Day
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
