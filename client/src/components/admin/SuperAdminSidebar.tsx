@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Kanban, BarChart2, Building2, Users, Target, CalendarDays, ClipboardList, Mail } from "lucide-react";
+import { LayoutDashboard, ChevronLeft, ChevronRight, LogOut, Kanban, BarChart2, Building2, Users, Target, CalendarDays, ClipboardList, Mail, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
@@ -55,6 +55,11 @@ const navItems = [
     title: "Email Templates",
     href: "/admin/email-templates",
     icon: Mail,
+  },
+  {
+    title: "Scoring Criteria",
+    href: "/admin/scoring-criteria",
+    icon: BookOpen,
   },
 ];
 
