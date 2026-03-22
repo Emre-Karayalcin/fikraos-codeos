@@ -1405,6 +1405,72 @@ export function registerRoutes(app: Express): Server {
           .returning();
       }
       res.json(result);
+
+      // Fire-and-forget: notify org admins that a PMO evaluation was submitted
+      setImmediate(async () => {
+        try {
+          const resendApiKey = process.env.RESEND_API_KEY;
+          if (!resendApiKey) return;
+          const resendClient = new Resend(resendApiKey);
+          const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
+
+          // Load org admins/owners with their email
+          const adminRows = await db
+            .select({ email: users.email, firstName: users.firstName })
+            .from(organizationMembers)
+            .innerJoin(users, eq(organizationMembers.userId, users.id))
+            .where(and(
+              eq(organizationMembers.orgId, orgId),
+              inArray(organizationMembers.role as any, ['ADMIN', 'OWNER'])
+            ));
+
+          if (!adminRows.length) return;
+
+          // Load project title
+          const [project] = await db.select({ title: projects.title }).from(projects).where(eq(projects.id, projectId));
+          const ideaTitle = project?.title || projectId;
+
+          // Load evaluator name
+          const [evaluator] = await db.select({ firstName: users.firstName, email: users.email }).from(users).where(eq(users.id, req.user.id));
+          const evaluatorName = evaluator?.firstName || evaluator?.email || 'Unknown';
+
+          // Load org name
+          const [orgRecord] = await db.select({ name: organizations.name, slug: organizations.slug }).from(organizations).where(eq(organizations.id, orgId));
+          const orgName = orgRecord?.name || orgId;
+
+          const loadTpl = (name: string, vars: Record<string, string>) => {
+            const candidates = [
+              path.join(__dirname, 'email-templates', `${name}.html`),
+              path.join(process.cwd(), 'server', 'email-templates', `${name}.html`),
+            ];
+            const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+            if (!found) return '';
+            try { return mustache.render(fs.readFileSync(found, 'utf8'), vars); } catch { return ''; }
+          };
+
+          for (const admin of adminRows) {
+            if (!admin.email) continue;
+            const adminName = admin.firstName || admin.email;
+            const html = loadTpl('pmo-evaluation-submitted', {
+              adminName,
+              orgName,
+              ideaTitle,
+              totalScore: String(totalScore),
+              evaluatorName,
+              dashboardUrl: `${hostUrl}/w/${orgRecord?.slug || orgId}/admin/ideas/${projectId}`,
+            });
+            if (!html) continue;
+            await resendClient.emails.send({
+              from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+              to: admin.email,
+              subject: `📋 PMO Evaluation Submitted — ${ideaTitle}`,
+              html,
+            });
+          }
+        } catch (emailErr) {
+          console.error('Failed to send PMO evaluation email:', emailErr);
+        }
+      });
     } catch (error) {
       console.error('Error saving idea evaluation:', error);
       res.status(500).json({ error: 'Failed to save evaluation' });

@@ -59,6 +59,7 @@ import SuperAdminUsers from "@/pages/SuperAdminUsers";
 import SuperAdminChallenges from "@/pages/SuperAdminChallenges";
 import SuperAdminEvents from "@/pages/SuperAdminEvents";
 import SuperAdminApplicationsList from "@/pages/SuperAdminApplicationsList";
+import SuperAdminEmailTemplates from "@/pages/SuperAdminEmailTemplates";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -342,6 +343,12 @@ function Router() {
       <Route path="/admin/activity-insights" component={() => (
         <PageTransition>
           <SuperAdminGuard><SuperAdminActivityInsights /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/email-templates" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminEmailTemplates /></SuperAdminGuard>
         </PageTransition>
       )} />
 

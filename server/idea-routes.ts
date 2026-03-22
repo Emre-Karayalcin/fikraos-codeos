@@ -250,6 +250,60 @@ export function registerIdeaRoutes(app: Express) {
       // }
 
       res.json(updatedIdea);
+
+      // Fire-and-forget: send stage notification email to the idea owner
+      setImmediate(async () => {
+        try {
+          const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
+          const resendApiKey = process.env.RESEND_API_KEY;
+          if (!resendApiKey) return;
+          const resendClient = new Resend(resendApiKey);
+
+          const templateMap: Record<string, { tpl: string; subject: string }> = {
+            UNDER_REVIEW: { tpl: 'idea-stage-program-participation', subject: '🚀 Your idea has advanced to Program Participation' },
+            SHORTLISTED:  { tpl: 'idea-stage-predemo',               subject: '⭐ Your idea is in Pre-Demo Evaluation' },
+            IN_INCUBATION:{ tpl: 'idea-stage-demoday',               subject: "🏆 You've been selected for Demo Day!" },
+            ARCHIVED:     { tpl: 'idea-stage-results',               subject: '📢 Program Results Published' },
+          };
+
+          const mapping = templateMap[status];
+          if (!mapping) return;
+
+          const [owner] = await db.select().from(users).where(eq(users.id, currentIdea.createdById));
+          if (!owner?.email) return;
+
+          const [org] = await db.select().from(organizations).where(eq(organizations.id, currentIdea.orgId));
+          if (!org) return;
+
+          const loadTpl = (name: string, vars: Record<string, string>) => {
+            const candidates = [
+              path.join(__dirname, 'email-templates', `${name}.html`),
+              path.join(process.cwd(), 'server', 'email-templates', `${name}.html`),
+            ];
+            const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+            if (!found) return '';
+            try { return mustache.render(fs.readFileSync(found, 'utf8'), vars); } catch { return ''; }
+          };
+
+          const userName = owner.firstName || owner.email || 'there';
+          const html = loadTpl(mapping.tpl, {
+            userName,
+            orgName: org.name,
+            ideaTitle: currentIdea.title,
+            dashboardUrl: `${hostUrl}/w/${org.slug || org.id}/my-ideas`,
+          });
+          if (!html) return;
+
+          await resendClient.emails.send({
+            from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+            to: owner.email,
+            subject: mapping.subject,
+            html,
+          });
+        } catch (emailErr) {
+          console.error('Failed to send idea stage email:', emailErr);
+        }
+      });
     } catch (error) {
       console.error('Error updating idea status:', error);
       res.status(500).json({ error: 'Failed to update status' });

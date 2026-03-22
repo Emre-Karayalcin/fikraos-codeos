@@ -1161,4 +1161,37 @@ export function registerSuperAdminRoutes(app: Express) {
       res.status(500).json({ error: "Failed to update status" });
     }
   });
+
+  // GET /api/super-admin/email-templates — list all templates with metadata + content
+  app.get('/api/super-admin/email-templates', isAuthenticated, isSuperAdmin, (req, res) => {
+    const tplDir = [
+      path.join(__saDir, 'email-templates'),
+      path.join(process.cwd(), 'server', 'email-templates'),
+    ].find(d => { try { return fs.existsSync(d); } catch { return false; } });
+    if (!tplDir) return res.json([]);
+    const files = fs.readdirSync(tplDir).filter(f => f.endsWith('.html'));
+    const templates = files.map(f => ({
+      name: f.replace('.html', ''),
+      filename: f,
+      content: fs.readFileSync(path.join(tplDir, f), 'utf8'),
+    }));
+    res.json(templates);
+  });
+
+  // PUT /api/super-admin/email-templates/:name — update template content
+  app.put('/api/super-admin/email-templates/:name', isAuthenticated, isSuperAdmin, (req, res) => {
+    const { name } = req.params;
+    if (!/^[a-z0-9-]+$/.test(name)) return res.status(400).json({ error: 'Invalid template name' });
+    const { content } = req.body;
+    if (!content || typeof content !== 'string') return res.status(400).json({ error: 'Content required' });
+    const tplDir = [
+      path.join(__saDir, 'email-templates'),
+      path.join(process.cwd(), 'server', 'email-templates'),
+    ].find(d => { try { return fs.existsSync(d); } catch { return false; } });
+    if (!tplDir) return res.status(500).json({ error: 'Template directory not found' });
+    const filePath = path.join(tplDir, `${name}.html`);
+    if (!filePath.startsWith(tplDir)) return res.status(400).json({ error: 'Invalid path' });
+    fs.writeFileSync(filePath, content, 'utf8');
+    res.json({ ok: true });
+  });
 }
