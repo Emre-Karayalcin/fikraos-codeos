@@ -948,14 +948,14 @@ export function registerSuperAdminRoutes(app: Express) {
           COUNT(cs.id)::int                        AS "totalSubmissions",
           COUNT(cs.pitch_deck_url)::int            AS "withPitchDeck",
           COUNT(cs.prototype_url)::int             AS "withPrototype",
-          MIN(cs.submitted_at)                     AS "firstSubmissionAt",
-          MAX(cs.submitted_at)                     AS "lastSubmissionAt"
+          MIN(cs.created_at)                       AS "firstSubmissionAt",
+          MAX(cs.created_at)                       AS "lastSubmissionAt"
         FROM   challenge_submissions cs
         JOIN   challenges c ON c.id = cs.challenge_id
         JOIN   organizations o ON o.id = c.org_id
         WHERE  1=1 ${wsFilter} ${challengeFilter}
         GROUP BY o.id, o.name, o.slug, c.id, c.title
-        ORDER BY MAX(cs.submitted_at) DESC NULLS LAST
+        ORDER BY MAX(cs.created_at) DESC NULLS LAST
       `);
 
       // Applications aggregated by workspace (fixed status casing)
@@ -1020,7 +1020,7 @@ export function registerSuperAdminRoutes(app: Express) {
           SELECT
             'submission'       AS "type",
             cs.id              AS "id",
-            cs.submitted_at    AS "eventAt",
+            cs.created_at      AS "eventAt",
             u.first_name       AS "firstName",
             u.last_name        AS "lastName",
             u.email            AS "email",
