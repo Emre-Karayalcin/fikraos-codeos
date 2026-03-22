@@ -597,20 +597,20 @@ export default function AdminIdeasKanban() {
                 return (
                   <DroppableColumn key={status.id} status={{ ...status, label: t(status.labelKey) }}>
                     {/* Column Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2 flex-row">
-                        <div className={`w-3 h-3 rounded-full ${status.color}`} />
-                        <h3 className="font-semibold">{t(status.labelKey)}</h3>
-                        <Badge variant="secondary" className="ltr:ml-2 rtl:mr-2">
-                          {statusIdeas.length}
-                        </Badge>
+                    <div className="mb-4">
+                      <div className="flex items-start gap-1.5">
+                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${status.color}`} />
+                        <h3 className="font-semibold text-sm leading-snug">{t(status.labelKey)}</h3>
                       </div>
-                      {status.id === 'SHORTLISTED' && (
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setLeaderboardOpen(true)}>
-                          <Trophy className="w-3 h-3 mr-1" />
-                          Leaderboard
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2 mt-1.5 pl-4">
+                        <Badge variant="secondary">{statusIdeas.length}</Badge>
+                        {status.id === 'SHORTLISTED' && (
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setLeaderboardOpen(true)}>
+                            <Trophy className="w-3 h-3 mr-1" />
+                            Leaderboard
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Droppable Area */}
