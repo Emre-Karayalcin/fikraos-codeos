@@ -58,7 +58,7 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
@@ -1239,6 +1239,55 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error saving course progress:', error);
       res.status(500).json({ error: 'Failed to save progress' });
+    }
+  });
+
+  // Academy progress summary for all users in a workspace (admin use)
+  // Returns { [userId]: { completedVideos, totalVideos, pct } }
+  app.get('/api/workspaces/:orgId/admin/academy-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      await requireOrgAdmin(req, req.params.orgId);
+      const { orgId } = req.params;
+
+      // Get all member userIds in this workspace
+      const members = await db
+        .select({ userId: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.orgId, orgId));
+
+      if (members.length === 0) return res.json({});
+
+      const userIds = members.map((m) => m.userId);
+
+      // Get all completed video entries for these users
+      const rows = await db
+        .select({ userId: courseProgress.userId, completed: courseProgress.completed })
+        .from(courseProgress)
+        .where(
+          and(
+            inArray(courseProgress.userId, userIds),
+            eq(courseProgress.courseSlug, 'fikrahub-fundamentals')
+          )
+        );
+
+      const TOTAL_VIDEOS = 14;
+
+      // Aggregate per user
+      const result: Record<string, { completedVideos: number; totalVideos: number; pct: number }> = {};
+      for (const userId of userIds) {
+        const userRows = rows.filter((r) => r.userId === userId);
+        const completedVideos = userRows.filter((r) => r.completed).length;
+        result[userId] = {
+          completedVideos,
+          totalVideos: TOTAL_VIDEOS,
+          pct: Math.round((completedVideos / TOTAL_VIDEOS) * 100),
+        };
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching academy progress:', error);
+      res.status(500).json({ error: 'Failed to fetch academy progress' });
     }
   });
 

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Kanban, Plus, MoreVertical, User, Trash2 } from 'lucide-react';
+import { Kanban, Plus, MoreVertical, User, Trash2, GraduationCap } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -73,7 +73,7 @@ function DroppableColumn({ status, children }: { status: { id: string; label: st
 }
 
 // Draggable Card Component
-function DraggableIdeaCard({ item, onClick, onDelete }: { item: Idea; onClick: () => void; onDelete: () => void }) {
+function DraggableIdeaCard({ item, onClick, onDelete, academyPct }: { item: Idea; onClick: () => void; onDelete: () => void; academyPct?: number }) {
   const {
     attributes,
     listeners,
@@ -148,6 +148,24 @@ function DraggableIdeaCard({ item, onClick, onDelete }: { item: Idea; onClick: (
               </span>
             </div>
           )}
+          {/* Academy progress */}
+          {academyPct !== undefined && (
+            <div className="pt-1">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                <div className="flex items-center gap-1">
+                  <GraduationCap className="w-3 h-3" />
+                  <span>Academy</span>
+                </div>
+                <span className={academyPct === 100 ? 'text-green-600 font-medium' : ''}>{academyPct}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-1.5">
+                <div
+                  className={`rounded-full h-1.5 transition-all ${academyPct === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                  style={{ width: `${academyPct}%` }}
+                />
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
             <div className="flex items-center gap-1 flex-row">
               <User className="w-3 h-3" />
@@ -218,6 +236,17 @@ export default function AdminIdeasKanban() {
   });
 
   const challengesList: { challenge: { id: string; title: string } }[] = Array.isArray(challengesData) ? challengesData : [];
+
+  // Fetch academy progress for all workspace members
+  const { data: academyProgress = {} } = useQuery<Record<string, { completedVideos: number; totalVideos: number; pct: number }>>({
+    queryKey: ['/api/workspaces/admin/academy-progress', workspace?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/workspaces/${workspace!.id}/admin/academy-progress`, { credentials: 'include' });
+      if (!response.ok) return {};
+      return response.json();
+    },
+    enabled: !!workspace?.id,
+  });
 
   // Fetch ideas (all or filtered by challenge)
   const { data: ideasData, isLoading } = useQuery({
@@ -580,6 +609,7 @@ export default function AdminIdeasKanban() {
                               item={item}
                               onClick={() => handleIdeaClick(item.idea.id)}
                               onDelete={() => { setDeleteIdeaId(item.idea.id); setIsDeleteOpen(true); }}
+                              academyPct={academyProgress[item.owner.id]?.pct}
                             />
                           ))
                         )}
