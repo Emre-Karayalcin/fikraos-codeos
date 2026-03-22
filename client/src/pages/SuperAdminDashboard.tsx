@@ -24,7 +24,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, CalendarDays, ClipboardList, X } from "lucide-react";
+import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, CalendarDays, ClipboardList, X, GraduationCap, FileText } from "lucide-react";
 import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
 import { format, subDays, isAfter, parseISO } from "date-fns";
 
@@ -47,6 +47,13 @@ interface Workspace {
   projectCount: number;
   challengeCount: number;
   assetCount: number;
+  mentorCount: number;
+  pitchDeckCount: number;
+  backlogCount: number;
+  underReviewCount: number;
+  shortlistedCount: number;
+  inIncubationCount: number;
+  archivedCount: number;
 }
 
 interface SuperAdminUser {
@@ -197,6 +204,8 @@ export default function SuperAdminDashboard() {
         users: filteredUsers.length,
         ideas: selectedWorkspace.projectCount,
         challenges: selectedWorkspace.challengeCount,
+        mentors: selectedWorkspace.mentorCount,
+        pitchDecks: selectedWorkspace.pitchDeckCount,
       };
     }
     return {
@@ -204,6 +213,8 @@ export default function SuperAdminDashboard() {
       users: filteredUsers.length,
       ideas: workspaces.reduce((s, w) => s + w.projectCount, 0),
       challenges: workspaces.reduce((s, w) => s + w.challengeCount, 0),
+      mentors: workspaces.reduce((s, w) => s + w.mentorCount, 0),
+      pitchDecks: workspaces.reduce((s, w) => s + w.pitchDeckCount, 0),
     };
   }, [selectedWorkspace, workspaces, filteredUsers]);
 
@@ -214,6 +225,8 @@ export default function SuperAdminDashboard() {
     { title: "Total Challenges", value: totals.challenges, icon: Target, iconBg: "bg-orange-500/10", iconColor: "text-orange-400", sub: "active challenges" },
     { title: "Events", value: filteredEvents.length, icon: CalendarDays, iconBg: "bg-teal-500/10", iconColor: "text-teal-400", sub: "platform events" },
     { title: "Applications", value: filteredApplications.length, icon: ClipboardList, iconBg: "bg-indigo-500/10", iconColor: "text-indigo-400", sub: "member applications" },
+    { title: "Mentors", value: totals.mentors, icon: GraduationCap, iconBg: "bg-pink-500/10", iconColor: "text-pink-400", sub: "assigned mentors" },
+    { title: "Pitch Decks", value: totals.pitchDecks, icon: FileText, iconBg: "bg-cyan-500/10", iconColor: "text-cyan-400", sub: "generated" },
   ];
 
   // ── Chart data ────────────────────────────────────────────────────────
@@ -233,6 +246,27 @@ export default function SuperAdminDashboard() {
       name: w.name.length > 12 ? w.name.slice(0, 12) + "…" : w.name,
       Challenges: w.challengeCount,
       Assets: w.assetCount,
+    }));
+  }, [sortedWorkspaces, selectedWorkspace]);
+
+  const mentorsPitchDecksChartData = useMemo(() => {
+    const source = selectedWorkspace ? [selectedWorkspace] : sortedWorkspaces;
+    return source.map((w) => ({
+      name: w.name.length > 12 ? w.name.slice(0, 12) + "…" : w.name,
+      Mentors: w.mentorCount,
+      "Pitch Decks": w.pitchDeckCount,
+    }));
+  }, [sortedWorkspaces, selectedWorkspace]);
+
+  const ideaStatusChartData = useMemo(() => {
+    const source = selectedWorkspace ? [selectedWorkspace] : sortedWorkspaces;
+    return source.map((w) => ({
+      name: w.name.length > 12 ? w.name.slice(0, 12) + "…" : w.name,
+      Backlog: w.backlogCount,
+      "Under Review": w.underReviewCount,
+      Shortlisted: w.shortlistedCount,
+      "In Incubation": w.inIncubationCount,
+      Archived: w.archivedCount,
     }));
   }, [sortedWorkspaces, selectedWorkspace]);
 
@@ -384,7 +418,7 @@ export default function SuperAdminDashboard() {
           </Card>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             {summaryCards.map((card) => {
               const Icon = card.icon;
               return (
@@ -574,6 +608,57 @@ export default function SuperAdminDashboard() {
                     </ResponsiveContainer>
                   );
                 })()}
+              </CardContent>
+            </Card>
+
+            {/* Chart 7: Mentors & Pitch Decks per Workspace */}
+            <Card className="border border-border/50">
+              <CardHeader className="pb-2 pt-4 px-5">
+                <CardTitle className="text-sm font-semibold">Mentors &amp; Pitch Decks per Workspace</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-4">
+                {workspacesLoading ? <ChartLoading /> : mentorsPitchDecksChartData.length === 0 ? (
+                  <ChartEmpty message="No workspace data" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={mentorsPitchDecksChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="Mentors" fill="#ec4899" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Pitch Decks" fill="#06b6d4" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Chart 8: Idea Status per Workspace */}
+            <Card className="border border-border/50 md:col-span-2">
+              <CardHeader className="pb-2 pt-4 px-5">
+                <CardTitle className="text-sm font-semibold">Idea Status per Workspace</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-4">
+                {workspacesLoading ? <ChartLoading /> : ideaStatusChartData.length === 0 ? (
+                  <ChartEmpty message="No workspace data" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={ideaStatusChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="Backlog" fill="#94a3b8" stackId="status" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Under Review" fill="#f59e0b" stackId="status" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Shortlisted" fill="#3b82f6" stackId="status" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="In Incubation" fill="#22c55e" stackId="status" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Archived" fill="#6b7280" stackId="status" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 

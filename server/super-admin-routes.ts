@@ -114,7 +114,14 @@ export function registerSuperAdminRoutes(app: Express) {
           COALESCE((SELECT COUNT(*)::int FROM organization_members om WHERE om.org_id = o.id), 0) AS "memberCount",
           COALESCE((SELECT COUNT(*)::int FROM projects         p  WHERE p.org_id  = o.id), 0) AS "projectCount",
           COALESCE((SELECT COUNT(*)::int FROM challenges       c  WHERE c.org_id  = o.id), 0) AS "challengeCount",
-          COALESCE((SELECT COUNT(*)::int FROM assets           a  WHERE a.project_id IN (SELECT p.id FROM projects p WHERE p.org_id = o.id)), 0) AS "assetCount"
+          COALESCE((SELECT COUNT(*)::int FROM assets           a  WHERE a.project_id IN (SELECT p.id FROM projects p WHERE p.org_id = o.id)), 0) AS "assetCount",
+          COALESCE((SELECT COUNT(*)::int FROM organization_members om2 WHERE om2.org_id = o.id AND om2.role = 'MENTOR'), 0) AS "mentorCount",
+          COALESCE((SELECT COUNT(*)::int FROM pitch_deck_generations pdg WHERE pdg.project_id IN (SELECT p2.id FROM projects p2 WHERE p2.org_id = o.id)), 0) AS "pitchDeckCount",
+          COALESCE((SELECT COUNT(*)::int FROM projects ps1 WHERE ps1.org_id = o.id AND ps1.status = 'BACKLOG'), 0) AS "backlogCount",
+          COALESCE((SELECT COUNT(*)::int FROM projects ps2 WHERE ps2.org_id = o.id AND ps2.status = 'UNDER_REVIEW'), 0) AS "underReviewCount",
+          COALESCE((SELECT COUNT(*)::int FROM projects ps3 WHERE ps3.org_id = o.id AND ps3.status = 'SHORTLISTED'), 0) AS "shortlistedCount",
+          COALESCE((SELECT COUNT(*)::int FROM projects ps4 WHERE ps4.org_id = o.id AND ps4.status = 'IN_INCUBATION'), 0) AS "inIncubationCount",
+          COALESCE((SELECT COUNT(*)::int FROM projects ps5 WHERE ps5.org_id = o.id AND ps5.status = 'ARCHIVED'), 0) AS "archivedCount"
         FROM organizations o
         ORDER BY o.created_at DESC
       `);

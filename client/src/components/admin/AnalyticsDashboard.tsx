@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, Users, MessageCircle, Lightbulb, TrendingUp } from "lucide-react";
+import { BarChart3, Users, MessageCircle, Lightbulb, TrendingUp, GraduationCap, FileText } from "lucide-react";
 
 interface AnalyticsDashboardProps {
   orgId: string;
@@ -52,13 +52,27 @@ export default function AnalyticsDashboard({ orgId }: AnalyticsDashboardProps) {
       description: t('admin.analytics.stats.teamMembers.description'),
       icon: Users,
       color: "text-orange-600"
+    },
+    {
+      title: "Mentors",
+      value: stats?.totalMentors || 0,
+      description: "assigned mentors",
+      icon: GraduationCap,
+      color: "text-pink-600"
+    },
+    {
+      title: "Pitch Decks",
+      value: stats?.totalPitchDecks || 0,
+      description: "generated pitch decks",
+      icon: FileText,
+      color: "text-cyan-600"
     }
   ];
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+        {[...Array(6)].map((_, i) => (
           <Card key={i}>
             <CardContent className="p-6">
               <div className="flex items-center justify-center h-24">
@@ -104,7 +118,7 @@ export default function AnalyticsDashboard({ orgId }: AnalyticsDashboardProps) {
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -240,6 +254,43 @@ export default function AnalyticsDashboard({ orgId }: AnalyticsDashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Idea Status Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="ltr:text-left rtl:text-right">Idea Status Breakdown</CardTitle>
+          <CardDescription className="ltr:text-left rtl:text-right">
+            Distribution of ideas by current stage
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            {[
+              { label: "Backlog", key: "BACKLOG", color: "bg-slate-500", text: "text-slate-600" },
+              { label: "Under Review", key: "UNDER_REVIEW", color: "bg-amber-500", text: "text-amber-600" },
+              { label: "Shortlisted", key: "SHORTLISTED", color: "bg-blue-500", text: "text-blue-600" },
+              { label: "In Incubation", key: "IN_INCUBATION", color: "bg-green-500", text: "text-green-600" },
+              { label: "Archived", key: "ARCHIVED", color: "bg-gray-400", text: "text-gray-500" },
+            ].map(({ label, key, color, text }) => {
+              const count = stats?.ideaStatusBreakdown?.[key as keyof typeof stats.ideaStatusBreakdown] || 0;
+              const total = stats?.totalIdeas || 0;
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+              return (
+                <div key={key} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium ltr:text-left rtl:text-right">{label}</span>
+                    <span className={`text-sm font-bold ${text}`}>{count}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-xs text-text-secondary ltr:text-left rtl:text-right">{pct}% of total</p>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

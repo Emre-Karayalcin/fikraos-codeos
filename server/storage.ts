@@ -74,6 +74,15 @@ export interface IStorage {
     totalChats: number;
     totalAssets: number;
     totalMembers: number;
+    totalMentors: number;
+    totalPitchDecks: number;
+    ideaStatusBreakdown: {
+      BACKLOG: number;
+      UNDER_REVIEW: number;
+      SHORTLISTED: number;
+      IN_INCUBATION: number;
+      ARCHIVED: number;
+    };
   }>;
   
   // Course progress operations
@@ -462,6 +471,15 @@ export class DatabaseStorage implements IStorage {
     totalChats: number;
     totalAssets: number;
     totalMembers: number;
+    totalMentors: number;
+    totalPitchDecks: number;
+    ideaStatusBreakdown: {
+      BACKLOG: number;
+      UNDER_REVIEW: number;
+      SHORTLISTED: number;
+      IN_INCUBATION: number;
+      ARCHIVED: number;
+    };
   }> {
     // Get total projects (ideas) for this org
     const orgProjects = await db
@@ -500,11 +518,34 @@ export class DatabaseStorage implements IStorage {
       .from(organizationMembers)
       .where(eq(organizationMembers.orgId, orgId));
 
+    // Get mentor count (members with MENTOR role)
+    const mentors = members.filter(m => m.role === 'MENTOR');
+
+    // Get total pitch decks generated for this org's ideas
+    let totalPitchDecks = 0;
+    if (projectIds.length > 0) {
+      const pitchDecks = await db
+        .select()
+        .from(pitchDeckGenerations)
+        .where(inArray(pitchDeckGenerations.projectId, projectIds));
+      totalPitchDecks = pitchDecks.length;
+    }
+
+    // Idea status breakdown
+    const ideaStatusBreakdown = { BACKLOG: 0, UNDER_REVIEW: 0, SHORTLISTED: 0, IN_INCUBATION: 0, ARCHIVED: 0 };
+    for (const p of orgProjects) {
+      const status = p.status as keyof typeof ideaStatusBreakdown;
+      if (status in ideaStatusBreakdown) ideaStatusBreakdown[status]++;
+    }
+
     return {
       totalIdeas: orgProjects.length,
       totalChats,
       totalAssets,
-      totalMembers: members.length
+      totalMembers: members.length,
+      totalMentors: mentors.length,
+      totalPitchDecks,
+      ideaStatusBreakdown,
     };
   }
 
