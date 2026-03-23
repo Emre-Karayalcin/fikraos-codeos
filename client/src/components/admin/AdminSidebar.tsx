@@ -3,7 +3,7 @@ import { useLocation, Link } from 'wouter';
 import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
-  GraduationCap, ClipboardList,
+  GraduationCap, ClipboardList, Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -81,6 +81,16 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           titleKey: 'admin.sidebar.mentors.title',
           href: `/w/${workspaceSlug}/admin/mentors`,
           icon: GraduationCap,
+        },
+      ],
+    },
+    {
+      label: 'Communications',
+      items: [
+        {
+          titleKey: 'Email Templates',
+          href: `/w/${workspaceSlug}/admin/email-templates`,
+          icon: Mail,
         },
       ],
     },
