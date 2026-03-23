@@ -1047,13 +1047,13 @@
     "deletionFailedDesc": "فشل في حذف الحساب."
   },
   "challenges": {
-    "title": "التحديات",
+    "title": "بيانات المشكلة",
     "subtitle": "انضم إلى تحديات مبتكرة وتنافس مع رواد الأعمال في منطقة الشرق الأوسط وشمال أفريقيا",
     "activeChallenges": "{{count}} تحدٍ نشط",
     "upcomingChallenges": "{{count}} قادم",
     "submissions": "{{count}} مشاركة",
     "submissionsLabel": "المشاركات",
-    "errorFetch": "فشل في جلب التحديات",
+    "errorFetch": "فشل في جلب بيانات المشكلة",
     "status": {
       "active": "نشط",
       "upcoming": "قادم",
@@ -1075,15 +1075,15 @@
       "daysLeft": "{{days}} يوم متبقٍ"
     },
     "filters": {
-      "all": "جميع التحديات",
+      "all": "جميع بيانات المشكلة",
       "active": "نشط",
       "upcoming": "قادم",
       "ended": "منتهٍ"
     },
     "empty": {
-      "title": "لم يتم العثور على تحديات",
-      "noCreated": "لم يتم إنشاء أي تحديات بعد",
-      "tryFilters": "جرب تعديل الفلاتر لرؤية المزيد من التحديات"
+      "title": "لم يتم العثور على بيانات مشكلة",
+      "noCreated": "لم يتم إنشاء أي بيانات مشكلة بعد",
+      "tryFilters": "جرب تعديل الفلاتر لرؤية المزيد من بيانات المشكلة"
     },
     "create": {
       "button": "إنشاء تحدٍ",
@@ -1189,16 +1189,16 @@
     }
   },
   "challenge": {
-    "notFound": "التحدي غير موجود",
-    "backToChallenges": "العودة إلى التحديات",
+    "notFound": "بيان المشكلة غير موجود",
+    "backToChallenges": "العودة إلى بيانات المشكلة",
     "deadline": "الموعد النهائي",
     "daysLeft": "{{count}} أيام متبقية",
     "daysLeft_one": "{{count}} يوم متبقي",
     "ended": "انتهى",
     "submissions": "{{count}} مشاركات",
     "submissions_one": "{{count}} مشاركة",
-    "description": "وصف التحدي",
-    "myIdeas": "أفكاري للتحدي ({{count}})",
+    "description": "وصف بيان المشكلة",
+    "myIdeas": "أفكاري لبيان المشكلة ({{count}})",
     "creating": "جاري الإنشاء...",
     "createIdea": "إنشاء فكرة",
     "noIdeasYet": "لا توجد أفكار بعد. أنشئ أول فكرة!",
@@ -1221,7 +1221,7 @@
     "noSubmissionsYet": "لا توجد مشاركات بعد. كن أول من يشارك!",
     "submissionProgress": "تقدم المشاركات",
     "capacity": "السعة",
-    "challengeStatus": "حالة التحدي",
+    "challengeStatus": "حالة بيان المشكلة",
     "statusLabel": "الحالة",
     "timeLeft": "الوقت المتبقي",
     "days": "ي",
@@ -1233,12 +1233,12 @@
     },
     "submitSolution": "تقديم حلك",
     "submitYourSolution": "تقديم حلك",
-    "submitDescription": "شارك حلك المبتكر لهذا التحدي",
+    "submitDescription": "شارك حلك المبتكر لبيان المشكلة هذا",
     "form": {
       "title": "عنوان الحل *",
       "titlePlaceholder": "حلي للمدينة الذكية",
       "description": "الوصف *",
-      "descriptionPlaceholder": "صف حلك وكيف يعالج التحدي...",
+      "descriptionPlaceholder": "صف حلك وكيف يعالج بيان المشكلة...",
       "demoUrl": "رابط التجربة (اختياري)"
     },
     "submitSolutionButton": "تقديم الحل",
@@ -1394,8 +1394,8 @@
         "description": "إدارة الأفكار والمشاريع"
       },
       "workspace": {
-        "title": "مساحة العمل",
-        "description": "تكوين مساحة العمل"
+        "title": "المسابقة",
+        "description": "إعدادات المسابقة"
       },
       "branding": {
         "title": "العلامة التجارية",
@@ -1406,7 +1406,7 @@
         "description": "إدارة أعضاء الفريق"
       },
       "challenges": {
-        "title": "التحديات",
+        "title": "بيانات المشكلة",
         "description": "إدارة بيانات المشاكل"
       },
       "settings": {
@@ -1419,14 +1419,14 @@
     "guard": {
       "verifying": "جاري التحقق من صلاحية المسؤول...",
       "workspaceNotFound": {
-        "title": "مساحة العمل غير موجودة",
-        "invalidSlug": "معرف مساحة العمل غير صالح",
-        "notAccessible": "مساحة العمل \"{{slug}}\" غير موجودة أو غير قابلة للوصول"
+        "title": "المسابقة غير موجودة",
+        "invalidSlug": "معرف المسابقة غير صالح",
+        "notAccessible": "المسابقة \"{{slug}}\" غير موجودة أو غير قابلة للوصول"
       },
       "accessDenied": {
         "title": "تم رفض الوصول",
-        "notMember": "أنت لست عضوًا في مساحة العمل \"{{workspace}}\".",
-        "contactAdmin": "يرجى الاتصال بمسؤول مساحة العمل للحصول على الوصول."
+        "notMember": "أنت لست عضوًا في المسابقة \"{{workspace}}\".",
+        "contactAdmin": "يرجى الاتصال بمسؤول المسابقة للحصول على الوصول."
       },
       "adminRequired": {
         "title": "مطلوب صلاحية المسؤول",
@@ -1434,8 +1434,8 @@
         "currentRole": "الدور الحالي: {{role}}"
       },
       "goToHome": "الذهاب إلى الصفحة الرئيسية",
-      "goToMyWorkspaces": "الذهاب إلى مساحات العمل الخاصة بي",
-      "goToWorkspace": "الذهاب إلى مساحة العمل"
+      "goToMyWorkspaces": "الذهاب إلى مسابقاتي",
+      "goToWorkspace": "الذهاب إلى المسابقة"
     },
     "analytics": {
       "overview": {
@@ -1776,34 +1776,34 @@
   },
   "workspace": {
     "welcomeToFikrahub": "مرحباً بك في فكرة هب",
-    "enterWorkspace": "أدخل مساحة العمل الخاصة بك للمتابعة",
-    "workspaceNameLabel": "اسم مساحة العمل",
+    "enterWorkspace": "أدخل المسابقة الخاصة بك للمتابعة",
+    "workspaceNameLabel": "اسم المسابقة",
     "yourWorkspacePlaceholder": "مساحة-العمل-الخاصة-بك",
     "workspaceSlugDesc": "استخدم الأحرف الصغيرة والأرقام والشرطات فقط",
-    "continueToWorkspace": "المتابعة إلى مساحة العمل",
+    "continueToWorkspace": "المتابعة إلى المسابقة",
     "or": "أو",
-    "createNewWorkspaceBtn": "إنشاء مساحة عمل جديدة",
-    "dontKnowWorkspace": "لا تعرف اسم مساحة العمل الخاصة بك؟",
-    "contactWorkspaceAdmin": "اتصل بمسؤول مساحة العمل",
-    "invalidWorkspaceName": "اسم مساحة العمل غير صالح — استخدم الأحرف الصغيرة والأرقام والشرطات فقط",
-    "verifyingAccess": "التحقق من الوصول إلى مساحة العمل...",
-    "notFound": "مساحة العمل غير موجودة",
-    "invalidIdentifier": "معرّف مساحة العمل غير صالح",
-    "doesNotExist": "مساحة العمل \"{{slug}}\" غير موجودة أو غير متاحة",
-    "createNew": "إنشاء مساحة عمل جديدة",
+    "createNewWorkspaceBtn": "إنشاء مسابقة جديدة",
+    "dontKnowWorkspace": "لا تعرف اسم المسابقة الخاصة بك؟",
+    "contactWorkspaceAdmin": "اتصل بمسؤول المسابقة",
+    "invalidWorkspaceName": "اسم المسابقة غير صالح — استخدم الأحرف الصغيرة والأرقام والشرطات فقط",
+    "verifyingAccess": "التحقق من الوصول إلى المسابقة...",
+    "notFound": "المسابقة غير موجودة",
+    "invalidIdentifier": "معرّف المسابقة غير صالح",
+    "doesNotExist": "المسابقة \"{{slug}}\" غير موجودة أو غير متاحة",
+    "createNew": "إنشاء مسابقة جديدة",
     "goHome": "الذهاب إلى الصفحة الرئيسية",
     "accessDenied": "الوصول مرفوض",
-    "notMember": "أنت لست عضواً في مساحة العمل \"{{name}}\".",
-    "contactAdmin": "يرجى الاتصال بمسؤول مساحة العمل للحصول على حق الوصول.",
-    "goToMyWorkspaces": "الذهاب إلى مساحات العمل الخاصة بي",
-    "createNewWorkspace": "إنشاء مساحة عمل جديدة",
-    "createYourWorkspace": "إنشاء مساحة العمل الخاصة بك",
-    "step1": "الخطوة 1: إعداد مساحة العمل",
+    "notMember": "أنت لست عضواً في المسابقة \"{{name}}\".",
+    "contactAdmin": "يرجى الاتصال بمسؤول المسابقة للحصول على حق الوصول.",
+    "goToMyWorkspaces": "الذهاب إلى مسابقاتي",
+    "createNewWorkspace": "إنشاء مسابقة جديدة",
+    "createYourWorkspace": "إنشاء المسابقة الخاصة بك",
+    "step1": "الخطوة 1: إعداد المسابقة",
     "step2": "الخطوة 2: إنشاء حساب المسؤول",
-    "workspaceName": "اسم مساحة العمل",
+    "workspaceName": "اسم المسابقة",
     "workspaceNamePlaceholder": "شركة أكمي",
     "workspaceNameDesc": "هذا هو اسم مؤسستك أو فريقك",
-    "workspaceUrl": "رابط مساحة العمل",
+    "workspaceUrl": "رابط المسابقة",
     "workspaceSlugPlaceholder": "acme-inc",
     "continue": "متابعة ←",
     "checking": "جارٍ التحقق...",
@@ -1817,12 +1817,12 @@
     "passwordPlaceholder": "••••••••",
     "passwordDesc": "يجب أن تكون 8 أحرف على الأقل",
     "back": "→ رجوع",
-    "createWorkspace": "إنشاء مساحة العمل",
+    "createWorkspace": "إنشاء المسابقة",
     "creating": "جارٍ الإنشاء...",
     "welcomeMessage": "مرحباً بك في {{name}}! 🎉",
-    "provideWorkspaceName": "يرجى تقديم اسم مساحة العمل",
-    "nameNotAvailable": "اسم مساحة العمل غير متاح",
-    "failedToCheck": "فشل التحقق من اسم مساحة العمل",
+    "provideWorkspaceName": "يرجى تقديم اسم المسابقة",
+    "nameNotAvailable": "اسم المسابقة غير متاح",
+    "failedToCheck": "فشل التحقق من اسم المسابقة",
     "provideEmailPassword": "يرجى تقديم بريدك الإلكتروني وكلمة المرور",
     "passwordTooShort": "يجب أن تكون كلمة المرور 8 أحرف على الأقل"
   },

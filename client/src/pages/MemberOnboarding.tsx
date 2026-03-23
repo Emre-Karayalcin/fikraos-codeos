@@ -218,7 +218,7 @@ export default function MemberOnboarding() {
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Competition</h2>
-              <p className="text-gray-500 text-sm">Select the challenge you want to apply for.</p>
+              <p className="text-gray-500 text-sm">Select the problem statement you want to apply for.</p>
             </div>
 
             {/* Workspace (locked) */}
@@ -243,18 +243,18 @@ export default function MemberOnboarding() {
               </Card>
             </div>
 
-            {/* Challenge selector */}
+            {/* Problem statement selector */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                Challenge <span className="text-red-500">*</span>
+                Problem Statement <span className="text-red-500">*</span>
               </Label>
               <Select value={challengeId} onValueChange={setChallengeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an active challenge…" />
+                  <SelectValue placeholder="Select an active problem statement…" />
                 </SelectTrigger>
                 <SelectContent>
                   {challengeList.length === 0 ? (
-                    <div className="py-3 px-3 text-sm text-gray-400">No active challenges available</div>
+                    <div className="py-3 px-3 text-sm text-gray-400">No active problem statements available</div>
                   ) : (
                     challengeList.map((c) => (
                       <SelectItem key={c.challenge.id} value={c.challenge.id}>

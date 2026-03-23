@@ -17,7 +17,7 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Workspaces",
+    title: "Competitions",
     href: "/admin/workspaces",
     icon: Building2,
   },
@@ -32,7 +32,7 @@ const navItems = [
     icon: Kanban,
   },
   {
-    title: "Challenges",
+    title: "Problem Statements",
     href: "/admin/challenges",
     icon: Target,
   },

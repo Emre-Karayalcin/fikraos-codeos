@@ -1067,13 +1067,13 @@
     "deletionFailedDesc": "Failed to delete account."
   },
   "challenges": {
-    "title": "Challenges",
-    "subtitle": "Join innovative challenges and compete with entrepreneurs across the MENA region",
-    "activeChallenges": "{{count}} Active Challenges",
+    "title": "Problem Statements",
+    "subtitle": "Join innovative problem statements and compete with entrepreneurs across the MENA region",
+    "activeChallenges": "{{count}} Active Problem Statements",
     "upcomingChallenges": "{{count}} Upcoming",
     "submissions": "{{count}} submissions",
     "submissionsLabel": "Submissions",
-    "errorFetch": "Failed to fetch challenges",
+    "errorFetch": "Failed to fetch problem statements",
     "status": {
       "active": "Active",
       "upcoming": "Upcoming",
@@ -1081,11 +1081,11 @@
       "draft": "Draft"
     },
     "delete": {
-      "button": "Delete challenge",
-      "confirm": "Are you sure you want to delete this challenge? This action cannot be undone.",
-      "successTitle": "Challenge deleted",
-      "successDesc": "The challenge has been successfully deleted.",
-      "errorGeneric": "Failed to delete challenge"
+      "button": "Delete problem statement",
+      "confirm": "Are you sure you want to delete this problem statement? This action cannot be undone.",
+      "successTitle": "Problem statement deleted",
+      "successDesc": "The problem statement has been successfully deleted.",
+      "errorGeneric": "Failed to delete problem statement"
     },
     "timeLeft": {
       "ended": "Ended",
@@ -1095,23 +1095,23 @@
       "daysLeft": "{{days}} days left"
     },
     "filters": {
-      "all": "All Challenges",
+      "all": "All Problem Statements",
       "active": "Active",
       "upcoming": "Upcoming",
       "ended": "Ended"
     },
     "empty": {
-      "title": "No challenges found",
-      "noCreated": "No challenges have been created yet",
-      "tryFilters": "Try adjusting your filters to see more challenges"
+      "title": "No problem statements found",
+      "noCreated": "No problem statements have been created yet",
+      "tryFilters": "Try adjusting your filters to see more problem statements"
     },
     "create": {
-      "button": "Create Challenge",
-      "title": "Create New Challenge",
-      "description": "Create a new innovation challenge for your workspace",
-      "successTitle": "Challenge Created",
-      "successDesc": "Your challenge has been created successfully",
-      "errorGeneric": "Failed to create challenge",
+      "button": "Create Problem Statement",
+      "title": "Create New Problem Statement",
+      "description": "Create a new innovation problem statement for your competition",
+      "successTitle": "Problem Statement Created",
+      "successDesc": "Your problem statement has been created successfully",
+      "errorGeneric": "Failed to create problem statement",
       "missingFieldsTitle": "Missing Fields",
       "missingFieldsDesc": "Please fill in all required fields"
     },
@@ -1121,9 +1121,9 @@
       "slug": "URL Slug",
       "slugPlaceholder": "neom-smart-city",
       "shortDescription": "Short Description",
-      "shortDescriptionPlaceholder": "Brief one-liner about the challenge",
+      "shortDescriptionPlaceholder": "Brief one-liner about the problem statement",
       "description": "Description",
-      "descriptionPlaceholder": "Detailed description of the challenge...",
+      "descriptionPlaceholder": "Detailed description of the problem statement...",
       "deadline": "Deadline",
       "date": "Date",
       "time": "Time",
@@ -1213,25 +1213,25 @@
     }
   },
   "challenge": {
-    "notFound": "Challenge Not Found",
-    "backToChallenges": "Back to Challenges",
+    "notFound": "Problem Statement Not Found",
+    "backToChallenges": "Back to Problem Statements",
     "deadline": "Deadline",
     "daysLeft": "{{count}} days left",
     "daysLeft_one": "{{count}} day left",
     "ended": "Ended",
     "submissions": "{{count}} submissions",
     "submissions_one": "{{count}} submission",
-    "description": "Challenge Description",
-    "myIdeas": "My Challenge Ideas ({{count}})",
+    "description": "Problem Statement Description",
+    "myIdeas": "My Problem Statement Ideas ({{count}})",
     "creating": "Creating...",
     "createIdea": "Create Idea",
     "noIdeasYet": "No ideas yet. Create your first one!",
     "delete": {
-      "button": "Delete challenge",
-      "confirm": "Are you sure you want to delete this challenge? This will also delete all associated projects and submissions. This action cannot be undone.",
-      "successTitle": "Challenge deleted",
-      "successDesc": "The challenge and all associated projects have been successfully deleted.",
-      "errorGeneric": "Failed to delete challenge"
+      "button": "Delete problem statement",
+      "confirm": "Are you sure you want to delete this problem statement? This will also delete all associated projects and submissions. This action cannot be undone.",
+      "successTitle": "Problem statement deleted",
+      "successDesc": "The problem statement and all associated projects have been successfully deleted.",
+      "errorGeneric": "Failed to delete problem statement"
     },
     "table": {
       "title": "Title",
@@ -1245,7 +1245,7 @@
     "noSubmissionsYet": "No submissions yet. Be the first to submit!",
     "submissionProgress": "Submission Progress",
     "capacity": "Capacity",
-    "challengeStatus": "Challenge Status",
+    "challengeStatus": "Problem Statement Status",
     "statusLabel": "Status",
     "timeLeft": "Time Left",
     "days": "d",
@@ -1257,12 +1257,12 @@
     },
     "submitSolution": "Submit Your Solution",
     "submitYourSolution": "Submit Your Solution",
-    "submitDescription": "Share your innovative solution to this challenge",
+    "submitDescription": "Share your innovative solution to this problem statement",
     "form": {
       "title": "Solution Title *",
       "titlePlaceholder": "My Smart City Solution",
       "description": "Description *",
-      "descriptionPlaceholder": "Describe your solution and how it addresses the challenge...",
+      "descriptionPlaceholder": "Describe your solution and how it addresses the problem statement...",
       "demoUrl": "Demo URL (optional)"
     },
     "submitSolutionButton": "Submit Solution",
@@ -1297,31 +1297,31 @@
     "optional": "optional",
     "title": "Title",
     "url": "URL",
-    "reviewSubmissionNote": "Please review your idea carefully. You can edit it later before submitting to the challenge.",
+    "reviewSubmissionNote": "Please review your idea carefully. You can edit it later before submitting to the problem statement.",
     "back": "Back",
     "next": "Next",
     "titleRequired": "Title is required",
     "descriptionMinLength": "Description must be at least 50 characters",
     "submitting": "Submitting...",
     "creatingIdea": "Creating...",
-    "submitToChallenge": "Submit to Challenge",
+    "submitToChallenge": "Submit to Problem Statement",
     "createIdeaButton": "Create Idea",
     "projectSubmitted": "Project submitted successfully!",
     "submissionCreated": "Submission created successfully!",
     "submissionFailed": "Failed to create submission",
-    "confirmSubmit": "Submit this project to the challenge? This action cannot be undone.",
+    "confirmSubmit": "Submit this project to the problem statement? This action cannot be undone.",
     "submit": "Submit",
     "chooseCreationMethod": "How would you like to create your idea?",
-    "chooseMethodDescription": "Choose your preferred method for developing your challenge submission",
+    "chooseMethodDescription": "Choose your preferred method for developing your problem statement submission",
     "buildWithAI": "Build with AI",
     "buildWithAIDescription": "Use our AI assistant to help develop your idea through an interactive chat experience. Perfect for brainstorming and iterative development.",
     "submitViaForm": "Submit via Form",
-    "submitViaFormDescription": "Fill out a quick 3-step form to create your idea. Once created, you can click Submit to enter the challenge.",
+    "submitViaFormDescription": "Fill out a quick 3-step form to create your idea. Once created, you can click Submit to enter the problem statement.",
     "buildManually": "Build Manually",
     "buildManuallyDescription": "Fill out a structured 4-step form to define your idea comprehensively. Includes idea description, location, uniqueness, and naming.",
-    "submissionDisabled": "Submission options are currently disabled for this workspace. Please contact your workspace administrator.",
+    "submissionDisabled": "Submission options are currently disabled for this competition. Please contact your competition administrator.",
     "descriptionPlaceholder": "Describe your idea in detail (minimum 50 characters)",
-    "ideaCreated": "Idea created successfully! Click Submit to enter the challenge.",
+    "ideaCreated": "Idea created successfully! Click Submit to enter the problem statement.",
     "ideaCreationFailed": "Failed to create idea",
     "viewDetails": "View Details",
     "submittedBy": "Submitted by",
@@ -1339,11 +1339,11 @@
   },
   "admin": {
     "settings-page": {
-      "title": "Workspace Settings",
-      "description": "Customize your workspace appearance and URL",
+      "title": "Competition Settings",
+      "description": "Customize your competition appearance and URL",
       "success": {
         "title": "Settings updated",
-        "description": "Workspace settings have been successfully updated"
+        "description": "Competition settings have been successfully updated"
       },
       "error": {
         "title": "Error updating settings"
@@ -1351,19 +1351,19 @@
       "logoUrl": {
         "label": "Logo URL",
         "placeholder": "https://example.com/logo.png",
-        "description": "URL to your workspace logo image"
+        "description": "URL to your competition logo image"
       },
       "primaryColor": {
         "label": "Primary Color",
-        "description": "Choose your workspace's primary brand color"
+        "description": "Choose your competition's primary brand color"
       },
       "slug": {
-        "label": "Workspace URL Slug",
-        "description": "Custom URL for your workspace (lowercase letters, numbers, and hyphens only)"
+        "label": "Competition URL Slug",
+        "description": "Custom URL for your competition (lowercase letters, numbers, and hyphens only)"
       },
       "preview": {
         "title": "Preview",
-        "description": "How your workspace will appear to users"
+        "description": "How your competition will appear to users"
       }
     },
     "criteria": {
@@ -1455,7 +1455,7 @@
     "sidebar": {
       "header": {
         "title": "PMO Panel",
-        "subtitle": "Workspace Management"
+        "subtitle": "Competition Management"
       },
       "dashboard": {
         "title": "Dashboard",
@@ -1466,8 +1466,8 @@
         "description": "Manage ideas & projects"
       },
       "workspace": {
-        "title": "Workspace",
-        "description": "Workspace configuration"
+        "title": "Competition",
+        "description": "Competition configuration"
       },
       "branding": {
         "title": "Branding",
@@ -1478,7 +1478,7 @@
         "description": "Manage team members"
       },
       "challenges": {
-        "title": "Challenges",
+        "title": "Problem Statements",
         "description": "Manage problem statements"
       },
       "settings": {
@@ -1491,14 +1491,14 @@
     "guard": {
       "verifying": "Verifying admin access...",
       "workspaceNotFound": {
-        "title": "Workspace Not Found",
-        "invalidSlug": "Invalid workspace identifier",
-        "notAccessible": "The workspace \"{{slug}}\" does not exist or is not accessible"
+        "title": "Competition Not Found",
+        "invalidSlug": "Invalid competition identifier",
+        "notAccessible": "The competition \"{{slug}}\" does not exist or is not accessible"
       },
       "accessDenied": {
         "title": "Access Denied",
-        "notMember": "You are not a member of the workspace \"{{workspace}}\".",
-        "contactAdmin": "Please contact the workspace administrator for access."
+        "notMember": "You are not a member of the competition \"{{workspace}}\".",
+        "contactAdmin": "Please contact the competition administrator for access."
       },
       "adminRequired": {
         "title": "Admin Access Required",
@@ -1506,8 +1506,8 @@
         "currentRole": "Current role: {{role}}"
       },
       "goToHome": "Go to Home",
-      "goToMyWorkspaces": "Go to My Workspaces",
-      "goToWorkspace": "Go to Workspace"
+      "goToMyWorkspaces": "Go to My Competitions",
+      "goToWorkspace": "Go to Competition"
     },
     "analytics": {
       "overview": {
@@ -1865,34 +1865,34 @@
   },
   "workspace": {
     "welcomeToFikrahub": "Welcome to FikraHub",
-    "enterWorkspace": "Enter your workspace to continue",
-    "workspaceNameLabel": "Workspace Name",
-    "yourWorkspacePlaceholder": "your-workspace",
+    "enterWorkspace": "Enter your competition to continue",
+    "workspaceNameLabel": "Competition Name",
+    "yourWorkspacePlaceholder": "your-competition",
     "workspaceSlugDesc": "Use lowercase letters, numbers, and hyphens only",
-    "continueToWorkspace": "Continue to Workspace",
+    "continueToWorkspace": "Continue to Competition",
     "or": "Or",
-    "createNewWorkspaceBtn": "Create New Workspace",
-    "dontKnowWorkspace": "Don't know your workspace name?",
-    "contactWorkspaceAdmin": "Contact your workspace administrator",
-    "invalidWorkspaceName": "Workspace name invalid — use lowercase letters, numbers, and hyphens only",
-    "verifyingAccess": "Verifying workspace access...",
-    "notFound": "Workspace Not Found",
-    "invalidIdentifier": "Invalid workspace identifier",
-    "doesNotExist": "The workspace \"{{slug}}\" does not exist or is not accessible",
-    "createNew": "Create a New Workspace",
+    "createNewWorkspaceBtn": "Create New Competition",
+    "dontKnowWorkspace": "Don't know your competition name?",
+    "contactWorkspaceAdmin": "Contact your competition administrator",
+    "invalidWorkspaceName": "Competition name invalid — use lowercase letters, numbers, and hyphens only",
+    "verifyingAccess": "Verifying competition access...",
+    "notFound": "Competition Not Found",
+    "invalidIdentifier": "Invalid competition identifier",
+    "doesNotExist": "The competition \"{{slug}}\" does not exist or is not accessible",
+    "createNew": "Create a New Competition",
     "goHome": "Go to Home",
     "accessDenied": "Access Denied",
-    "notMember": "You are not a member of the workspace \"{{name}}\".",
-    "contactAdmin": "Please contact the workspace administrator for access.",
-    "goToMyWorkspaces": "Go to My Workspaces",
-    "createNewWorkspace": "Create New Workspace",
-    "createYourWorkspace": "Create Your Workspace",
-    "step1": "Step 1: Set up your workspace",
+    "notMember": "You are not a member of the competition \"{{name}}\".",
+    "contactAdmin": "Please contact the competition administrator for access.",
+    "goToMyWorkspaces": "Go to My Competitions",
+    "createNewWorkspace": "Create New Competition",
+    "createYourWorkspace": "Create Your Competition",
+    "step1": "Step 1: Set up your competition",
     "step2": "Step 2: Create your admin account",
-    "workspaceName": "Workspace Name",
+    "workspaceName": "Competition Name",
     "workspaceNamePlaceholder": "Acme Inc",
     "workspaceNameDesc": "This is the name of your organization or team",
-    "workspaceUrl": "Workspace URL",
+    "workspaceUrl": "Competition URL",
     "workspaceSlugPlaceholder": "acme-inc",
     "continue": "Continue →",
     "checking": "Checking...",
@@ -1906,12 +1906,12 @@
     "passwordPlaceholder": "••••••••",
     "passwordDesc": "Must be at least 8 characters",
     "back": "← Back",
-    "createWorkspace": "Create Workspace",
+    "createWorkspace": "Create Competition",
     "creating": "Creating...",
     "welcomeMessage": "Welcome to {{name}}! 🎉",
-    "provideWorkspaceName": "Please provide a workspace name",
-    "nameNotAvailable": "Workspace name is not available",
-    "failedToCheck": "Failed to check workspace name",
+    "provideWorkspaceName": "Please provide a competition name",
+    "nameNotAvailable": "Competition name is not available",
+    "failedToCheck": "Failed to check competition name",
     "provideEmailPassword": "Please provide your email and password",
     "passwordTooShort": "Password must be at least 8 characters"
   },

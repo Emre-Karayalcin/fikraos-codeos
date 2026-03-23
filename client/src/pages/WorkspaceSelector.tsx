@@ -71,9 +71,9 @@ export default function WorkspaceSelector() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Select a Workspace</h1>
+            <h1 className="text-3xl font-bold">Select a Competition</h1>
             <p className="text-text-secondary mt-1">
-              Choose a workspace to continue
+              Choose a competition to continue
             </p>
           </div>
           <Button variant="ghost" onClick={() => logout()}>

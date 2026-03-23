@@ -319,7 +319,7 @@ export function SuperAdminIdeasKanban({ workspaces }: Props) {
       {/* Selectors */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground font-medium">Workspace:</span>
+          <span className="text-sm text-muted-foreground font-medium">Competition:</span>
           <Select
             value={selectedOrgId}
             onValueChange={(v) => {
@@ -328,7 +328,7 @@ export function SuperAdminIdeasKanban({ workspaces }: Props) {
             }}
           >
             <SelectTrigger className="w-52">
-              <SelectValue placeholder="Select workspace" />
+              <SelectValue placeholder="Select competition" />
             </SelectTrigger>
             <SelectContent>
               {workspaces.map((w) => (
@@ -341,16 +341,16 @@ export function SuperAdminIdeasKanban({ workspaces }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground font-medium">Challenge:</span>
+          <span className="text-sm text-muted-foreground font-medium">Problem Statement:</span>
           <Select
             value={selectedChallengeId}
             onValueChange={setSelectedChallengeId}
           >
             <SelectTrigger className="w-64">
-              <SelectValue placeholder="All workspace ideas" />
+              <SelectValue placeholder="All competition ideas" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Workspace Ideas</SelectItem>
+              <SelectItem value="all">All Competition Ideas</SelectItem>
               {challengesList.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.title}

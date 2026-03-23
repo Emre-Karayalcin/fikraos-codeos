@@ -213,8 +213,8 @@ export default function Dashboard() {
     },
     {
       id: 'challenges',
-      title: 'Challenges',
-      description: 'Compete in active challenges',
+      title: 'Problem Statements',
+      description: 'Compete in active problem statements',
       icon: FiZap,
       color: 'text-blue-600',
       path: `/w/${slug}/challenges`,
