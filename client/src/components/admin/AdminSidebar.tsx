@@ -3,7 +3,7 @@ import { useLocation, Link } from 'wouter';
 import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
-  GraduationCap, ClipboardList, Mail, BarChart2,
+  GraduationCap, ClipboardList, Mail, BarChart2, BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -92,10 +92,20 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           href: `/w/${workspaceSlug}/admin/email-templates`,
           icon: Mail,
         },
+      ],
+    },
+    {
+      label: 'Analytics & Config',
+      items: [
         {
           titleKey: 'Activity Insights',
           href: `/w/${workspaceSlug}/admin/activity-insights`,
           icon: BarChart2,
+        },
+        {
+          titleKey: 'Scoring Criteria',
+          href: `/w/${workspaceSlug}/admin/scoring-criteria`,
+          icon: BookOpen,
         },
       ],
     },

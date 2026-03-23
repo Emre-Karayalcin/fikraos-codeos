@@ -292,16 +292,11 @@ function SectionCard({ data, hasPmo = false }: { data: typeof AI_SCREENING | typ
   );
 }
 
-// ─── Main page ──────────────────────────────────────────────────────────────────
+// ─── Shared content (reused by both super admin and PMO pages) ──────────────────
 
-export default function SuperAdminScoringCriteria() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
+export function ScoringCriteriaContent() {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <SuperAdminSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed((v) => !v)} />
-
-      <main className="flex-1 overflow-y-auto">
+    <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
           {/* Page header */}
@@ -357,6 +352,17 @@ export default function SuperAdminScoringCriteria() {
 
         </div>
       </main>
+  );
+}
+
+// ─── Super Admin page ────────────────────────────────────────────────────────
+
+export default function SuperAdminScoringCriteria() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      <SuperAdminSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed((v) => !v)} />
+      <ScoringCriteriaContent />
     </div>
   );
 }

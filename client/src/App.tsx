@@ -63,6 +63,7 @@ import SuperAdminEmailTemplates from "@/pages/SuperAdminEmailTemplates";
 import SuperAdminScoringCriteria from "@/pages/SuperAdminScoringCriteria";
 import AdminEmailTemplates from "@/pages/AdminEmailTemplates";
 import AdminActivityInsights from "@/pages/AdminActivityInsights";
+import AdminScoringCriteria from "@/pages/AdminScoringCriteria";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -303,6 +304,12 @@ function Router() {
       <Route path="/w/:slug/admin/activity-insights" component={() => (
         <PageTransition>
           <AdminGuard><AdminActivityInsights /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/scoring-criteria" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminScoringCriteria /></AdminGuard>
         </PageTransition>
       )} />
 
