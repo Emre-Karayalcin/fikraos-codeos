@@ -29,6 +29,8 @@ import {
   Eye,
   FileText,
   ExternalLink,
+  Layers,
+  Rocket,
 } from "lucide-react";
 
 interface Booking {
@@ -113,6 +115,58 @@ function IdeaViewDialog({ booking, open, onClose }: { booking: Booking; open: bo
   );
 }
 
+function IdeaResourcesDialog({ idea, open, onClose }: { idea: any; open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl w-full max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+          <DialogTitle className="text-text-primary text-lg">{idea?.title || "Idea Resources"}</DialogTitle>
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            {idea?.status && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium capitalize">
+                {idea.status.toLowerCase().replace(/_/g, " ")}
+              </span>
+            )}
+            {idea?.description && (
+              <span className="text-xs text-text-secondary line-clamp-1 flex-1">{idea.description}</span>
+            )}
+          </div>
+          {/* Quick resource links */}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            {idea?.pitchDeckUrl && (
+              <a href={idea.pitchDeckUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-primary border border-primary/30 rounded-full px-3 py-1 hover:bg-primary/5 transition-colors">
+                <FileText size={11} /> Pitch Deck <ExternalLink size={10} />
+              </a>
+            )}
+            {idea?.pitchDecks?.filter((d: any) => d.downloadUrl).map((deck: any) => (
+              <a key={deck.id} href={deck.downloadUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-purple-600 border border-purple-300 rounded-full px-3 py-1 hover:bg-purple-50 transition-colors">
+                <FileText size={11} /> Generated Deck <ExternalLink size={10} />
+              </a>
+            ))}
+            {idea?.deploymentUrl && (
+              <a href={idea.deploymentUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-green-600 border border-green-300 rounded-full px-3 py-1 hover:bg-green-50 transition-colors">
+                <Rocket size={11} /> Prototype / Live App <ExternalLink size={10} />
+              </a>
+            )}
+          </div>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto">
+          {idea?.id ? (
+            <AllAIOutputsView ideaId={idea.id} />
+          ) : (
+            <div className="flex items-center justify-center h-40 text-text-secondary text-sm">
+              No AI outputs yet.
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function MentorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -122,6 +176,7 @@ export default function MentorDashboard() {
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
   const [showAllBookings, setShowAllBookings] = useState(false);
   const [viewingIdeaBooking, setViewingIdeaBooking] = useState<Booking | null>(null);
+  const [viewingParticipantIdea, setViewingParticipantIdea] = useState<any | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -199,7 +254,7 @@ export default function MentorDashboard() {
 
   const stats = [
     { label: "Total Sessions", value: totalSessions, icon: TrendingUp, colorClass: "text-blue-600" },
-    { label: "Active Students", value: activeStudents, icon: Users, colorClass: "text-green-600" },
+    { label: "Assigned Participants", value: participants.length, icon: Users, colorClass: "text-primary", onClick: () => setActiveTab("participants") },
     { label: "Average Rating", value: averageRating != null ? averageRating.toFixed(1) : "—", icon: Star, colorClass: "text-yellow-500" },
     { label: "Pending Requests", value: pendingRequests, icon: Clock, colorClass: "text-orange-500" },
   ];
@@ -306,12 +361,19 @@ export default function MentorDashboard() {
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {stats.map((stat) => (
-                  <div key={stat.label} className="bg-card border border-border rounded-lg p-4 sm:p-5">
+                  <div
+                    key={stat.label}
+                    onClick={stat.onClick}
+                    className={`bg-card border border-border rounded-lg p-4 sm:p-5 ${stat.onClick ? "cursor-pointer hover:border-primary/40 hover:bg-muted/20 transition-colors" : ""}`}
+                  >
                     <div className="flex items-center justify-between mb-2 sm:mb-3">
                       <p className="text-text-secondary text-xs sm:text-sm">{stat.label}</p>
                       <stat.icon size={16} className={stat.colorClass} />
                     </div>
                     <p className="text-2xl sm:text-3xl font-bold text-text-primary">{stat.value}</p>
+                    {stat.onClick && (
+                      <p className="text-xs text-primary mt-1.5">View all →</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -430,65 +492,87 @@ export default function MentorDashboard() {
                 participants.map((p: any) => (
                   <div key={p.user.id} className="bg-card border border-border rounded-lg overflow-hidden">
                     {/* Member header */}
-                    <div className="flex items-center gap-3 p-4 border-b border-border">
-                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
+                    <div className="flex items-center gap-3 p-4 border-b border-border bg-muted/20">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
                         {getInitials(p.user.firstName, p.user.lastName)}
                       </div>
-                      <div>
-                        <p className="font-medium text-text-primary text-sm">
+                      <div className="flex-1">
+                        <p className="font-semibold text-text-primary text-sm">
                           {p.user.firstName} {p.user.lastName}
                         </p>
                         <p className="text-xs text-text-secondary">{p.user.email}</p>
                       </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {p.ideas?.length ?? 0} idea{p.ideas?.length !== 1 ? "s" : ""}
+                      </Badge>
                     </div>
 
-                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Ideas */}
-                      <div>
-                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-                          Ideas ({p.ideas?.length ?? 0})
-                        </p>
-                        {p.ideas?.length === 0 && (
-                          <p className="text-xs text-text-secondary italic">No ideas yet</p>
-                        )}
-                        {p.ideas?.map((idea: any) => (
-                          <div key={idea.id} className="flex items-center gap-2 py-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                            <span className="text-sm text-text-primary truncate">{idea.title}</span>
-                            <span className="text-xs text-text-secondary capitalize ml-auto">
-                              {idea.status?.replace(/_/g, " ").toLowerCase()}
-                            </span>
+                    <div className="p-4 space-y-3">
+                      {p.ideas?.length === 0 && (
+                        <p className="text-xs text-text-secondary italic text-center py-2">No ideas created yet.</p>
+                      )}
+                      {p.ideas?.map((idea: any) => {
+                        const hasGeneratedDecks = idea.pitchDecks?.some((d: any) => d.downloadUrl);
+                        const hasPitchDeck = idea.pitchDeckUrl || hasGeneratedDecks;
+                        const hasPrototype = !!idea.deploymentUrl;
+                        return (
+                          <div key={idea.id} className="border border-border rounded-lg p-3 hover:border-primary/30 transition-colors">
+                            <div className="flex items-start justify-between gap-2 flex-wrap">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium text-sm text-text-primary truncate">{idea.title}</span>
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize">
+                                    {idea.status?.replace(/_/g, " ").toLowerCase() ?? "backlog"}
+                                  </span>
+                                </div>
+                                {idea.description && (
+                                  <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{idea.description}</p>
+                                )}
+                                {/* Resource badges */}
+                                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                  {hasPitchDeck && (
+                                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 border border-purple-200">
+                                      <FileText size={10} /> Pitch Deck
+                                    </span>
+                                  )}
+                                  {hasPrototype && (
+                                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-200">
+                                      <Rocket size={10} /> Prototype
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Action buttons */}
+                              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                                <button
+                                  onClick={() => setViewingParticipantIdea(idea)}
+                                  className="flex items-center gap-1.5 text-xs text-primary border border-primary/30 rounded-md px-2.5 py-1.5 hover:bg-primary/5 transition-colors"
+                                >
+                                  <Layers size={11} /> AI Outputs
+                                </button>
+                                {idea.pitchDeckUrl && (
+                                  <a href={idea.pitchDeckUrl} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-xs text-purple-600 border border-purple-300 rounded-md px-2.5 py-1.5 hover:bg-purple-50 transition-colors">
+                                    <FileText size={11} /> Pitch Deck <ExternalLink size={10} />
+                                  </a>
+                                )}
+                                {idea.pitchDecks?.filter((d: any) => d.downloadUrl).slice(0, 1).map((deck: any) => (
+                                  <a key={deck.id} href={deck.downloadUrl} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-xs text-purple-600 border border-purple-300 rounded-md px-2.5 py-1.5 hover:bg-purple-50 transition-colors">
+                                    <FileText size={11} /> Gen. Deck <ExternalLink size={10} />
+                                  </a>
+                                ))}
+                                {idea.deploymentUrl && (
+                                  <a href={idea.deploymentUrl} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-xs text-green-600 border border-green-300 rounded-md px-2.5 py-1.5 hover:bg-green-50 transition-colors">
+                                    <Rocket size={11} /> Prototype <ExternalLink size={10} />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-
-                      {/* Pitch Decks */}
-                      <div>
-                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-                          Pitch Decks ({p.pitchDecks?.length ?? 0})
-                        </p>
-                        {p.pitchDecks?.length === 0 && (
-                          <p className="text-xs text-text-secondary italic">No pitch decks yet</p>
-                        )}
-                        {p.pitchDecks?.map((deck: any) => (
-                          <div key={deck.id} className="flex items-center gap-2 py-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0" />
-                            <span className="text-sm text-text-primary truncate">
-                              {deck.projectTitle || "Pitch deck"}
-                            </span>
-                            {deck.downloadUrl && (
-                              <a
-                                href={deck.downloadUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="ml-auto text-primary hover:underline text-xs flex items-center gap-1"
-                              >
-                                <ExternalLink size={11} /> View
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))
@@ -686,12 +770,21 @@ export default function MentorDashboard() {
       {/* Profile setup sheet (from banner) */}
       <MentorProfileSetup open={setupOpen} onOpenChange={setSetupOpen} />
 
-      {/* Idea view dialog */}
+      {/* Idea view dialog (from bookings) */}
       {viewingIdeaBooking && (
         <IdeaViewDialog
           booking={viewingIdeaBooking}
           open={!!viewingIdeaBooking}
           onClose={() => setViewingIdeaBooking(null)}
+        />
+      )}
+
+      {/* Idea resources dialog (from participants tab) */}
+      {viewingParticipantIdea && (
+        <IdeaResourcesDialog
+          idea={viewingParticipantIdea}
+          open={!!viewingParticipantIdea}
+          onClose={() => setViewingParticipantIdea(null)}
         />
       )}
     </div>

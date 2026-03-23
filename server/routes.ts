@@ -1184,23 +1184,57 @@ export function registerRoutes(app: Express): Server {
         })
         .from(users)
         .where(inArray(users.id, participantIds));
-      // Fetch their ideas (projects)
+      // Fetch their ideas (projects) — includes pitchDeckUrl and deploymentUrl
       const memberProjects = await db
-        .select()
+        .select({
+          id: projects.id,
+          orgId: projects.orgId,
+          title: projects.title,
+          description: projects.description,
+          status: projects.status,
+          type: projects.type,
+          tags: projects.tags,
+          pitchDeckUrl: projects.pitchDeckUrl,
+          deploymentUrl: projects.deploymentUrl,
+          submitted: projects.submitted,
+          createdById: projects.createdById,
+          createdAt: projects.createdAt,
+          updatedAt: projects.updatedAt,
+        })
         .from(projects)
         .where(inArray(projects.createdById, participantIds));
-      // Fetch their pitch decks
-      const memberPitchDecks = await db
-        .select()
-        .from(pitchDeckGenerations)
-        .where(inArray(pitchDeckGenerations.createdById, participantIds));
+      // Fetch generated pitch decks by projectId
+      const projectIds = memberProjects.map((p) => p.id);
+      const memberPitchDecks = projectIds.length > 0
+        ? await db
+            .select({
+              id: pitchDeckGenerations.id,
+              projectId: pitchDeckGenerations.projectId,
+              status: pitchDeckGenerations.status,
+              downloadUrl: pitchDeckGenerations.downloadUrl,
+              createdById: pitchDeckGenerations.createdById,
+              createdAt: pitchDeckGenerations.createdAt,
+            })
+            .from(pitchDeckGenerations)
+            .where(inArray(pitchDeckGenerations.projectId, projectIds))
+        : [];
+      // Index pitch decks by projectId for fast lookup
+      const pitchDecksByProject: Record<string, any[]> = {};
+      for (const deck of memberPitchDecks) {
+        if (!pitchDecksByProject[deck.projectId]) pitchDecksByProject[deck.projectId] = [];
+        pitchDecksByProject[deck.projectId].push(deck);
+      }
+      // Enrich each project with its pitch decks
+      const enrichedProjects = memberProjects.map((p) => ({
+        ...p,
+        pitchDecks: pitchDecksByProject[p.id] ?? [],
+      }));
       // Group by member
       const memberMap: Record<string, any> = {};
       for (const m of members) {
         memberMap[m.id] = {
           user: m,
-          ideas: memberProjects.filter((p) => p.createdById === m.id),
-          pitchDecks: memberPitchDecks.filter((p) => p.createdById === m.id),
+          ideas: enrichedProjects.filter((p) => p.createdById === m.id),
         };
       }
       res.json(Object.values(memberMap));
