@@ -1898,6 +1898,52 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // GET /api/workspaces/:orgId/admin/email-templates — list email templates (PMO admin access)
+  app.get('/api/workspaces/:orgId/admin/email-templates', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const tplDir = [
+        path.join(__dirname, 'email-templates'),
+        path.join(process.cwd(), 'server', 'email-templates'),
+      ].find(d => { try { return fs.existsSync(d); } catch { return false; } });
+      if (!tplDir) return res.json([]);
+      const files = fs.readdirSync(tplDir).filter((f: string) => f.endsWith('.html'));
+      const templates = files.map((f: string) => ({
+        name: f.replace('.html', ''),
+        filename: f,
+        content: fs.readFileSync(path.join(tplDir, f), 'utf8'),
+      }));
+      res.json(templates);
+    } catch (error) {
+      console.error('Error fetching email templates:', error);
+      res.status(500).json({ error: 'Failed to fetch templates' });
+    }
+  });
+
+  // PUT /api/workspaces/:orgId/admin/email-templates/:name — update template (PMO admin access)
+  app.put('/api/workspaces/:orgId/admin/email-templates/:name', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, name } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      if (!/^[a-z0-9-]+$/.test(name)) return res.status(400).json({ error: 'Invalid template name' });
+      const { content } = req.body;
+      if (!content || typeof content !== 'string') return res.status(400).json({ error: 'Content required' });
+      const tplDir = [
+        path.join(__dirname, 'email-templates'),
+        path.join(process.cwd(), 'server', 'email-templates'),
+      ].find(d => { try { return fs.existsSync(d); } catch { return false; } });
+      if (!tplDir) return res.status(500).json({ error: 'Template directory not found' });
+      const filePath = path.join(tplDir, `${name}.html`);
+      if (!filePath.startsWith(tplDir)) return res.status(400).json({ error: 'Invalid path' });
+      fs.writeFileSync(filePath, content, 'utf8');
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('Error saving email template:', error);
+      res.status(500).json({ error: 'Failed to save template' });
+    }
+  });
+
   // GET /api/workspaces/:orgId/admin/activity-insights — workspace-scoped activity insights for PMO admins
   app.get('/api/workspaces/:orgId/admin/activity-insights', isAuthenticated, async (req: any, res) => {
     try {

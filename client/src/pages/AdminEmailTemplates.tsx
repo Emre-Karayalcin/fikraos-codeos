@@ -28,18 +28,30 @@ export default function AdminEmailTemplates() {
   const [showPreview, setShowPreview] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: templates = [], isLoading } = useQuery<Template[]>({
-    queryKey: ['/api/super-admin/email-templates'],
+  const { data: workspace } = useQuery<{ id: string }>({
+    queryKey: [`/api/workspaces/${slug}`],
     queryFn: async () => {
-      const res = await fetch('/api/super-admin/email-templates', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to load templates');
+      const res = await fetch(`/api/workspaces/${slug}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch workspace');
       return res.json();
     },
   });
 
+  const orgId = workspace?.id;
+
+  const { data: templates = [], isLoading } = useQuery<Template[]>({
+    queryKey: [`/api/workspaces/${orgId}/admin/email-templates`],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/email-templates`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load templates');
+      return res.json();
+    },
+    enabled: !!orgId,
+  });
+
   const saveMutation = useMutation({
     mutationFn: async ({ name, content }: { name: string; content: string }) => {
-      const res = await fetch(`/api/super-admin/email-templates/${name}`, {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/email-templates/${name}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -49,7 +61,7 @@ export default function AdminEmailTemplates() {
     },
     onSuccess: () => {
       toast.success('Template saved');
-      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/email-templates'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/email-templates`] });
     },
     onError: () => toast.error('Failed to save template'),
   });
