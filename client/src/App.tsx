@@ -62,6 +62,7 @@ import SuperAdminApplicationsList from "@/pages/SuperAdminApplicationsList";
 import SuperAdminEmailTemplates from "@/pages/SuperAdminEmailTemplates";
 import SuperAdminScoringCriteria from "@/pages/SuperAdminScoringCriteria";
 import AdminEmailTemplates from "@/pages/AdminEmailTemplates";
+import AdminActivityInsights from "@/pages/AdminActivityInsights";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -296,6 +297,12 @@ function Router() {
       <Route path="/w/:slug/admin/email-templates" component={() => (
         <PageTransition>
           <AdminGuard><AdminEmailTemplates /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/activity-insights" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminActivityInsights /></AdminGuard>
         </PageTransition>
       )} />
 

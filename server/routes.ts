@@ -1898,6 +1898,162 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // GET /api/workspaces/:orgId/admin/activity-insights — workspace-scoped activity insights for PMO admins
+  app.get('/api/workspaces/:orgId/admin/activity-insights', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const { challengeId } = req.query as { challengeId?: string };
+      const challengeFilter = challengeId ? drizzleSql`AND cs.challenge_id = ${challengeId}` : drizzleSql``;
+
+      const submissionsResult = await db.execute(drizzleSql`
+        SELECT
+          c.id            AS "challengeId",
+          c.title         AS "challengeTitle",
+          COUNT(cs.id)::int                        AS "totalSubmissions",
+          COUNT(cs.pitch_deck_url)::int            AS "withPitchDeck",
+          COUNT(cs.prototype_url)::int             AS "withPrototype",
+          MIN(cs.created_at)                       AS "firstSubmissionAt",
+          MAX(cs.created_at)                       AS "lastSubmissionAt"
+        FROM   challenge_submissions cs
+        JOIN   challenges c ON c.id = cs.challenge_id
+        WHERE  c.org_id = ${orgId} ${challengeFilter}
+        GROUP BY c.id, c.title
+        ORDER BY MAX(cs.created_at) DESC NULLS LAST
+      `);
+
+      const applicationsResult = await db.execute(drizzleSql`
+        SELECT
+          COUNT(*)::int                                                         AS "total",
+          COUNT(*) FILTER (WHERE ma.status = 'APPROVED')::int                  AS "approved",
+          COUNT(*) FILTER (WHERE ma.status = 'REJECTED')::int                  AS "rejected",
+          COUNT(*) FILTER (WHERE ma.status = 'PENDING_REVIEW')::int            AS "pending",
+          COUNT(*) FILTER (WHERE ma.status = 'AI_REVIEWED')::int               AS "aiReviewed"
+        FROM   member_applications ma
+        WHERE  ma.org_id = ${orgId}
+      `);
+
+      const invitesResult = await db.execute(drizzleSql`
+        SELECT
+          COUNT(*)::int                                               AS "totalInvited",
+          COUNT(*) FILTER (WHERE om.role = 'MEMBER')::int            AS "members",
+          COUNT(*) FILTER (WHERE om.role = 'MENTOR')::int            AS "mentors",
+          COUNT(*) FILTER (WHERE om.role = 'ADMIN')::int             AS "admins"
+        FROM   organization_members om
+        WHERE  om.org_id = ${orgId} AND om.role != 'OWNER'
+      `);
+
+      const totalsResult = await db.execute(drizzleSql`
+        SELECT
+          (SELECT COUNT(*)::int FROM challenge_submissions cs
+            JOIN challenges c ON c.id = cs.challenge_id
+            WHERE c.org_id = ${orgId} ${challengeFilter})            AS "totalSubmissions",
+          (SELECT COUNT(*)::int FROM member_applications ma
+            WHERE ma.org_id = ${orgId})                              AS "totalApplications",
+          (SELECT COUNT(*)::int FROM member_applications ma
+            WHERE ma.org_id = ${orgId} AND ma.status = 'APPROVED')  AS "approvedApplications",
+          (SELECT COUNT(*)::int FROM member_applications ma
+            WHERE ma.org_id = ${orgId} AND ma.status = 'REJECTED')  AS "rejectedApplications",
+          (SELECT COUNT(*)::int FROM organization_members om
+            WHERE om.org_id = ${orgId} AND om.role != 'OWNER')      AS "totalInvites"
+      `);
+
+      const activityLogResult = await db.execute(drizzleSql`
+        SELECT * FROM (
+          SELECT
+            'submission'  AS "type",
+            cs.id         AS "id",
+            cs.created_at AS "eventAt",
+            u.first_name  AS "firstName",
+            u.last_name   AS "lastName",
+            u.email       AS "email",
+            cs.title      AS "detail",
+            c.title       AS "subDetail",
+            NULL          AS "status"
+          FROM challenge_submissions cs
+          JOIN challenges c ON c.id = cs.challenge_id
+          JOIN users u ON u.id = cs.user_id
+          WHERE c.org_id = ${orgId} ${challengeFilter}
+
+          UNION ALL
+
+          SELECT
+            'application' AS "type",
+            ma.id         AS "id",
+            COALESCE(ma.reviewed_at, ma.submitted_at) AS "eventAt",
+            u.first_name  AS "firstName",
+            u.last_name   AS "lastName",
+            u.email       AS "email",
+            ma.idea_name  AS "detail",
+            NULL          AS "subDetail",
+            ma.status     AS "status"
+          FROM member_applications ma
+          JOIN users u ON u.id = ma.user_id
+          WHERE ma.org_id = ${orgId}
+
+          UNION ALL
+
+          SELECT
+            'invite'      AS "type",
+            om.id         AS "id",
+            om.created_at AS "eventAt",
+            u.first_name  AS "firstName",
+            u.last_name   AS "lastName",
+            u.email       AS "email",
+            om.role::text AS "detail",
+            NULL          AS "subDetail",
+            NULL          AS "status"
+          FROM organization_members om
+          JOIN users u ON u.id = om.user_id
+          WHERE om.org_id = ${orgId} AND om.role::text != 'OWNER'
+
+          UNION ALL
+
+          SELECT
+            pe.event_type::text AS "type",
+            pe.id               AS "id",
+            pe.created_at       AS "eventAt",
+            actor.first_name    AS "firstName",
+            actor.last_name     AS "lastName",
+            COALESCE(actor.email, '') AS "email",
+            CASE
+              WHEN pe.event_type = 'ROLE_UPDATED'             THEN COALESCE(target.email, pe.target_entity_label, 'Unknown user')
+              WHEN pe.event_type = 'MEMBER_REMOVED'           THEN COALESCE(pe.target_entity_label, target.email, 'Unknown user')
+              WHEN pe.event_type = 'IDEA_STATUS_CHANGED'      THEN pe.target_entity_label
+              WHEN pe.event_type = 'PROGRAM_PROGRESS_UPDATED' THEN 'Step ' || COALESCE((pe.metadata->>'currentStep'), '?')
+              ELSE pe.target_entity_label
+            END AS "detail",
+            CASE
+              WHEN pe.event_type = 'ROLE_UPDATED'             THEN COALESCE((pe.metadata->>'newRole'), '')
+              WHEN pe.event_type = 'IDEA_STATUS_CHANGED'      THEN COALESCE((pe.metadata->>'previousStatus'), '') || ' → ' || COALESCE((pe.metadata->>'newStatus'), '')
+              WHEN pe.event_type = 'PROGRAM_PROGRESS_UPDATED' THEN 'Step ' || COALESCE((pe.metadata->>'previousStep'), '?') || ' → Step ' || COALESCE((pe.metadata->>'currentStep'), '?')
+              ELSE ''
+            END AS "subDetail",
+            NULL AS "status"
+          FROM platform_events pe
+          JOIN organizations o ON o.id = pe.org_id
+          LEFT JOIN users actor  ON actor.id  = pe.actor_id
+          LEFT JOIN users target ON target.id = pe.target_user_id
+          WHERE pe.org_id = ${orgId}
+        ) events
+        ORDER BY "eventAt" DESC NULLS LAST
+        LIMIT 200
+      `);
+
+      res.json({
+        totals: totalsResult.rows[0] || {},
+        submissions: submissionsResult.rows,
+        applications: applicationsResult.rows[0] || {},
+        invites: invitesResult.rows[0] || {},
+        activityLog: activityLogResult.rows,
+      });
+    } catch (error) {
+      console.error('Error fetching workspace activity insights:', error);
+      res.status(500).json({ error: 'Failed to fetch activity insights' });
+    }
+  });
+
   // ─── End judge endpoints ─────────────────────────────────────────────────────
 
   // Chat routes
