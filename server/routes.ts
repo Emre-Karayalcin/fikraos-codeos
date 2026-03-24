@@ -1957,7 +1957,7 @@ export function registerRoutes(app: Express): Server {
       if (data.startDate !== undefined) update.startDate = new Date(data.startDate);
       if (data.endDate !== undefined) update.endDate = data.endDate ? new Date(data.endDate) : null;
       if (data.isPublished !== undefined) update.isPublished = data.isPublished;
-      const [updated] = await db.update(events).set(update).where(and(eq(events.id, id), eq(events.orgId, orgId))).returning();
+      const [updated] = await db.update(events).set(update).where(eq(events.id, id)).returning();
       if (!updated) return res.status(404).json({ error: 'Event not found' });
       res.json(updated);
     } catch (error) {
@@ -1971,7 +1971,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const { orgId, id } = req.params;
       if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
-      await db.delete(events).where(and(eq(events.id, id), eq(events.orgId, orgId)));
+      await db.delete(events).where(eq(events.id, id));
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting workspace event:', error);
