@@ -2079,6 +2079,32 @@ export function registerRoutes(app: Express): Server {
     } catch (e) { res.status(500).json({ error: 'Failed to update attendance record' }); }
   });
 
+  // ─── Admin Pitch Decks ────────────────────────────────────────────────────
+  app.get('/api/workspaces/:orgId/admin/pitch-decks', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const rows = await db
+        .select({
+          id: pitchDeckGenerations.id,
+          status: pitchDeckGenerations.status,
+          template: pitchDeckGenerations.template,
+          downloadUrl: pitchDeckGenerations.downloadUrl,
+          createdAt: pitchDeckGenerations.createdAt,
+          projectId: pitchDeckGenerations.projectId,
+          projectTitle: projects.title,
+          creatorFirstName: users.firstName,
+          creatorLastName: users.lastName,
+        })
+        .from(pitchDeckGenerations)
+        .innerJoin(projects, eq(projects.id, pitchDeckGenerations.projectId))
+        .innerJoin(users, eq(users.id, pitchDeckGenerations.createdById))
+        .where(eq(projects.orgId, orgId))
+        .orderBy(desc(pitchDeckGenerations.createdAt));
+      res.json(rows);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch pitch decks' }); }
+  });
+
   // ─── Academy Course Management ─────────────────────────────────────────────
   app.get('/api/academy/courses', isAuthenticated, async (req: any, res) => {
     try {

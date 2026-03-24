@@ -248,6 +248,10 @@ export default function MentorDashboard() {
   const averageRating = ratedBookings.length > 0
     ? ratedBookings.reduce((s, b) => s + (b.rating ?? 0), 0) / ratedBookings.length
     : null;
+  const completedBookings = bookings.filter((b) => b.status === "COMPLETED");
+  const totalHours = Math.round(completedBookings.reduce((sum, b) => sum + (b.durationMinutes ?? 60), 0) / 60 * 10) / 10;
+  const confirmedOrCompleted = bookings.filter((b) => b.status === "CONFIRMED" || b.status === "COMPLETED").length;
+  const attendanceRate = confirmedOrCompleted > 0 ? Math.round((completedBookings.length / confirmedOrCompleted) * 100) : null;
 
   const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
@@ -270,8 +274,10 @@ export default function MentorDashboard() {
 
   const stats = [
     { label: "Total Sessions", value: totalSessions, icon: TrendingUp, colorClass: "text-blue-600" },
+    { label: "Hours Logged", value: `${totalHours}h`, icon: Clock, colorClass: "text-purple-500" },
     { label: "Assigned Participants", value: participants.length, icon: Users, colorClass: "text-primary", onClick: () => setActiveTab("participants") },
-    { label: "Average Rating", value: averageRating != null ? averageRating.toFixed(1) : "—", icon: Star, colorClass: "text-yellow-500" },
+    { label: "Avg Rating", value: averageRating != null ? averageRating.toFixed(1) : "—", icon: Star, colorClass: "text-yellow-500" },
+    { label: "Attendance Rate", value: attendanceRate != null ? `${attendanceRate}%` : "—", icon: CheckCircle, colorClass: "text-green-500" },
     { label: "Pending Requests", value: pendingRequests, icon: Clock, colorClass: "text-orange-500" },
   ];
 
@@ -385,7 +391,7 @@ export default function MentorDashboard() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {stats.map((stat) => (
                   <div
                     key={stat.label}

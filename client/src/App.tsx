@@ -68,6 +68,7 @@ import AdminEvents from "@/pages/AdminEvents";
 import AdminAttendance from "@/pages/AdminAttendance";
 import AdminMentorFeedback from "@/pages/AdminMentorFeedback";
 import AdminAcademy from "@/pages/AdminAcademy";
+import AdminPitchDecks from "@/pages/AdminPitchDecks";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -338,6 +339,12 @@ function Router() {
       <Route path="/w/:slug/admin/academy" component={() => (
         <PageTransition>
           <AdminGuard><AdminAcademy /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/pitch-decks" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminPitchDecks /></AdminGuard>
         </PageTransition>
       )} />
 
