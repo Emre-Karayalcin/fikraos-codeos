@@ -154,9 +154,15 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
     mutationFn: async (data: any) => {
       return apiRequest("PUT", "/api/mentor-profile/me", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mentor-profile/me"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
+    onSuccess: async () => {
+      // Invalidate list and any cached individual mentor detail pages
+      await queryClient.invalidateQueries({ queryKey: ["/api/mentor-profile/me"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
+      // Invalidate all individual mentor queries so booking sheet picks up new availability
+      queryClient.invalidateQueries({ predicate: (q) => {
+        const key = q.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/mentors/");
+      }});
       toast({ title: "Profile saved successfully" });
       onOpenChange(false);
     },

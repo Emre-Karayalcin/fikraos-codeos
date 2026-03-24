@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  ExternalLink,
 } from "lucide-react";
 
 interface Availability {
@@ -51,6 +52,7 @@ interface MentorDetail {
   sessionDurationMinutes?: number;
   location?: string;
   website?: string;
+  calendlyLink?: string | null;
   availability?: Availability[];
 }
 
@@ -386,6 +388,26 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
               </div>
             </div>
 
+            {/* Calendly shortcut — bypass internal calendar entirely */}
+            {mentorDetail?.calendlyLink && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  This mentor uses Calendly for scheduling. Click below to pick a time directly on their calendar.
+                </p>
+                <Button
+                  className="w-full gap-2"
+                  onClick={() => window.open(mentorDetail.calendlyLink!, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Book via Calendly
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">You'll be redirected to Calendly to complete your booking.</p>
+              </div>
+            )}
+
+            {/* Internal calendar — only shown when no Calendly link */}
+            {!mentorDetail?.calendlyLink && (<>
+
             {/* Idea selector */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -519,6 +541,7 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
             >
               {bookMutation.isPending ? "Booking…" : "Book Session"}
             </Button>
+            </>)}
           </div>
         </div>
       </SheetContent>
