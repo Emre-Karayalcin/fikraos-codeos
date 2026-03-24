@@ -894,6 +894,69 @@ export const judgeEvaluations = pgTable("judge_evaluations", {
 
 export type JudgeEvaluation = typeof judgeEvaluations.$inferSelect;
 
+// Event speakers
+export const eventSpeakers = pgTable("event_speakers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 200 }).notNull(),
+  role: varchar("role", { length: 200 }),
+  company: varchar("company", { length: 200 }),
+  bio: text("bio"),
+  imageUrl: varchar("image_url", { length: 1000 }),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type EventSpeaker = typeof eventSpeakers.$inferSelect;
+
+// Attendance tracking
+export const attendanceRecords = pgTable("attendance_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  bookingId: varchar("booking_id").references(() => mentorBookings.id, { onDelete: "set null" }),
+  sessionType: varchar("session_type", { length: 50 }).default("MENTOR_SESSION"),
+  scheduledDate: varchar("scheduled_date", { length: 10 }).notNull(),
+  scheduledTime: varchar("scheduled_time", { length: 5 }),
+  checkedInAt: timestamp("checked_in_at"),
+  checkedOutAt: timestamp("checked_out_at"),
+  status: varchar("status", { length: 20 }).default("SCHEDULED"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+
+// Academy courses
+export const academyCourses = pgTable("academy_courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  slug: varchar("slug", { length: 100 }).unique().notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  thumbnailUrl: varchar("thumbnail_url", { length: 1000 }),
+  isPublished: boolean("is_published").default(false),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const academyVideos = pgTable("academy_videos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => academyCourses.id, { onDelete: "cascade" }),
+  slug: varchar("slug", { length: 100 }).notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  videoUrl: varchar("video_url", { length: 1000 }).notNull(),
+  durationSeconds: integer("duration_seconds").default(0),
+  displayOrder: integer("display_order").default(0),
+  isPublished: boolean("is_published").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AcademyCourse = typeof academyCourses.$inferSelect;
+export type AcademyVideo = typeof academyVideos.$inferSelect;
+
 export const insertMentorProfileSchema = createInsertSchema(mentorProfiles);
 export const insertMentorBookingSchema = createInsertSchema(mentorBookings);
 export const insertCourseProgressSchema = createInsertSchema(courseProgress).omit({ id: true, lastWatchedAt: true });

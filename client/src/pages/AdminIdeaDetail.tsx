@@ -304,6 +304,17 @@ export default function AdminIdeaDetail() {
     return Math.round(raw);
   };
 
+  // Fetch pitch deck generations for this idea
+  const { data: pitchDecks = [] } = useQuery<any[]>({
+    queryKey: ['/api/projects', ideaId, 'pitch-deck-generations'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${ideaId}/pitch-deck-generations`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!ideaId && activeTab === 'pitch-decks',
+  });
+
   // DEFINE MISSING VARIABLES
   // Extract evaluation data from response
   const evaluation = evaluationData?.evaluation || null;
@@ -450,18 +461,22 @@ export default function AdminIdeaDetail() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <Info className="w-4 h-4" />
                 Overview
               </TabsTrigger>
               <TabsTrigger value="evaluation" className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
-                {idea?.status === 'SHORTLISTED' ? 'PMO Evaluation' : 'Evaluation'}
+                Evaluation
               </TabsTrigger>
               <TabsTrigger value="ai-outputs" className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 AI Outputs
+              </TabsTrigger>
+              <TabsTrigger value="pitch-decks" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Pitch Decks
               </TabsTrigger>
               <TabsTrigger value="comments" className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
@@ -717,130 +732,17 @@ export default function AdminIdeaDetail() {
               </div>
             </TabsContent>
 
-            {/* Evaluation Tab — shows PMO form for SHORTLISTED ideas, AI evaluation otherwise */}
+            {/* Evaluation Tab — always shows AI screening, PMO scoring form shown when SHORTLISTED */}
             <TabsContent value="evaluation" className="mt-6">
-              {idea?.status === 'SHORTLISTED' ? (
-                <div className="space-y-6">
-                  {/* Live score banner */}
-                  <Card className="border-amber-500/30 bg-amber-500/5">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Live PMO Total Score</p>
-                        <p className="text-4xl font-bold">{computePmoTotal()}<span className="text-lg text-muted-foreground">/100</span></p>
-                      </div>
-                      <Button onClick={() => savePmoEval.mutate()} disabled={savePmoEval.isPending}>
-                        {savePmoEval.isPending ? 'Saving...' : 'Save Evaluation'}
-                      </Button>
-                    </CardContent>
-                  </Card>
+              <div className="space-y-8">
 
-                  {/* Business Maturity */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Business Maturity <span className="text-muted-foreground font-normal text-sm">(40%)</span></CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {[
-                        { key: 'b1', label: 'Problem clearly defined', weight: '10%' },
-                        { key: 'b2', label: 'Target customer identified', weight: '8%' },
-                        { key: 'b3', label: 'Revenue model established', weight: '8%' },
-                        { key: 'b4', label: 'Traction / early validation', weight: '8%' },
-                        { key: 'b5', label: 'Scalability plan', weight: '6%' },
-                      ].map(({ key, label, weight }) => (
-                        <div key={key} className="flex items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{label}</p>
-                            <span className="text-xs text-muted-foreground">{weight}</span>
-                          </div>
-                          <div className="flex gap-1">
-                            {[1,2,3,4,5].map((v) => (
-                              <button
-                                key={v}
-                                onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
-                                className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
-                                  pmoScores[key] === v
-                                    ? 'bg-amber-500 text-white border-amber-500'
-                                    : 'border-border hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950'
-                                }`}
-                              >{v}</button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
+              {/* ── AI Screening Evaluation ────────────────────────────── */}
+              <div>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  AI Screening Evaluation
+                </h2>
 
-                  {/* Technical Maturity */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Technical Maturity <span className="text-muted-foreground font-normal text-sm">(30%)</span></CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {[
-                        { key: 't1', label: 'Working prototype exists', weight: '10%' },
-                        { key: 't2', label: 'Technical feasibility demonstrated', weight: '8%' },
-                        { key: 't3', label: 'Scalability considered', weight: '6%' },
-                        { key: 't4', label: 'Risk mitigation planned', weight: '6%' },
-                      ].map(({ key, label, weight }) => (
-                        <div key={key} className="flex items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{label}</p>
-                            <span className="text-xs text-muted-foreground">{weight}</span>
-                          </div>
-                          <div className="flex gap-1">
-                            {[1,2,3,4,5].map((v) => (
-                              <button
-                                key={v}
-                                onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
-                                className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
-                                  pmoScores[key] === v
-                                    ? 'bg-blue-500 text-white border-blue-500'
-                                    : 'border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950'
-                                }`}
-                              >{v}</button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-
-                  {/* Strategic Alignment */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Strategic Alignment <span className="text-muted-foreground font-normal text-sm">(30%)</span></CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {[
-                        { key: 's1', label: 'Program alignment', weight: '12%' },
-                        { key: 's2', label: 'Impact is measurable', weight: '10%' },
-                        { key: 's3', label: 'National / sector priorities', weight: '8%' },
-                      ].map(({ key, label, weight }) => (
-                        <div key={key} className="flex items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{label}</p>
-                            <span className="text-xs text-muted-foreground">{weight}</span>
-                          </div>
-                          <div className="flex gap-1">
-                            {[1,2,3,4,5].map((v) => (
-                              <button
-                                key={v}
-                                onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
-                                className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
-                                  pmoScores[key] === v
-                                    ? 'bg-purple-500 text-white border-purple-500'
-                                    : 'border-border hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950'
-                                }`}
-                              >{v}</button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </div>
-              ) : (
-              <>{/* Legacy AI Evaluation — shown for non-SHORTLISTED ideas */}
               {/* Loading State */}
               {evaluationLoading && (
                 <div className="flex items-center justify-center py-12">
@@ -881,7 +783,7 @@ export default function AdminIdeaDetail() {
                         <Sparkles className="w-8 h-8 text-primary" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-semibold mb-2">No Evaluation Yet</h3>
+                        <h3 className="text-xl font-semibold mb-2">No AI Evaluation Yet</h3>
                         <p className="text-muted-foreground max-w-md mx-auto">
                           Generate an AI-powered evaluation for this idea based on your organization's criteria.
                           This will analyze market opportunity, innovation level, feasibility, and more.
@@ -921,7 +823,7 @@ export default function AdminIdeaDetail() {
                   {/* Header with Regenerate Button */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-2xl font-bold">Evaluation Results</h2>
+                      <h3 className="text-xl font-bold">Evaluation Results</h3>
                       <p className="text-sm text-muted-foreground">
                         Generated on {new Date(evaluation.evaluatedAt).toLocaleString()}
                       </p>
@@ -1134,12 +1036,195 @@ export default function AdminIdeaDetail() {
                   )}
                 </div>
               )}
-              </>)}
+              </div>{/* end AI Screening section */}
+
+              {/* ── PMO Evaluation (only when SHORTLISTED) ──────────────── */}
+              {idea?.status === 'SHORTLISTED' && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-amber-500" />
+                    PMO Evaluation
+                  </h2>
+                  <div className="space-y-6">
+                    {/* Live score banner */}
+                    <Card className="border-amber-500/30 bg-amber-500/5">
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Live PMO Total Score</p>
+                          <p className="text-4xl font-bold">{computePmoTotal()}<span className="text-lg text-muted-foreground">/100</span></p>
+                        </div>
+                        <Button onClick={() => savePmoEval.mutate()} disabled={savePmoEval.isPending}>
+                          {savePmoEval.isPending ? 'Saving...' : 'Save Evaluation'}
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Business Maturity */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Business Maturity <span className="text-muted-foreground font-normal text-sm">(40%)</span></CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {[
+                          { key: 'b1', label: 'Problem clearly defined', weight: '10%' },
+                          { key: 'b2', label: 'Target customer identified', weight: '8%' },
+                          { key: 'b3', label: 'Revenue model established', weight: '8%' },
+                          { key: 'b4', label: 'Traction / early validation', weight: '8%' },
+                          { key: 'b5', label: 'Scalability plan', weight: '6%' },
+                        ].map(({ key, label, weight }) => (
+                          <div key={key} className="flex items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{label}</p>
+                              <span className="text-xs text-muted-foreground">{weight}</span>
+                            </div>
+                            <div className="flex gap-1">
+                              {[1,2,3,4,5].map((v) => (
+                                <button
+                                  key={v}
+                                  onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                  className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                    pmoScores[key] === v
+                                      ? 'bg-amber-500 text-white border-amber-500'
+                                      : 'border-border hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950'
+                                  }`}
+                                >{v}</button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+
+                    {/* Technical Maturity */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Technical Maturity <span className="text-muted-foreground font-normal text-sm">(30%)</span></CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {[
+                          { key: 't1', label: 'Working prototype exists', weight: '10%' },
+                          { key: 't2', label: 'Technical feasibility demonstrated', weight: '8%' },
+                          { key: 't3', label: 'Scalability considered', weight: '6%' },
+                          { key: 't4', label: 'Risk mitigation planned', weight: '6%' },
+                        ].map(({ key, label, weight }) => (
+                          <div key={key} className="flex items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{label}</p>
+                              <span className="text-xs text-muted-foreground">{weight}</span>
+                            </div>
+                            <div className="flex gap-1">
+                              {[1,2,3,4,5].map((v) => (
+                                <button
+                                  key={v}
+                                  onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                  className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                    pmoScores[key] === v
+                                      ? 'bg-blue-500 text-white border-blue-500'
+                                      : 'border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950'
+                                  }`}
+                                >{v}</button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+
+                    {/* Strategic Alignment */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Strategic Alignment <span className="text-muted-foreground font-normal text-sm">(30%)</span></CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {[
+                          { key: 's1', label: 'Program alignment', weight: '12%' },
+                          { key: 's2', label: 'Impact is measurable', weight: '10%' },
+                          { key: 's3', label: 'National / sector priorities', weight: '8%' },
+                        ].map(({ key, label, weight }) => (
+                          <div key={key} className="flex items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{label}</p>
+                              <span className="text-xs text-muted-foreground">{weight}</span>
+                            </div>
+                            <div className="flex gap-1">
+                              {[1,2,3,4,5].map((v) => (
+                                <button
+                                  key={v}
+                                  onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                  className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                    pmoScores[key] === v
+                                      ? 'bg-purple-500 text-white border-purple-500'
+                                      : 'border-border hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950'
+                                  }`}
+                                >{v}</button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              )}
+
+              </div>{/* end space-y-8 wrapper */}
             </TabsContent>
 
             {/* AI Outputs Tab */}
             <TabsContent value="ai-outputs" className="mt-6">
               <AllAIOutputsView ideaId={ideaId!} />
+            </TabsContent>
+
+            {/* Pitch Decks Tab */}
+            <TabsContent value="pitch-decks" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Pitch Decks
+                  </CardTitle>
+                  <CardDescription>Generated pitch decks for this idea</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pitchDecks.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p>No pitch decks generated yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {pitchDecks.map((deck: any) => (
+                        <div key={deck.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                          <div>
+                            <p className="font-medium text-sm">{deck.template || 'Pitch Deck'}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(deck.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              deck.status === 'COMPLETED' ? 'bg-green-500/15 text-green-500' :
+                              deck.status === 'FAILED' ? 'bg-red-500/15 text-red-500' :
+                              'bg-yellow-500/15 text-yellow-500'
+                            }`}>{deck.status}</span>
+                            {deck.downloadUrl && (
+                              <a
+                                href={deck.downloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Download
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Comments Tab */}

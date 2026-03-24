@@ -16,140 +16,38 @@ interface CourseProgressEntry {
   completed: boolean;
 }
 
-// Parse "MM:SS" duration string to total seconds
-function parseDuration(duration: string): number {
-  const parts = duration.split(":").map(Number);
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  return 0;
+interface AcademyVideo {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  videoUrl: string;
+  durationSeconds: number;
+  displayOrder: number;
 }
 
-// Course structure with videos
-const COURSES = [
-  {
-    id: "fikrahub-fundamentals",
-    slug: "fikrahub-fundamentals",
-    title: "FikraHub Course",
-    description: "Master the fundamentals of building and launching your startup",
-    thumbnail: "/fikracourse-cover.png",
-    videoCount: 14,
-    duration: "19 min",
-    videos: [
-      {
-        id: "brand-identity",
-        slug: "brand-identity",
-        url: "https://app.fikrahub.com/videos/FrikaHub-brand-identity.mp4",
-        title: "Brand Identity",
-        description: "Learn how to create a compelling brand identity for your startup",
-        duration: "1:34"
-      },
-      {
-        id: "brand-wheel",
-        slug: "brand-wheel",
-        url: "https://app.fikrahub.com/videos/FrikaHub-brand-wheel.mp4",
-        title: "Brand Wheel",
-        description: "Understand your brand positioning with the brand wheel framework",
-        duration: "1:34"
-      },
-      {
-        id: "customer-interview",
-        slug: "customer-interview",
-        url: "https://app.fikrahub.com/videos/FrikaHub-customer-interview-questions.mp4",
-        title: "Customer Interview Questions",
-        description: "Master the art of customer interviews with the right questions",
-        duration: "1:33"
-      },
-      {
-        id: "landing-pages",
-        slug: "landing-pages",
-        url: "https://app.fikrahub.com/videos/FrikaHub-landing-pages.mp4",
-        title: "Landing Pages",
-        description: "Build high-converting landing pages that capture leads",
-        duration: "1:22"
-      },
-      {
-        id: "launch-roadmap",
-        slug: "launch-roadmap",
-        url: "https://app.fikrahub.com/videos/FrikaHub-launch-roadmap.mp4",
-        title: "Launch Roadmap",
-        description: "Plan your product launch with a structured roadmap",
-        duration: "1:12"
-      },
-      {
-        id: "lean-canvas",
-        slug: "lean-canvas",
-        url: "https://app.fikrahub.com/videos/FrikaHub-lean-canvas.mp4",
-        title: "Lean Canvas",
-        description: "Validate your business model with the Lean Canvas framework",
-        duration: "1:33"
-      },
-      {
-        id: "marketing-content",
-        slug: "marketing-content",
-        url: "https://app.fikrahub.com/videos/FrikaHub-marketing-content.mp4",
-        title: "Marketing Content",
-        description: "Create engaging marketing content that resonates",
-        duration: "1:12"
-      },
-      {
-        id: "marketing-overview",
-        slug: "marketing-overview",
-        url: "https://app.fikrahub.com/videos/FrikaHub-marketing-overview.mp4",
-        title: "Marketing Overview",
-        description: "Get a comprehensive overview of marketing strategies",
-        duration: "1:42"
-      },
-      {
-        id: "swot-analysis",
-        slug: "swot-analysis",
-        url: "https://app.fikrahub.com/videos/FrikaHub-swot-analysis.mp4",
-        title: "SWOT Analysis",
-        description: "Analyze your strengths, weaknesses, opportunities, and threats",
-        duration: "1:09"
-      },
-      {
-        id: "tasks-management",
-        slug: "tasks-management",
-        url: "https://app.fikrahub.com/videos/FrikaHub-tasks-management.mp4",
-        title: "Tasks Management",
-        description: "Organize and prioritize tasks effectively",
-        duration: "1:16"
-      },
-      {
-        id: "team-roles",
-        slug: "team-roles",
-        url: "https://app.fikrahub.com/videos/FrikaHub-team-roles.mp4",
-        title: "Team Roles",
-        description: "Define clear roles and responsibilities for your team",
-        duration: "1:00"
-      },
-      {
-        id: "user-journey",
-        slug: "user-journey",
-        url: "https://app.fikrahub.com/videos/FrikaHub-user-journey-map.mp4",
-        title: "User Journey Map",
-        description: "Map out your customer's journey from awareness to advocacy",
-        duration: "1:46"
-      },
-      {
-        id: "user-personas",
-        slug: "user-personas",
-        url: "https://app.fikrahub.com/videos/FrikaHub-user-personas.mp4",
-        title: "User Personas",
-        description: "Create detailed personas to understand your target users",
-        duration: "1:14"
-      },
-      {
-        id: "user-stories",
-        slug: "user-stories",
-        url: "https://app.fikrahub.com/videos/FrikaHub-user-stories.mp4",
-        title: "User Stories",
-        description: "Write effective user stories for product development",
-        duration: "1:01"
-      },
-    ]
-  }
-];
+interface AcademyCourse {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  isPublished: boolean;
+  displayOrder: number;
+  videos: AcademyVideo[];
+}
+
+function formatSeconds(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatCourseDuration(videos: AcademyVideo[]): string {
+  const total = videos.reduce((sum, v) => sum + (v.durationSeconds || 0), 0);
+  const mins = Math.round(total / 60);
+  return `${mins} min`;
+}
 
 // Academy Home - Shows list of courses
 function AcademyHome() {
@@ -158,18 +56,14 @@ function AcademyHome() {
   const { workspaceSlug } = useWorkspace();
   const currentSlug = slug || workspaceSlug;
 
-  const { data: homeProgress } = useQuery<CourseProgressEntry[]>({
-    queryKey: ["/api/academy/progress/fikrahub-fundamentals"],
+  const { data: courses = [] } = useQuery<AcademyCourse[]>({
+    queryKey: ["/api/academy/courses"],
     queryFn: async () => {
-      const res = await fetch("/api/academy/progress/fikrahub-fundamentals", { credentials: "include" });
+      const res = await fetch("/api/academy/courses", { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
   });
-
-  const completedCountBySlug = useMemo<Record<string, number>>(() => ({
-    "fikrahub-fundamentals": homeProgress?.filter(p => p.completed).length ?? 0,
-  }), [homeProgress]);
 
   return (
     <div className="p-6 sm:p-8">
@@ -196,9 +90,9 @@ function AcademyHome() {
 
         {/* Courses Grid - Aligned to left */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {COURSES.map((course) => {
-            const completed = completedCountBySlug[course.slug] ?? 0;
-            const pct = Math.round((completed / course.videoCount) * 100);
+          {courses.map((course) => {
+            const videoCount = course.videos?.length ?? 0;
+            const duration = formatCourseDuration(course.videos ?? []);
             return (
               <Card
                 key={course.id}
@@ -206,15 +100,21 @@ function AcademyHome() {
                 onClick={() => setLocation(`/w/${currentSlug}/academy/${course.slug}`)}
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-orange-500 to-orange-600">
-                  <img
-                    src={course.thumbnail}
-                    alt={course.title}
-                    className="w-full h-full object-cover"
-                  />
+                  {course.thumbnailUrl ? (
+                    <img
+                      src={course.thumbnailUrl}
+                      alt={course.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <GraduationCap className="w-16 h-16 text-white/60" />
+                    </div>
+                  )}
                   {/* START / CONTINUE overlay button */}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <div className="bg-white text-orange-600 px-6 py-2 rounded-md font-semibold text-sm">
-                      {pct > 0 ? "CONTINUE" : "START COURSE"}
+                      START COURSE
                     </div>
                   </div>
                 </div>
@@ -225,23 +125,9 @@ function AcademyHome() {
                   <p className="text-xs text-muted-foreground mb-3 line-clamp-3">
                     {course.description}
                   </p>
-                  {pct > 0 && (
-                    <div className="mb-2">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">{completed}/{course.videoCount} completed</span>
-                        <span className="font-medium text-primary">{pct}%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-1.5">
-                        <div
-                          className="bg-primary rounded-full h-1.5 transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                    <span>{course.videoCount} lessons</span>
-                    <span>{course.duration}</span>
+                    <span>{videoCount} lessons</span>
+                    <span>{duration}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -259,7 +145,15 @@ function CourseContents({ courseSlug }: { courseSlug: string }) {
   const { slug } = useParams<{ slug: string }>();
   const { workspaceSlug } = useWorkspace();
   const currentSlug = slug || workspaceSlug;
-  const course = COURSES.find((c) => c.slug === courseSlug);
+
+  const { data: course } = useQuery<AcademyCourse>({
+    queryKey: [`/api/academy/courses/${courseSlug}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/academy/courses/${courseSlug}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Course not found");
+      return res.json();
+    },
+  });
 
   const { data: courseProgress } = useQuery<CourseProgressEntry[]>({
     queryKey: [`/api/academy/progress/${courseSlug}`],
@@ -279,18 +173,14 @@ function CourseContents({ courseSlug }: { courseSlug: string }) {
 
   if (!course) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-muted-foreground">Course not found</p>
-        <Button
-          variant="outline"
-          onClick={() => setLocation(`/w/${currentSlug}/academy`)}
-          className="mt-4"
-        >
-          Back to Academy
-        </Button>
+      <div className="flex items-center justify-center h-40">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
+
+  const videos = course?.videos ?? [];
+  const videoCount = videos.length;
 
   return (
     <>
@@ -307,18 +197,18 @@ function CourseContents({ courseSlug }: { courseSlug: string }) {
         <div className="flex items-center gap-3">
           <BookOpen className="w-6 h-6 text-primary" />
           <div>
-            <h1 className="text-xl font-bold">{course.title}</h1>
+            <h1 className="text-xl font-bold">{course?.title}</h1>
             <p className="text-sm text-muted-foreground">
-              {course.videoCount} lessons • {course.duration}
+              {videoCount} lessons • {formatCourseDuration(videos)}
               {completedCount > 0 && ` • ${completedCount} completed`}
             </p>
           </div>
         </div>
-        {completedCount > 0 && (
+        {completedCount > 0 && videoCount > 0 && (
           <div className="mt-3 w-full bg-muted rounded-full h-1.5">
             <div
               className="bg-primary rounded-full h-1.5 transition-all"
-              style={{ width: `${Math.round((completedCount / course.videoCount) * 100)}%` }}
+              style={{ width: `${Math.round((completedCount / videoCount) * 100)}%` }}
             />
           </div>
         )}
@@ -326,13 +216,13 @@ function CourseContents({ courseSlug }: { courseSlug: string }) {
 
       <div className="p-4 sm:p-6">
         <div className="max-w-4xl mx-auto space-y-3">
-          {course.videos.map((video, index) => {
+          {videos.map((video, index) => {
             const prog = progressBySlug[video.slug];
-            const totalSec = parseDuration(video.duration);
+            const totalSec = video.durationSeconds || 0;
             const watchPct = prog && totalSec > 0 ? Math.min(100, Math.round((prog.watchedSeconds / totalSec) * 100)) : 0;
 
             // First video always unlocked; each subsequent video requires previous to be 100% complete
-            const prevVideo = index > 0 ? course.videos[index - 1] : null;
+            const prevVideo = index > 0 ? videos[index - 1] : null;
             const prevProg = prevVideo ? progressBySlug[prevVideo.slug] : null;
             const isLocked = index > 0 && !prevProg?.completed;
 
@@ -389,7 +279,7 @@ function CourseContents({ courseSlug }: { courseSlug: string }) {
 
                   {/* Duration + action icon */}
                   <div className="flex-shrink-0 flex items-center gap-3 ml-2">
-                    <span className="text-xs text-muted-foreground">{video.duration}</span>
+                    <span className="text-xs text-muted-foreground">{formatSeconds(video.durationSeconds)}</span>
                     {prog?.completed ? (
                       <CheckCircle2 className="w-5 h-5 text-green-500" />
                     ) : isLocked ? (
@@ -414,11 +304,21 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
   const { slug } = useParams<{ slug: string }>();
   const { workspaceSlug } = useWorkspace();
   const currentSlug = slug || workspaceSlug;
-  const course = COURSES.find((c) => c.slug === courseSlug);
-  const video = course?.videos.find((v) => v.slug === videoSlug);
-  const videoIndex = course?.videos.findIndex((v) => v.slug === videoSlug) ?? -1;
-  const nextVideo = course?.videos[videoIndex + 1];
-  const prevVideo = course?.videos[videoIndex - 1];
+
+  const { data: course } = useQuery<AcademyCourse>({
+    queryKey: [`/api/academy/courses/${courseSlug}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/academy/courses/${courseSlug}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Course not found");
+      return res.json();
+    },
+  });
+
+  const videos = course?.videos ?? [];
+  const video = videos.find((v) => v.slug === videoSlug);
+  const videoIndex = videos.findIndex((v) => v.slug === videoSlug) ?? -1;
+  const nextVideo = videos[videoIndex + 1];
+  const prevVideo = videos[videoIndex - 1];
 
   // Progress tracking
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -509,7 +409,7 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
     doSave(v ? Math.floor(v.duration || 0) : 0, true);
   };
 
-  if (!course || !video) {
+  if (course && !video) {
     return (
       <div className="p-6 text-center">
         <p className="text-muted-foreground">Video not found</p>
@@ -520,6 +420,14 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
         >
           Back to Academy
         </Button>
+      </div>
+    );
+  }
+
+  if (!course || !video) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -541,7 +449,7 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
           <div>
             <h1 className="text-xl font-bold">{video.title}</h1>
             <p className="text-sm text-muted-foreground">
-              Lesson {videoIndex + 1} of {course.videos.length}
+              Lesson {videoIndex + 1} of {videos.length}
             </p>
           </div>
         </div>
@@ -557,7 +465,7 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
               controls
               autoPlay
               preload="metadata"
-              src={video.url}
+              src={video.videoUrl}
               onTimeUpdate={handleTimeUpdate}
               onPause={handlePause}
               onEnded={handleEnded}
@@ -593,7 +501,7 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
           <div className="pt-6 border-t">
             <h3 className="text-lg font-semibold mb-4">All Lessons</h3>
             <div className="space-y-2">
-              {course.videos.map((v, index) => {
+              {videos.map((v, index) => {
                 const prog = progressBySlug[v.slug];
                 return (
                   <div

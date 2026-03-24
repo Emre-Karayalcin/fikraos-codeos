@@ -58,11 +58,11 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations, events } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations, events, eventSpeakers, attendanceRecords, academyCourses, academyVideos, mentorBookings, mentorProfiles } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, and, inArray, desc, avg, sql as drizzleSql, isNull, or } from "drizzle-orm";
+import { eq, and, inArray, desc, asc, avg, count, sql as drizzleSql, isNull, or, isNotNull } from "drizzle-orm";
 import { canAccessProject, canModifyProject, canAccessChat, canAccessAssets } from "./middleware/authorization";
 import { requireApiKey } from "./middleware/api-key-auth";
 import { passwordResetLimiter, authRateLimiter, orgCreationLimiter, fileUploadLimiter, aiRateLimiter, dataExportLimiter } from "./middleware/security";
@@ -1977,6 +1977,202 @@ export function registerRoutes(app: Express): Server {
       console.error('Error deleting workspace event:', error);
       res.status(500).json({ error: 'Failed to delete event' });
     }
+  });
+
+  // ─── Event Speakers ────────────────────────────────────────────────────────
+  app.get('/api/workspaces/:orgId/admin/events/:eventId/speakers', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, eventId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const speakers = await db.select().from(eventSpeakers).where(eq(eventSpeakers.eventId, eventId)).orderBy(asc(eventSpeakers.displayOrder));
+      res.json(speakers);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch speakers' }); }
+  });
+
+  app.post('/api/workspaces/:orgId/admin/events/:eventId/speakers', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, eventId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { name, role, company, bio, imageUrl, displayOrder } = req.body;
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+      const [speaker] = await db.insert(eventSpeakers).values({ eventId, name, role, company, bio, imageUrl, displayOrder: displayOrder ?? 0 }).returning();
+      res.status(201).json(speaker);
+    } catch (e) { res.status(500).json({ error: 'Failed to add speaker' }); }
+  });
+
+  app.patch('/api/workspaces/:orgId/admin/events/:eventId/speakers/:speakerId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, speakerId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { name, role, company, bio, imageUrl, displayOrder } = req.body;
+      const [speaker] = await db.update(eventSpeakers).set({ name, role, company, bio, imageUrl, displayOrder }).where(eq(eventSpeakers.id, speakerId)).returning();
+      res.json(speaker);
+    } catch (e) { res.status(500).json({ error: 'Failed to update speaker' }); }
+  });
+
+  app.delete('/api/workspaces/:orgId/admin/events/:eventId/speakers/:speakerId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, speakerId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      await db.delete(eventSpeakers).where(eq(eventSpeakers.id, speakerId));
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed to delete speaker' }); }
+  });
+
+  // ─── Attendance Tracking ───────────────────────────────────────────────────
+  app.get('/api/workspaces/:orgId/admin/attendance', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { status, userId, date } = req.query as Record<string, string>;
+      const conditions = [eq(attendanceRecords.orgId, orgId)];
+      if (status) conditions.push(eq(attendanceRecords.status, status));
+      if (userId) conditions.push(eq(attendanceRecords.userId, userId));
+      if (date) conditions.push(eq(attendanceRecords.scheduledDate, date));
+      const records = await db
+        .select({
+          id: attendanceRecords.id,
+          userId: attendanceRecords.userId,
+          bookingId: attendanceRecords.bookingId,
+          sessionType: attendanceRecords.sessionType,
+          scheduledDate: attendanceRecords.scheduledDate,
+          scheduledTime: attendanceRecords.scheduledTime,
+          checkedInAt: attendanceRecords.checkedInAt,
+          checkedOutAt: attendanceRecords.checkedOutAt,
+          status: attendanceRecords.status,
+          notes: attendanceRecords.notes,
+          memberFirstName: users.firstName,
+          memberLastName: users.lastName,
+          memberEmail: users.email,
+        })
+        .from(attendanceRecords)
+        .innerJoin(users, eq(attendanceRecords.userId, users.id))
+        .where(and(...conditions))
+        .orderBy(desc(attendanceRecords.scheduledDate));
+      res.json(records);
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to fetch attendance' }); }
+  });
+
+  app.post('/api/workspaces/:orgId/admin/attendance', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { userId, bookingId, sessionType, scheduledDate, scheduledTime, status, notes } = req.body;
+      if (!userId || !scheduledDate) return res.status(400).json({ error: 'userId and scheduledDate required' });
+      const [record] = await db.insert(attendanceRecords).values({ orgId, userId, bookingId, sessionType, scheduledDate, scheduledTime, status: status || 'SCHEDULED', notes }).returning();
+      res.status(201).json(record);
+    } catch (e) { res.status(500).json({ error: 'Failed to create attendance record' }); }
+  });
+
+  app.patch('/api/workspaces/:orgId/admin/attendance/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { status, checkedInAt, checkedOutAt, notes } = req.body;
+      const updateData: any = {};
+      if (status !== undefined) updateData.status = status;
+      if (checkedInAt !== undefined) updateData.checkedInAt = checkedInAt ? new Date(checkedInAt) : null;
+      if (checkedOutAt !== undefined) updateData.checkedOutAt = checkedOutAt ? new Date(checkedOutAt) : null;
+      if (notes !== undefined) updateData.notes = notes;
+      const [record] = await db.update(attendanceRecords).set(updateData).where(and(eq(attendanceRecords.id, id), eq(attendanceRecords.orgId, orgId))).returning();
+      res.json(record);
+    } catch (e) { res.status(500).json({ error: 'Failed to update attendance record' }); }
+  });
+
+  // ─── Academy Course Management ─────────────────────────────────────────────
+  app.get('/api/academy/courses', isAuthenticated, async (req: any, res) => {
+    try {
+      const courses = await db.select().from(academyCourses).where(eq(academyCourses.isPublished, true)).orderBy(asc(academyCourses.displayOrder));
+      const withVideos = await Promise.all(courses.map(async (c) => {
+        const videos = await db.select().from(academyVideos).where(and(eq(academyVideos.courseId, c.id), eq(academyVideos.isPublished, true))).orderBy(asc(academyVideos.displayOrder));
+        return { ...c, videos };
+      }));
+      res.json(withVideos);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch courses' }); }
+  });
+
+  app.get('/api/academy/courses/:slug', isAuthenticated, async (req: any, res) => {
+    try {
+      const [course] = await db.select().from(academyCourses).where(eq(academyCourses.slug, req.params.slug));
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      const videos = await db.select().from(academyVideos).where(and(eq(academyVideos.courseId, course.id), eq(academyVideos.isPublished, true))).orderBy(asc(academyVideos.displayOrder));
+      res.json({ ...course, videos });
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch course' }); }
+  });
+
+  app.get('/api/workspaces/:orgId/admin/academy/courses', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const courses = await db.select().from(academyCourses).orderBy(asc(academyCourses.displayOrder));
+      const withVideos = await Promise.all(courses.map(async (c) => {
+        const videos = await db.select().from(academyVideos).where(eq(academyVideos.courseId, c.id)).orderBy(asc(academyVideos.displayOrder));
+        return { ...c, videos };
+      }));
+      res.json(withVideos);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch courses' }); }
+  });
+
+  app.post('/api/workspaces/:orgId/admin/academy/courses', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { title, description, thumbnailUrl, isPublished, displayOrder } = req.body;
+      if (!title) return res.status(400).json({ error: 'Title is required' });
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
+      const [course] = await db.insert(academyCourses).values({ orgId: orgId || null, slug, title, description, thumbnailUrl, isPublished: isPublished ?? false, displayOrder: displayOrder ?? 0 }).returning();
+      res.status(201).json({ ...course, videos: [] });
+    } catch (e) { res.status(500).json({ error: 'Failed to create course' }); }
+  });
+
+  app.patch('/api/workspaces/:orgId/admin/academy/courses/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { title, description, thumbnailUrl, isPublished, displayOrder } = req.body;
+      const [course] = await db.update(academyCourses).set({ title, description, thumbnailUrl, isPublished, displayOrder, updatedAt: new Date() }).where(eq(academyCourses.id, id)).returning();
+      res.json(course);
+    } catch (e) { res.status(500).json({ error: 'Failed to update course' }); }
+  });
+
+  app.delete('/api/workspaces/:orgId/admin/academy/courses/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      await db.delete(academyCourses).where(eq(academyCourses.id, id));
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed to delete course' }); }
+  });
+
+  app.post('/api/workspaces/:orgId/admin/academy/courses/:id/videos', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { title, description, videoUrl, durationSeconds, displayOrder, isPublished } = req.body;
+      if (!title || !videoUrl) return res.status(400).json({ error: 'Title and videoUrl are required' });
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
+      const [video] = await db.insert(academyVideos).values({ courseId: id, slug, title, description, videoUrl, durationSeconds: durationSeconds ?? 0, displayOrder: displayOrder ?? 0, isPublished: isPublished ?? true }).returning();
+      res.status(201).json(video);
+    } catch (e) { res.status(500).json({ error: 'Failed to add video' }); }
+  });
+
+  app.patch('/api/workspaces/:orgId/admin/academy/courses/:id/videos/:videoId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, videoId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const { title, description, videoUrl, durationSeconds, displayOrder, isPublished } = req.body;
+      const [video] = await db.update(academyVideos).set({ title, description, videoUrl, durationSeconds, displayOrder, isPublished }).where(eq(academyVideos.id, videoId)).returning();
+      res.json(video);
+    } catch (e) { res.status(500).json({ error: 'Failed to update video' }); }
+  });
+
+  app.delete('/api/workspaces/:orgId/admin/academy/courses/:id/videos/:videoId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, videoId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      await db.delete(academyVideos).where(eq(academyVideos.id, videoId));
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed to delete video' }); }
   });
 
   // GET /api/workspaces/:orgId/admin/email-templates — list email templates (PMO admin access)

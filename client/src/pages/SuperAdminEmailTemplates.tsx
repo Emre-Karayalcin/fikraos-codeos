@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SuperAdminSidebar } from '@/components/admin/SuperAdminSidebar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Mail, Eye, EyeOff, Save, ChevronRight } from 'lucide-react';
+import { Mail, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { GuidedEmailEditor } from '@/components/admin/GuidedEmailEditor';
 
 interface Template {
   name: string;
@@ -15,9 +14,6 @@ interface Template {
 
 const formatName = (name: string) =>
   name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-const extractVars = (html: string): string[] =>
-  [...new Set([...html.matchAll(/\{\{(\w+)\}\}/g)].map(m => m[1]))];
 
 export default function SuperAdminEmailTemplates() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -103,60 +99,23 @@ export default function SuperAdminEmailTemplates() {
           </div>
         </div>
 
-        {/* Right: editor + preview */}
+        {/* Right: guided editor */}
         {selectedTemplate ? (
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Toolbar */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">{formatName(selectedTemplate.name)}</h3>
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  {extractVars(editContent).map(v => (
-                    <Badge key={v} variant="outline" className="text-[10px] font-mono">
-                      {'{{' + v + '}}'}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPreview(!showPreview)}
-                >
-                  {showPreview ? (
-                    <EyeOff className="w-4 h-4 mr-1" />
-                  ) : (
-                    <Eye className="w-4 h-4 mr-1" />
-                  )}
-                  {showPreview ? 'Hide Preview' : 'Show Preview'}
-                </Button>
-                <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
-                  <Save className="w-4 h-4 mr-1" />
-                  {saveMutation.isPending ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <h3 className="font-semibold">{formatName(selectedTemplate.name)}</h3>
+              <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
+                <Save className="w-4 h-4 mr-1" />
+                {saveMutation.isPending ? 'Saving...' : 'Save'}
+              </Button>
             </div>
-
-            {/* Editor + preview split */}
-            <div className={`flex-1 flex overflow-hidden ${showPreview ? 'flex-row' : 'flex-col'}`}>
-              <textarea
-                className="flex-1 p-4 font-mono text-xs resize-none bg-muted/30 focus:outline-none border-r border-border"
-                value={editContent}
-                onChange={e => setEditContent(e.target.value)}
-                spellCheck={false}
-              />
-              {showPreview && (
-                <div className="flex-1 overflow-hidden border-l border-border">
-                  <iframe
-                    srcDoc={editContent}
-                    className="w-full h-full border-0"
-                    title="Email Preview"
-                    sandbox="allow-same-origin"
-                  />
-                </div>
-              )}
-            </div>
+            <GuidedEmailEditor
+              html={editContent}
+              onChange={setEditContent}
+              showPreview={showPreview}
+              onTogglePreview={() => setShowPreview(!showPreview)}
+            />
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">

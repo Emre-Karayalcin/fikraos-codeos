@@ -65,6 +65,9 @@ import AdminEmailTemplates from "@/pages/AdminEmailTemplates";
 import AdminActivityInsights from "@/pages/AdminActivityInsights";
 import AdminScoringCriteria from "@/pages/AdminScoringCriteria";
 import AdminEvents from "@/pages/AdminEvents";
+import AdminAttendance from "@/pages/AdminAttendance";
+import AdminMentorFeedback from "@/pages/AdminMentorFeedback";
+import AdminAcademy from "@/pages/AdminAcademy";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -317,6 +320,24 @@ function Router() {
       <Route path="/w/:slug/admin/events" component={() => (
         <PageTransition>
           <AdminGuard><AdminEvents /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/attendance" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminAttendance /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/mentor-feedback" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminMentorFeedback /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/academy" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminAcademy /></AdminGuard>
         </PageTransition>
       )} />
 

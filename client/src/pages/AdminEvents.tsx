@@ -17,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CalendarDays, Pencil, Trash2, Plus } from "lucide-react";
+import { CalendarDays, Pencil, Trash2, Plus, UserRound, X } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import toast from "react-hot-toast";
 
@@ -231,6 +231,7 @@ export default function AdminEvents() {
         <EventModal
           mode={eventModal.mode}
           event={eventModal.event}
+          orgId={orgId}
           onClose={() => setEventModal(null)}
           onSubmit={(data) =>
             eventModal.mode === "create"
@@ -263,15 +264,29 @@ export default function AdminEvents() {
   );
 }
 
+interface EventSpeaker {
+  id: string;
+  name: string;
+  role: string | null;
+  company: string | null;
+  bio: string | null;
+  imageUrl: string | null;
+  displayOrder: number;
+}
+
+const DEFAULT_SPEAKER = { name: "", role: "", company: "", bio: "", imageUrl: "" };
+
 interface EventModalProps {
   mode: "create" | "edit";
   event?: WorkspaceEvent;
+  orgId?: string;
   onClose: () => void;
   onSubmit: (data: Record<string, any>) => void;
   isPending: boolean;
 }
 
-function EventModal({ mode, event, onClose, onSubmit, isPending }: EventModalProps) {
+function EventModal({ mode, event, orgId, onClose, onSubmit, isPending }: EventModalProps) {
+  const qc = useQueryClient();
   const [form, setForm] = useState<EventFormData>(() =>
     event
       ? {
@@ -287,8 +302,55 @@ function EventModal({ mode, event, onClose, onSubmit, isPending }: EventModalPro
         }
       : DEFAULT_FORM
   );
+  const [speakerForm, setSpeakerForm] = useState(DEFAULT_SPEAKER);
+  const [addingSpeaker, setAddingSpeaker] = useState(false);
 
   const set = (k: keyof EventFormData, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
+
+  const { data: speakers = [] } = useQuery<EventSpeaker[]>({
+    queryKey: [`/api/workspaces/${orgId}/admin/events/${event?.id}/speakers`],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/events/${event!.id}/speakers`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: mode === "edit" && !!orgId && !!event?.id,
+  });
+
+  const addSpeaker = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/events/${event!.id}/speakers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to add speaker");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/events/${event?.id}/speakers`] });
+      setSpeakerForm(DEFAULT_SPEAKER);
+      setAddingSpeaker(false);
+      toast.success("Speaker added");
+    },
+    onError: () => toast.error("Failed to add speaker"),
+  });
+
+  const deleteSpeaker = useMutation({
+    mutationFn: async (speakerId: string) => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/events/${event!.id}/speakers/${speakerId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete speaker");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/events/${event?.id}/speakers`] });
+      toast.success("Speaker removed");
+    },
+    onError: () => toast.error("Failed to remove speaker"),
+  });
 
   const handleSubmit = () => {
     const data: Record<string, any> = {
@@ -303,6 +365,16 @@ function EventModal({ mode, event, onClose, onSubmit, isPending }: EventModalPro
     if (form.imageUrl) data.imageUrl = form.imageUrl;
     if (form.endDate) data.endDate = new Date(form.endDate).toISOString();
     onSubmit(data);
+  };
+
+  const handleAddSpeaker = () => {
+    if (!speakerForm.name.trim()) return;
+    const data: Record<string, any> = { name: speakerForm.name };
+    if (speakerForm.role) data.role = speakerForm.role;
+    if (speakerForm.company) data.company = speakerForm.company;
+    if (speakerForm.bio) data.bio = speakerForm.bio;
+    if (speakerForm.imageUrl) data.imageUrl = speakerForm.imageUrl;
+    addSpeaker.mutate(data);
   };
 
   return (
@@ -350,6 +422,103 @@ function EventModal({ mode, event, onClose, onSubmit, isPending }: EventModalPro
             <Switch checked={form.isPublished} onCheckedChange={(v) => set("isPublished", v)} id="event-published" />
             <Label htmlFor="event-published">Published (visible to workspace members)</Label>
           </div>
+
+          {/* Speakers section — edit mode only */}
+          {mode === "edit" && (
+            <div className="pt-4 border-t space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserRound className="w-4 h-4 text-muted-foreground" />
+                  <Label className="text-sm font-semibold">Speakers ({speakers.length})</Label>
+                </div>
+                {!addingSpeaker && (
+                  <Button variant="outline" size="sm" onClick={() => setAddingSpeaker(true)}>
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Speaker
+                  </Button>
+                )}
+              </div>
+
+              {speakers.length > 0 && (
+                <div className="space-y-2">
+                  {speakers.map((s) => (
+                    <div key={s.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/40 border border-border/40">
+                      {s.imageUrl && (
+                        <img src={s.imageUrl} alt={s.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{s.name}</p>
+                        {(s.role || s.company) && (
+                          <p className="text-xs text-muted-foreground">
+                            {[s.role, s.company].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        {s.bio && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{s.bio}</p>}
+                      </div>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive flex-shrink-0"
+                        onClick={() => deleteSpeaker.mutate(s.id)}
+                        disabled={deleteSpeaker.isPending}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {addingSpeaker && (
+                <div className="p-3 rounded-lg border border-border space-y-2 bg-muted/20">
+                  <Input
+                    placeholder="Name *"
+                    value={speakerForm.name}
+                    onChange={(e) => setSpeakerForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Role / Title"
+                      value={speakerForm.role}
+                      onChange={(e) => setSpeakerForm((f) => ({ ...f, role: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Company"
+                      value={speakerForm.company}
+                      onChange={(e) => setSpeakerForm((f) => ({ ...f, company: e.target.value }))}
+                    />
+                  </div>
+                  <Textarea
+                    placeholder="Bio (optional)"
+                    value={speakerForm.bio}
+                    onChange={(e) => setSpeakerForm((f) => ({ ...f, bio: e.target.value }))}
+                    rows={2}
+                  />
+                  <Input
+                    placeholder="Photo URL (optional)"
+                    value={speakerForm.imageUrl}
+                    onChange={(e) => setSpeakerForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                    type="url"
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={handleAddSpeaker} disabled={!speakerForm.name.trim() || addSpeaker.isPending}>
+                      {addSpeaker.isPending ? "Adding…" : "Add"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { setAddingSpeaker(false); setSpeakerForm(DEFAULT_SPEAKER); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {mode === "edit" && speakers.length === 0 && !addingSpeaker && (
+                <p className="text-xs text-muted-foreground">No speakers added yet.</p>
+              )}
+            </div>
+          )}
+
+          {mode === "create" && (
+            <p className="text-xs text-muted-foreground pt-1">
+              Save the event first, then edit it to add speakers.
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>

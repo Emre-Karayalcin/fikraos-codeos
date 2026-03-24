@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
   GraduationCap, ClipboardList, Mail, BarChart2, BookOpen, CalendarDays,
+  ClipboardCheck, MessageSquare, Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -82,6 +83,16 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           href: `/w/${workspaceSlug}/admin/mentors`,
           icon: GraduationCap,
         },
+        {
+          titleKey: 'Attendance',
+          href: `/w/${workspaceSlug}/admin/attendance`,
+          icon: ClipboardCheck,
+        },
+        {
+          titleKey: 'Mentor Feedback',
+          href: `/w/${workspaceSlug}/admin/mentor-feedback`,
+          icon: MessageSquare,
+        },
       ],
     },
     {
@@ -96,6 +107,11 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           titleKey: 'Email Templates',
           href: `/w/${workspaceSlug}/admin/email-templates`,
           icon: Mail,
+        },
+        {
+          titleKey: 'Academy',
+          href: `/w/${workspaceSlug}/admin/academy`,
+          icon: Video,
         },
       ],
     },

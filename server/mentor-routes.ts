@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "./db";
-import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, projects, organizationMembers, pitchDeckGenerations } from "../shared/schema";
-import { eq, and, isNotNull, inArray, sql, desc } from "drizzle-orm";
+import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords } from "../shared/schema";
+import { eq, and, isNotNull, inArray, sql, desc, avg, count } from "drizzle-orm";
 import { Resend } from "resend";
 
 const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -664,6 +664,39 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
       .where(eq(mentorBookings.id, req.params.id))
       .returning();
 
+    // Auto-create attendance record when booking is CONFIRMED
+    if (status === "CONFIRMED" && updated) {
+      try {
+        const [mentorProfile] = await db
+          .select({ orgId: mentorProfiles.orgId })
+          .from(mentorProfiles)
+          .where(eq(mentorProfiles.id, updated.mentorProfileId))
+          .limit(1);
+
+        if (mentorProfile?.orgId) {
+          const existing = await db
+            .select({ id: attendanceRecords.id })
+            .from(attendanceRecords)
+            .where(eq(attendanceRecords.bookingId, updated.id))
+            .limit(1);
+
+          if (existing.length === 0) {
+            await db.insert(attendanceRecords).values({
+              orgId: mentorProfile.orgId,
+              userId: updated.userId,
+              bookingId: updated.id,
+              sessionType: "MENTOR_SESSION",
+              scheduledDate: updated.bookedDate,
+              scheduledTime: updated.bookedTime || undefined,
+              status: "SCHEDULED",
+            });
+          }
+        }
+      } catch (attendanceErr) {
+        console.error("Failed to create attendance record:", attendanceErr);
+      }
+    }
+
     res.json(updated);
   } catch (error) {
     console.error("Error updating booking status:", error);
@@ -781,6 +814,137 @@ router.get("/mentors/:id/reviews", async (req: any, res) => {
   } catch (error) {
     console.error("Error fetching reviews:", error);
     res.status(500).json({ message: "Failed to fetch reviews" });
+  }
+});
+
+// GET /api/workspaces/:orgId/admin/mentor-insights
+router.get("/workspaces/:orgId/admin/mentor-insights", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { orgId } = req.params;
+
+    // Get all mentors in this org
+    const mentors = await db
+      .select({
+        id: mentorProfiles.id,
+        userId: mentorProfiles.userId,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        title: mentorProfiles.title,
+      })
+      .from(mentorProfiles)
+      .innerJoin(users, eq(mentorProfiles.userId, users.id))
+      .where(eq(mentorProfiles.orgId, orgId));
+
+    const insights = await Promise.all(mentors.map(async (mentor) => {
+      const bookings = await db
+        .select({
+          status: mentorBookings.status,
+          durationMinutes: mentorBookings.durationMinutes,
+          userId: mentorBookings.userId,
+          rating: mentorBookings.rating,
+        })
+        .from(mentorBookings)
+        .where(eq(mentorBookings.mentorProfileId, mentor.id));
+
+      const completed = bookings.filter(b => b.status === 'COMPLETED');
+      const confirmed = bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'COMPLETED');
+      const totalHours = completed.reduce((sum, b) => sum + (b.durationMinutes || 60), 0) / 60;
+      const attendanceRate = confirmed.length > 0 ? Math.round((completed.length / confirmed.length) * 100) : 0;
+      const uniqueParticipants = new Set(bookings.map(b => b.userId)).size;
+      const ratings = completed.filter(b => b.rating).map(b => b.rating as number);
+      const avgRating = ratings.length > 0 ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : null;
+
+      const riskFlags: string[] = [];
+      if (completed.length === 0) riskFlags.push("no_sessions");
+      if (avgRating !== null && avgRating < 3) riskFlags.push("low_rating");
+      if (attendanceRate < 50 && confirmed.length >= 3) riskFlags.push("low_attendance");
+
+      return {
+        ...mentor,
+        totalSessions: completed.length,
+        totalHours: Math.round(totalHours * 10) / 10,
+        attendanceRate,
+        uniqueParticipants,
+        avgRating,
+        riskFlags,
+      };
+    }));
+
+    res.json(insights);
+  } catch (error) {
+    console.error("Error fetching mentor insights:", error);
+    res.status(500).json({ message: "Failed to fetch mentor insights" });
+  }
+});
+
+// GET /api/workspaces/:orgId/admin/mentor-feedback
+router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { orgId } = req.params;
+    const { mentorId, minRating, maxRating } = req.query as Record<string, string>;
+
+    const mentorUsers = users;
+    const memberUsers = users;
+
+    // Get org's mentor profile IDs
+    const orgMentors = await db
+      .select({ id: mentorProfiles.id, userId: mentorProfiles.userId })
+      .from(mentorProfiles)
+      .where(eq(mentorProfiles.orgId, orgId));
+
+    if (orgMentors.length === 0) return res.json([]);
+
+    const mentorProfileIds = mentorId
+      ? orgMentors.filter(m => m.userId === mentorId).map(m => m.id)
+      : orgMentors.map(m => m.id);
+
+    if (mentorProfileIds.length === 0) return res.json([]);
+
+    const rows = await db
+      .select({
+        id: mentorBookings.id,
+        bookedDate: mentorBookings.bookedDate,
+        bookedTime: mentorBookings.bookedTime,
+        durationMinutes: mentorBookings.durationMinutes,
+        rating: mentorBookings.rating,
+        feedback: mentorBookings.feedback,
+        mentorFeedback: mentorBookings.mentorFeedback,
+        memberFirstName: memberUsers.firstName,
+        memberLastName: memberUsers.lastName,
+        mentorProfileId: mentorBookings.mentorProfileId,
+      })
+      .from(mentorBookings)
+      .innerJoin(memberUsers, eq(mentorBookings.userId, memberUsers.id))
+      .where(
+        and(
+          inArray(mentorBookings.mentorProfileId, mentorProfileIds),
+          eq(mentorBookings.status, "COMPLETED"),
+          isNotNull(mentorBookings.rating),
+        )
+      )
+      .orderBy(desc(mentorBookings.createdAt));
+
+    // Attach mentor name
+    const mentorMap: Record<string, string> = {};
+    for (const m of orgMentors) {
+      const [u] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, m.userId));
+      if (u) mentorMap[m.id] = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+    }
+
+    let result = rows.map(r => ({ ...r, mentorName: mentorMap[r.mentorProfileId] || "" }));
+
+    if (minRating) result = result.filter(r => (r.rating || 0) >= parseInt(minRating));
+    if (maxRating) result = result.filter(r => (r.rating || 0) <= parseInt(maxRating));
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching mentor feedback:", error);
+    res.status(500).json({ message: "Failed to fetch mentor feedback" });
   }
 });
 
