@@ -6,6 +6,7 @@ import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -49,8 +50,11 @@ interface Booking {
   bookedDate: string;
   bookedTime: string;
   durationMinutes: number;
+  meetingProvider?: string | null;
+  meetingLink?: string | null;
   notes?: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  mentorFeedback?: string | null;
   rating?: number | null;
   feedback?: string | null;
 }
@@ -177,6 +181,7 @@ export default function MentorDashboard() {
   const [showAllBookings, setShowAllBookings] = useState(false);
   const [viewingIdeaBooking, setViewingIdeaBooking] = useState<Booking | null>(null);
   const [viewingParticipantIdea, setViewingParticipantIdea] = useState<any | null>(null);
+  const [mentorFeedbackDrafts, setMentorFeedbackDrafts] = useState<Record<string, string>>({});
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -220,6 +225,17 @@ export default function MentorDashboard() {
       toast({ title: "Booking updated" });
     },
     onError: () => toast({ title: "Failed to update booking", variant: "destructive" }),
+  });
+
+  const mentorFeedbackMutation = useMutation({
+    mutationFn: async ({ id, mentorFeedback }: { id: string; mentorFeedback: string }) => {
+      return apiRequest("PATCH", `/api/mentor-bookings/${id}/mentor-feedback`, { mentorFeedback });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mentor-profile/my-bookings"] });
+      toast({ title: "Participant feedback saved" });
+    },
+    onError: () => toast({ title: "Failed to save feedback", variant: "destructive" }),
   });
 
   const totalSessions = bookings.length;
@@ -291,6 +307,16 @@ export default function MentorDashboard() {
               className="flex items-center gap-1 text-xs text-primary hover:underline"
             >
               <FileText size={11} /> View Pitch Deck <ExternalLink size={10} />
+            </a>
+          )}
+          {booking.meetingLink && (
+            <a
+              href={booking.meetingLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <ExternalLink size={11} /> Meeting Link
             </a>
           )}
         </div>
@@ -444,6 +470,16 @@ export default function MentorDashboard() {
                                 className="flex items-center gap-1 text-xs text-primary hover:underline mb-2"
                               >
                                 <FileText size={11} /> View Pitch Deck <ExternalLink size={10} />
+                              </a>
+                            )}
+                            {booking.meetingLink && (
+                              <a
+                                href={booking.meetingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-primary hover:underline mb-2"
+                              >
+                                <ExternalLink size={11} /> Open Meeting Link <ExternalLink size={10} />
                               </a>
                             )}
                             <div className="flex gap-2">
@@ -678,6 +714,16 @@ export default function MentorDashboard() {
                         {b.notes && (
                           <p className="text-xs text-text-secondary bg-muted/40 rounded-md px-2.5 py-1.5 line-clamp-2">{b.notes}</p>
                         )}
+                        {b.meetingLink && (
+                          <a
+                            href={b.meetingLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            <ExternalLink size={11} /> Open Meeting Link
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -754,6 +800,53 @@ export default function MentorDashboard() {
                   ))}
                 </div>
               )}
+
+              <div className="pt-4 border-t border-border">
+                <h3 className="font-semibold text-text-primary">Feedback to Participants</h3>
+                <p className="text-text-secondary text-sm mt-0.5">
+                  Share post-session notes that participants can view in their My Sessions panel.
+                </p>
+
+                <div className="space-y-3 mt-4">
+                  {bookings.filter((b) => b.status === "COMPLETED").length === 0 ? (
+                    <div className="bg-card border border-border rounded-xl p-4 text-sm text-text-secondary">
+                      Completed sessions will appear here.
+                    </div>
+                  ) : (
+                    bookings
+                      .filter((b) => b.status === "COMPLETED")
+                      .map((b) => {
+                        const value = mentorFeedbackDrafts[b.id] ?? b.mentorFeedback ?? "";
+                        return (
+                          <div key={`mentor-feedback-${b.id}`} className="bg-card border border-border rounded-xl p-4 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-text-primary">
+                                {b.bookerFirstName} {b.bookerLastName}
+                                {b.ideaTitle ? ` · ${b.ideaTitle}` : ""}
+                              </p>
+                              <span className="text-xs text-muted-foreground">{b.bookedDate}</span>
+                            </div>
+                            <Textarea
+                              value={value}
+                              onChange={(e) => setMentorFeedbackDrafts((prev) => ({ ...prev, [b.id]: e.target.value }))}
+                              placeholder="Write actionable feedback for this participant..."
+                              rows={3}
+                            />
+                            <div className="flex justify-end">
+                              <Button
+                                size="sm"
+                                disabled={mentorFeedbackMutation.isPending}
+                                onClick={() => mentorFeedbackMutation.mutate({ id: b.id, mentorFeedback: value })}
+                              >
+                                Save Feedback
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

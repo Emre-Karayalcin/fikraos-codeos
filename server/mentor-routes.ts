@@ -6,8 +6,77 @@ import { Resend } from "resend";
 
 const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const EMAIL_FROM = process.env.EMAIL_FROM || "no-reply@fikrahub.com";
+const CALENDLY_API_BASE = process.env.CALENDLY_API_BASE || "https://api.calendly.com";
 
 const router = Router();
+
+function normalizeCalendlyUrl(raw?: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    return new URL(withProtocol).toString();
+  } catch {
+    return null;
+  }
+}
+
+function buildCalendlyPrefillLink(
+  baseUrl: string,
+  userName: string,
+  userEmail: string,
+  bookedDate: string,
+  bookedTime: string,
+): string {
+  const url = new URL(baseUrl);
+  if (userName) url.searchParams.set("name", userName);
+  if (userEmail) url.searchParams.set("email", userEmail);
+  url.searchParams.set("utm_source", "codeos");
+  url.searchParams.set("utm_campaign", "mentor-booking");
+  url.searchParams.set("date", bookedDate);
+  url.searchParams.set("time", bookedTime);
+  return url.toString();
+}
+
+async function createCalendlySchedulingLink(eventTypeUri: string): Promise<{ bookingUrl: string; resourceUri?: string } | null> {
+  const calendlyToken = process.env.CALENDLY_PAT_TOKEN;
+  if (!calendlyToken || !eventTypeUri) return null;
+
+  try {
+    const response = await fetch(`${CALENDLY_API_BASE}/scheduling_links`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${calendlyToken}`,
+      },
+      body: JSON.stringify({
+        owner: eventTypeUri,
+        owner_type: "EventType",
+        max_event_count: 1,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      console.warn("Calendly scheduling link generation failed:", response.status, body);
+      return null;
+    }
+
+    const data: any = await response.json();
+    const bookingUrl = data?.resource?.booking_url;
+    if (!bookingUrl) return null;
+
+    return {
+      bookingUrl,
+      resourceUri: data?.resource?.owner,
+    };
+  } catch (error) {
+    console.warn("Calendly scheduling link generation error:", error);
+    return null;
+  }
+}
 
 // Helper: get the user's primary orgId from organizationMembers
 async function getUserOrgId(userId: string): Promise<string | null> {
@@ -99,6 +168,7 @@ router.get("/mentors/:id", async (req: any, res) => {
         sessionDurationMinutes: mentorProfiles.sessionDurationMinutes,
         location: mentorProfiles.location,
         website: mentorProfiles.website,
+        calendlyLink: mentorProfiles.calendlyLink,
       })
       .from(mentorProfiles)
       .innerJoin(users, eq(mentorProfiles.userId, users.id))
@@ -124,6 +194,27 @@ router.post("/mentor-bookings", async (req: any, res) => {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
     const { mentorProfileId, ideaId, pitchDeckId, bookedDate, bookedTime, durationMinutes, notes } = req.body;
+
+    const [mentorProfile] = await db
+      .select({
+        id: mentorProfiles.id,
+        calendlyLink: mentorProfiles.calendlyLink,
+        calendlyEventTypeUri: mentorProfiles.calendlyEventTypeUri,
+      })
+      .from(mentorProfiles)
+      .where(eq(mentorProfiles.id, mentorProfileId))
+      .limit(1);
+
+    if (!mentorProfile) {
+      return res.status(404).json({ message: "Mentor profile not found" });
+    }
+
+    const memberName = `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim();
+    const normalizedCalendlyLink = normalizeCalendlyUrl(mentorProfile.calendlyLink);
+    const meetingProvider = normalizedCalendlyLink || mentorProfile.calendlyEventTypeUri ? "CALENDLY" : "INTERNAL";
+    const initialMeetingLink = normalizedCalendlyLink
+      ? buildCalendlyPrefillLink(normalizedCalendlyLink, memberName, req.user.email || "", bookedDate, bookedTime)
+      : null;
 
     // Check for conflicts
     const [existing] = await db
@@ -151,6 +242,8 @@ router.post("/mentor-bookings", async (req: any, res) => {
         bookedDate,
         bookedTime,
         durationMinutes: durationMinutes || 60,
+        meetingProvider,
+        meetingLink: initialMeetingLink,
         notes: notes || null,
         status: "PENDING",
       })
@@ -292,7 +385,10 @@ router.get("/mentor-bookings/mine", async (req: any, res) => {
         bookedDate: mentorBookings.bookedDate,
         bookedTime: mentorBookings.bookedTime,
         durationMinutes: mentorBookings.durationMinutes,
+        meetingProvider: mentorBookings.meetingProvider,
+        meetingLink: mentorBookings.meetingLink,
         notes: mentorBookings.notes,
+        mentorFeedback: mentorBookings.mentorFeedback,
         status: mentorBookings.status,
         rating: mentorBookings.rating,
         feedback: mentorBookings.feedback,
@@ -341,7 +437,19 @@ router.put("/mentor-profile/me", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const { title, bio, location, website, expertise, industries, sessionDurationMinutes, isActive, availability: availabilityData } = req.body;
+    const {
+      title,
+      bio,
+      location,
+      website,
+      calendlyLink,
+      calendlyEventTypeUri,
+      expertise,
+      industries,
+      sessionDurationMinutes,
+      isActive,
+      availability: availabilityData,
+    } = req.body;
 
     // Upsert mentor profile
     const [existing] = await db
@@ -353,7 +461,19 @@ router.put("/mentor-profile/me", async (req: any, res) => {
     if (existing) {
       [profile] = await db
         .update(mentorProfiles)
-        .set({ title, bio, location, website, expertise, industries, sessionDurationMinutes, isActive, updatedAt: new Date() })
+        .set({
+          title,
+          bio,
+          location,
+          website,
+          calendlyLink: normalizeCalendlyUrl(calendlyLink),
+          calendlyEventTypeUri: calendlyEventTypeUri?.trim() || null,
+          expertise,
+          industries,
+          sessionDurationMinutes,
+          isActive,
+          updatedAt: new Date(),
+        })
         .where(eq(mentorProfiles.userId, req.user.id))
         .returning();
     } else {
@@ -365,7 +485,16 @@ router.put("/mentor-profile/me", async (req: any, res) => {
         .values({
           userId: req.user.id,
           orgId,
-          title, bio, location, website, expertise, industries, sessionDurationMinutes, isActive,
+          title,
+          bio,
+          location,
+          website,
+          calendlyLink: normalizeCalendlyUrl(calendlyLink),
+          calendlyEventTypeUri: calendlyEventTypeUri?.trim() || null,
+          expertise,
+          industries,
+          sessionDurationMinutes,
+          isActive,
         })
         .returning();
     }
@@ -427,7 +556,10 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
         bookedDate: mentorBookings.bookedDate,
         bookedTime: mentorBookings.bookedTime,
         durationMinutes: mentorBookings.durationMinutes,
+        meetingProvider: mentorBookings.meetingProvider,
+        meetingLink: mentorBookings.meetingLink,
         notes: mentorBookings.notes,
+        mentorFeedback: mentorBookings.mentorFeedback,
         status: mentorBookings.status,
         rating: mentorBookings.rating,
         feedback: mentorBookings.feedback,
@@ -476,9 +608,59 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
 
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
+    let meetingLink = booking.meetingLink;
+    let calendlyEventUri = booking.calendlyEventUri;
+    if (status === "CONFIRMED") {
+      const [mentorConfig] = await db
+        .select({
+          calendlyLink: mentorProfiles.calendlyLink,
+          calendlyEventTypeUri: mentorProfiles.calendlyEventTypeUri,
+        })
+        .from(mentorProfiles)
+        .where(eq(mentorProfiles.id, booking.mentorProfileId))
+        .limit(1);
+
+      const [booker] = await db
+        .select({
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(users)
+        .where(eq(users.id, booking.userId))
+        .limit(1);
+
+      if (mentorConfig?.calendlyEventTypeUri) {
+        const generated = await createCalendlySchedulingLink(mentorConfig.calendlyEventTypeUri);
+        if (generated?.bookingUrl) {
+          meetingLink = generated.bookingUrl;
+          calendlyEventUri = generated.resourceUri || null;
+        }
+      }
+
+      if (!meetingLink && mentorConfig?.calendlyLink) {
+        const normalizedCalendlyLink = normalizeCalendlyUrl(mentorConfig.calendlyLink);
+        if (normalizedCalendlyLink) {
+          const bookerName = `${booker?.firstName || ""} ${booker?.lastName || ""}`.trim();
+          meetingLink = buildCalendlyPrefillLink(
+            normalizedCalendlyLink,
+            bookerName,
+            booker?.email || "",
+            booking.bookedDate,
+            booking.bookedTime,
+          );
+        }
+      }
+    }
+
     const [updated] = await db
       .update(mentorBookings)
-      .set({ status: status as any, updatedAt: new Date() })
+      .set({
+        status: status as any,
+        meetingLink,
+        calendlyEventUri,
+        updatedAt: new Date(),
+      })
       .where(eq(mentorBookings.id, req.params.id))
       .returning();
 
@@ -518,6 +700,57 @@ router.patch("/mentor-bookings/:id/complete", async (req: any, res) => {
   } catch (error) {
     console.error("Error completing booking:", error);
     res.status(500).json({ message: "Failed to complete booking" });
+  }
+});
+
+// PATCH /api/mentor-bookings/:id/mentor-feedback - Mentor writes feedback for participant
+router.patch("/mentor-bookings/:id/mentor-feedback", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const mentorFeedback = typeof req.body?.mentorFeedback === "string"
+      ? req.body.mentorFeedback.trim()
+      : "";
+
+    if (mentorFeedback.length > 2000) {
+      return res.status(400).json({ message: "Feedback must be 2000 characters or less" });
+    }
+
+    const [profile] = await db
+      .select({ id: mentorProfiles.id })
+      .from(mentorProfiles)
+      .where(eq(mentorProfiles.userId, req.user.id))
+      .limit(1);
+
+    if (!profile) return res.status(403).json({ message: "No mentor profile found" });
+
+    const [booking] = await db
+      .select({ id: mentorBookings.id })
+      .from(mentorBookings)
+      .where(
+        and(
+          eq(mentorBookings.id, req.params.id),
+          eq(mentorBookings.mentorProfileId, profile.id),
+        )
+      )
+      .limit(1);
+
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    const [updated] = await db
+      .update(mentorBookings)
+      .set({
+        mentorFeedback: mentorFeedback || null,
+        mentorFeedbackUpdatedAt: mentorFeedback ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(mentorBookings.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error saving mentor feedback:", error);
+    res.status(500).json({ message: "Failed to save mentor feedback" });
   }
 });
 

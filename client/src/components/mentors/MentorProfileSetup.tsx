@@ -127,6 +127,8 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
   const [website, setWebsite] = useState("");
+  const [calendlyLink, setCalendlyLink] = useState("");
+  const [calendlyEventTypeUri, setCalendlyEventTypeUri] = useState("");
   const [expertise, setExpertise] = useState<string[]>([]);
   const [industries, setIndustries] = useState<string[]>([]);
   const [sessionDuration, setSessionDuration] = useState("60");
@@ -139,6 +141,8 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
       setBio(existingProfile.bio || "");
       setLocation(existingProfile.location || "");
       setWebsite(existingProfile.website || "");
+      setCalendlyLink(existingProfile.calendlyLink || "");
+      setCalendlyEventTypeUri(existingProfile.calendlyEventTypeUri || "");
       setExpertise(existingProfile.expertise || []);
       setIndustries(existingProfile.industries || []);
       setSessionDuration(String(existingProfile.sessionDurationMinutes || 60));
@@ -165,6 +169,8 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
       bio,
       location,
       website,
+      calendlyLink,
+      calendlyEventTypeUri,
       expertise,
       industries,
       sessionDurationMinutes: parseInt(sessionDuration),
@@ -254,6 +260,36 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
               className={inputClass}
               style={inputStyle}
             />
+          </div>
+
+          {/* Calendly link */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Calendly Link</label>
+            <input
+              value={calendlyLink}
+              onChange={(e) => setCalendlyLink(e.target.value)}
+              placeholder="https://calendly.com/your-handle/intro-call"
+              className={inputClass}
+              style={inputStyle}
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Used as the participant-facing booking/meeting link.
+            </p>
+          </div>
+
+          {/* Calendly event type URI */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Calendly Event Type URI (advanced)</label>
+            <input
+              value={calendlyEventTypeUri}
+              onChange={(e) => setCalendlyEventTypeUri(e.target.value)}
+              placeholder="https://api.calendly.com/event_types/XXXXXXXX"
+              className={inputClass}
+              style={inputStyle}
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Optional. Enables one-time scheduling link generation with Calendly API token.
+            </p>
           </div>
 
           {/* Expertise */}

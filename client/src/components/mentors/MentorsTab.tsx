@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Search, Calendar, Clock, ChevronDown, ChevronUp, Star, CheckCircle } from "lucide-react";
+import { Search, Calendar, Clock, ChevronDown, ChevronUp, Star, CheckCircle, ExternalLink, MessageSquareText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import MentorCard from "./MentorCard";
@@ -41,8 +41,11 @@ interface MyBooking {
   bookedDate: string;
   bookedTime: string;
   durationMinutes: number;
+  meetingProvider?: string | null;
+  meetingLink?: string | null;
   notes?: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  mentorFeedback?: string | null;
   rating?: number | null;
   feedback?: string | null;
 }
@@ -166,7 +169,32 @@ function BookingDetailModal({
             {booking.notes && (
               <p className="text-muted-foreground pt-1 border-t border-border">{booking.notes}</p>
             )}
+            {booking.meetingLink && (
+              <a
+                href={booking.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-primary hover:underline pt-1"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open Meeting Link
+              </a>
+            )}
+            {!booking.meetingLink && booking.status === "CONFIRMED" && booking.meetingProvider === "CALENDLY" && (
+              <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+                Meeting link will appear once the mentor finishes Calendly setup.
+              </p>
+            )}
           </div>
+
+          {booking.mentorFeedback && (
+            <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <MessageSquareText className="h-3.5 w-3.5" /> Mentor Feedback
+              </p>
+              <p className="text-sm text-foreground">{booking.mentorFeedback}</p>
+            </div>
+          )}
 
           {/* Already rated */}
           {alreadyRated && (
