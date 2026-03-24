@@ -62,7 +62,7 @@ import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAsset
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, and, inArray, desc, avg, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, inArray, desc, avg, sql as drizzleSql, isNull, or } from "drizzle-orm";
 import { canAccessProject, canModifyProject, canAccessChat, canAccessAssets } from "./middleware/authorization";
 import { requireApiKey } from "./middleware/api-key-auth";
 import { passwordResetLimiter, authRateLimiter, orgCreationLimiter, fileUploadLimiter, aiRateLimiter, dataExportLimiter } from "./middleware/security";
@@ -1900,12 +1900,14 @@ export function registerRoutes(app: Express): Server {
 
   // ─── Workspace-scoped events (PMO admin) ─────────────────────────────────────
 
-  // GET /api/workspaces/:orgId/admin/events
+  // GET /api/workspaces/:orgId/admin/events — returns workspace events + global (super admin) events
   app.get('/api/workspaces/:orgId/admin/events', isAuthenticated, async (req: any, res) => {
     try {
       const { orgId } = req.params;
       if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
-      const rows = await db.select().from(events).where(eq(events.orgId, orgId)).orderBy(events.startDate);
+      const rows = await db.select().from(events)
+        .where(or(eq(events.orgId, orgId), isNull(events.orgId)))
+        .orderBy(events.startDate);
       res.json(rows);
     } catch (error) {
       console.error('Error fetching workspace events:', error);

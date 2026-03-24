@@ -23,6 +23,7 @@ import toast from "react-hot-toast";
 
 interface WorkspaceEvent {
   id: string;
+  orgId: string | null;
   title: string;
   shortDescription: string | null;
   description: string | null;
@@ -182,10 +183,17 @@ export default function AdminEvents() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      sortedEvents.map((e) => (
+                      sortedEvents.map((e) => {
+                        const isGlobal = !e.orgId;
+                        return (
                         <TableRow key={e.id}>
                           <TableCell>
-                            <div className="font-medium">{e.title}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{e.title}</span>
+                              {isGlobal && (
+                                <span className="inline-flex items-center text-[10px] rounded-full px-2 py-0.5 font-medium bg-blue-500/10 text-blue-500 border border-blue-200">Platform</span>
+                              )}
+                            </div>
                             {e.shortDescription && (
                               <div className="text-xs text-muted-foreground truncate max-w-xs">{e.shortDescription}</div>
                             )}
@@ -203,20 +211,23 @@ export default function AdminEvents() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8"
-                                onClick={() => setEventModal({ mode: "edit", event: e })} title="Edit">
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => setDeleteTarget(e)} title="Delete">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
+                            {!isGlobal && (
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8"
+                                  onClick={() => setEventModal({ mode: "edit", event: e })} title="Edit">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => setDeleteTarget(e)} title="Delete">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
