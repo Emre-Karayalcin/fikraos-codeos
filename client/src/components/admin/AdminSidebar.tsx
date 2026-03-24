@@ -3,7 +3,7 @@ import { useLocation, Link } from 'wouter';
 import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
-  GraduationCap, ClipboardList, Mail, BarChart2, BookOpen,
+  GraduationCap, ClipboardList, Mail, BarChart2, BookOpen, CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -87,6 +87,11 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
     {
       label: 'Communications',
       items: [
+        {
+          titleKey: 'Events',
+          href: `/w/${workspaceSlug}/admin/events`,
+          icon: CalendarDays,
+        },
         {
           titleKey: 'Email Templates',
           href: `/w/${workspaceSlug}/admin/email-templates`,

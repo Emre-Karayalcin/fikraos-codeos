@@ -451,6 +451,7 @@ export const challengeSubmissions = pgTable("challenge_submissions", {
 // Events (platform-wide, no orgId)
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }).notNull(),
   shortDescription: text("short_description"),
   description: text("description"),

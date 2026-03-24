@@ -58,7 +58,7 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations, events } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
@@ -1895,6 +1895,85 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching judge leaderboard:', error);
       res.status(500).json({ error: 'Failed to fetch judge leaderboard' });
+    }
+  });
+
+  // ─── Workspace-scoped events (PMO admin) ─────────────────────────────────────
+
+  // GET /api/workspaces/:orgId/admin/events
+  app.get('/api/workspaces/:orgId/admin/events', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const rows = await db.select().from(events).where(eq(events.orgId, orgId)).orderBy(events.startDate);
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching workspace events:', error);
+      res.status(500).json({ error: 'Failed to fetch events' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/admin/events
+  app.post('/api/workspaces/:orgId/admin/events', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const data = req.body;
+      if (!data.title || !data.startDate) return res.status(400).json({ error: 'title and startDate are required' });
+      const [created] = await db.insert(events).values({
+        orgId,
+        title: data.title,
+        shortDescription: data.shortDescription || null,
+        description: data.description || null,
+        location: data.location || null,
+        websiteUrl: data.websiteUrl || null,
+        imageUrl: data.imageUrl || null,
+        startDate: new Date(data.startDate),
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        isPublished: data.isPublished ?? false,
+      }).returning();
+      res.status(201).json(created);
+    } catch (error) {
+      console.error('Error creating workspace event:', error);
+      res.status(500).json({ error: 'Failed to create event' });
+    }
+  });
+
+  // PATCH /api/workspaces/:orgId/admin/events/:id
+  app.patch('/api/workspaces/:orgId/admin/events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const data = req.body;
+      const update: Record<string, any> = { updatedAt: new Date() };
+      if (data.title !== undefined) update.title = data.title;
+      if (data.shortDescription !== undefined) update.shortDescription = data.shortDescription || null;
+      if (data.description !== undefined) update.description = data.description || null;
+      if (data.location !== undefined) update.location = data.location || null;
+      if (data.websiteUrl !== undefined) update.websiteUrl = data.websiteUrl || null;
+      if (data.imageUrl !== undefined) update.imageUrl = data.imageUrl || null;
+      if (data.startDate !== undefined) update.startDate = new Date(data.startDate);
+      if (data.endDate !== undefined) update.endDate = data.endDate ? new Date(data.endDate) : null;
+      if (data.isPublished !== undefined) update.isPublished = data.isPublished;
+      const [updated] = await db.update(events).set(update).where(and(eq(events.id, id), eq(events.orgId, orgId))).returning();
+      if (!updated) return res.status(404).json({ error: 'Event not found' });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating workspace event:', error);
+      res.status(500).json({ error: 'Failed to update event' });
+    }
+  });
+
+  // DELETE /api/workspaces/:orgId/admin/events/:id
+  app.delete('/api/workspaces/:orgId/admin/events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, id } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      await db.delete(events).where(and(eq(events.id, id), eq(events.orgId, orgId)));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting workspace event:', error);
+      res.status(500).json({ error: 'Failed to delete event' });
     }
   });
 
