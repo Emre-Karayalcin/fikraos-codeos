@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2, ExternalLink, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AllAIOutputsView } from '@/components/idea/AllAIOutputsView';
 import {
@@ -28,6 +28,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
+const SCORE_DESCRIPTIONS: Record<string, string[]> = {
+  b1: ['No clear problem statement and no evidence of market need.','Problem is vaguely stated; market need is assumed only.','Problem is somewhat defined; limited or anecdotal evidence of need.','Problem is clear; some research, interviews, or evidence supports demand.','Problem is well defined and supported by solid market research or validation.','Problem is exceptionally clear, urgent, and strongly validated by robust market evidence.'],
+  b2: ['No clear target customer identified.','Customer definition is extremely broad or unclear.','Customer segment is partially identified but lacks specificity.','Target customer is reasonably clear, with some segmentation and rationale.','Target customer is clearly defined, specific, and well justified.','Target customer is highly specific, deeply understood, and supported by strong insight or evidence.'],
+  b3: ['No revenue model presented.','Revenue model is unclear or unrealistic.','Basic revenue model provided, but assumptions are weak or incomplete.','Revenue model is clear and somewhat realistic, with reasonable assumptions.','Revenue model is well explained, realistic, and supported by sound assumptions.','Revenue model is highly credible, financially robust, and clearly linked to business viability.'],
+  b4: ['No traction or validation evidence.','Minimal claims of interest with no real proof.','Early validation exists, such as conversations, surveys, or informal testing.','Some meaningful traction exists, such as pilots, early users, or partnership interest.','Strong traction exists, such as active pilots, paying users, signed partnerships, or measurable engagement.','Compelling traction exists with multiple strong validation signals and measurable market pull.'],
+  b5: ['No scaling plan provided.','Scaling plan is vague and unrealistic.','Some scaling ideas are mentioned, but they lack detail or feasibility.','Scaling plan is reasonably clear and achievable.','Scaling plan is clear, realistic, and supported by logical growth steps.','Scaling plan is highly credible, well structured, and demonstrates strong understanding of growth levers and constraints.'],
+  t1: ['No prototype or proof of concept exists.','Only a concept or mockup exists.','Early prototype exists, but functionality is very limited.','A working prototype or proof of concept demonstrates core functionality.','A strong working prototype exists and demonstrates key use cases well.','A highly functional prototype exists, is tested, and clearly proves feasibility.'],
+  t2: ['Technical feasibility is not demonstrated.','Feasibility appears doubtful or unsupported.','Feasibility is partially addressed, but significant uncertainty remains.','Feasibility is reasonably demonstrated based on current progress.','Feasibility is clearly demonstrated with solid technical progress.','Feasibility is strongly proven, with substantial progress and minimal uncertainty.'],
+  t3: ['No consideration of technical scalability.','Major technical barriers are evident and unresolved.','Some scalability thinking exists, but major concerns remain.','Solution appears moderately scalable with manageable barriers.','Solution is designed with clear scalability considerations and limited barriers.','Solution shows strong technical scalability with a well considered architecture and low execution risk.'],
+  t4: ['No technical risks identified.','Risks are barely acknowledged and no mitigation is provided.','Some risks are identified, but mitigation is weak or incomplete.','Key risks are identified with reasonable mitigation plans.','Risks are clearly identified and supported by strong, practical mitigation plans.','Risk management is comprehensive, proactive, and shows strong technical judgment.'],
+  s1: ['No alignment with the Program Objective is shown.','Alignment is weak or asserted without explanation.','Some alignment exists, but the connection is not fully clear.','Project is reasonably aligned with the Program Objective.','Project is clearly and strongly aligned with the Program Objective.','Project is exceptionally well aligned and directly advances the Program Objective in a compelling way.'],
+  s2: ['No impact is defined.','Impact is vague and not measurable.','Some intended impact is stated, but measures are weak or unclear.','Expected impact is clear and partially measurable.','Expected impact is clearly defined with strong measurable indicators.','Expected impact is highly clear, meaningful, and supported by specific, credible metrics.'],
+  s3: ['No contribution to national or sector priorities is evident.','Contribution is claimed but not explained.','Some relevance exists, but the connection is weak or generic.','Solution shows reasonable contribution to relevant priorities.','Solution clearly contributes to important national or sector-level priorities.','Solution strongly advances strategic national or sector priorities in a clear and well evidenced way.'],
+};
+
+const SCORE_COLORS = ['bg-red-500','bg-orange-500','bg-yellow-500','bg-lime-500','bg-green-400','bg-green-600'];
 
 const STATUSES = [
   { id: 'BACKLOG', label: 'Registration & Idea Evaluation', color: 'bg-gray-500' },
@@ -71,6 +88,12 @@ export default function AdminIdeaDetail() {
     b1: null, b2: null, b3: null, b4: null, b5: null,
     t1: null, t2: null, t3: null, t4: null,
     s1: null, s2: null, s3: null,
+  });
+  const [expandedGuides, setExpandedGuides] = useState<Set<string>>(new Set());
+  const toggleGuide = (key: string) => setExpandedGuides(prev => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
   });
 
   // Fetch idea details (from projects API since ideas are stored as projects)
@@ -1072,24 +1095,42 @@ export default function AdminIdeaDetail() {
                           { key: 'b4', label: 'Traction / early validation', weight: '8%' },
                           { key: 'b5', label: 'Scalability plan', weight: '6%' },
                         ].map(({ key, label, weight }) => (
-                          <div key={key} className="flex items-center justify-between gap-4">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{label}</p>
-                              <span className="text-xs text-muted-foreground">{weight}</span>
+                          <div key={key} className="space-y-2">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{label}</p>
+                                <span className="text-xs text-muted-foreground">{weight}</span>
+                              </div>
+                              <button onClick={() => toggleGuide(key)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                <BookOpen className="w-3 h-3" />
+                                Guide
+                                {expandedGuides.has(key) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                              </button>
+                              <div className="flex gap-1">
+                                {[1,2,3,4,5].map((v) => (
+                                  <button
+                                    key={v}
+                                    onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                    className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                      pmoScores[key] === v
+                                        ? 'bg-amber-500 text-white border-amber-500'
+                                        : 'border-border hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950'
+                                    }`}
+                                  >{v}</button>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex gap-1">
-                              {[1,2,3,4,5].map((v) => (
-                                <button
-                                  key={v}
-                                  onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
-                                  className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
-                                    pmoScores[key] === v
-                                      ? 'bg-amber-500 text-white border-amber-500'
-                                      : 'border-border hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950'
-                                  }`}
-                                >{v}</button>
-                              ))}
-                            </div>
+                            {expandedGuides.has(key) && (
+                              <div className="ml-2 p-3 bg-muted/40 rounded-lg border border-border space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Score Guide (0–5)</p>
+                                {SCORE_DESCRIPTIONS[key]?.map((desc, i) => (
+                                  <div key={i} className="flex items-start gap-2">
+                                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold text-white shrink-0 mt-0.5 ${SCORE_COLORS[i]}`}>{i}</span>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </CardContent>
@@ -1107,24 +1148,42 @@ export default function AdminIdeaDetail() {
                           { key: 't3', label: 'Scalability considered', weight: '6%' },
                           { key: 't4', label: 'Risk mitigation planned', weight: '6%' },
                         ].map(({ key, label, weight }) => (
-                          <div key={key} className="flex items-center justify-between gap-4">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{label}</p>
-                              <span className="text-xs text-muted-foreground">{weight}</span>
+                          <div key={key} className="space-y-2">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{label}</p>
+                                <span className="text-xs text-muted-foreground">{weight}</span>
+                              </div>
+                              <button onClick={() => toggleGuide(key)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                <BookOpen className="w-3 h-3" />
+                                Guide
+                                {expandedGuides.has(key) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                              </button>
+                              <div className="flex gap-1">
+                                {[1,2,3,4,5].map((v) => (
+                                  <button
+                                    key={v}
+                                    onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                    className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                      pmoScores[key] === v
+                                        ? 'bg-blue-500 text-white border-blue-500'
+                                        : 'border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950'
+                                    }`}
+                                  >{v}</button>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex gap-1">
-                              {[1,2,3,4,5].map((v) => (
-                                <button
-                                  key={v}
-                                  onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
-                                  className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
-                                    pmoScores[key] === v
-                                      ? 'bg-blue-500 text-white border-blue-500'
-                                      : 'border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950'
-                                  }`}
-                                >{v}</button>
-                              ))}
-                            </div>
+                            {expandedGuides.has(key) && (
+                              <div className="ml-2 p-3 bg-muted/40 rounded-lg border border-border space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Score Guide (0–5)</p>
+                                {SCORE_DESCRIPTIONS[key]?.map((desc, i) => (
+                                  <div key={i} className="flex items-start gap-2">
+                                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold text-white shrink-0 mt-0.5 ${SCORE_COLORS[i]}`}>{i}</span>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </CardContent>
@@ -1141,24 +1200,42 @@ export default function AdminIdeaDetail() {
                           { key: 's2', label: 'Impact is measurable', weight: '10%' },
                           { key: 's3', label: 'National / sector priorities', weight: '8%' },
                         ].map(({ key, label, weight }) => (
-                          <div key={key} className="flex items-center justify-between gap-4">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{label}</p>
-                              <span className="text-xs text-muted-foreground">{weight}</span>
+                          <div key={key} className="space-y-2">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{label}</p>
+                                <span className="text-xs text-muted-foreground">{weight}</span>
+                              </div>
+                              <button onClick={() => toggleGuide(key)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                <BookOpen className="w-3 h-3" />
+                                Guide
+                                {expandedGuides.has(key) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                              </button>
+                              <div className="flex gap-1">
+                                {[1,2,3,4,5].map((v) => (
+                                  <button
+                                    key={v}
+                                    onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
+                                    className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
+                                      pmoScores[key] === v
+                                        ? 'bg-purple-500 text-white border-purple-500'
+                                        : 'border-border hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950'
+                                    }`}
+                                  >{v}</button>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex gap-1">
-                              {[1,2,3,4,5].map((v) => (
-                                <button
-                                  key={v}
-                                  onClick={() => setPmoScores(s => ({ ...s, [key]: v }))}
-                                  className={`w-8 h-8 rounded text-xs font-semibold border transition-colors ${
-                                    pmoScores[key] === v
-                                      ? 'bg-purple-500 text-white border-purple-500'
-                                      : 'border-border hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950'
-                                  }`}
-                                >{v}</button>
-                              ))}
-                            </div>
+                            {expandedGuides.has(key) && (
+                              <div className="ml-2 p-3 bg-muted/40 rounded-lg border border-border space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Score Guide (0–5)</p>
+                                {SCORE_DESCRIPTIONS[key]?.map((desc, i) => (
+                                  <div key={i} className="flex items-start gap-2">
+                                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold text-white shrink-0 mt-0.5 ${SCORE_COLORS[i]}`}>{i}</span>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </CardContent>
