@@ -5,7 +5,7 @@ import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, desc, inArray } from "drizzle-orm";
-import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, type ScoringConfig } from "../shared/schema";
+import { organizations, organizationMembers, projects, challenges, assets, assetVersions, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, type ScoringConfig } from "../shared/schema";
 import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
 import { Resend } from "resend";
 import mustache from "mustache";
@@ -1193,6 +1193,42 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching activity insights:", error);
       res.status(500).json({ error: "Failed to fetch activity insights" });
+    }
+  });
+
+  // GET /api/super-admin/edit-history — AI output edit history across all workspaces
+  app.get("/api/super-admin/edit-history", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { workspaceId } = req.query as { workspaceId?: string };
+
+      const baseQuery = db
+        .select({
+          id: assetVersions.id,
+          label: assetVersions.label,
+          editedAt: assetVersions.createdAt,
+          assetTitle: assets.title,
+          assetKind: assets.kind,
+          projectId: projects.id,
+          projectTitle: projects.title,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          username: users.username,
+        })
+        .from(assetVersions)
+        .innerJoin(assets, eq(assets.id, assetVersions.assetId))
+        .innerJoin(projects, eq(projects.id, assets.projectId))
+        .innerJoin(users, eq(users.id, assets.createdById));
+
+      const rows = await (workspaceId
+        ? baseQuery.where(eq(projects.orgId, workspaceId))
+        : baseQuery
+      ).orderBy(desc(assetVersions.createdAt)).limit(200);
+
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching edit history:", error);
+      res.status(500).json({ error: "Failed to fetch edit history" });
     }
   });
 

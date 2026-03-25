@@ -58,7 +58,7 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations, events, eventSpeakers, attendanceRecords, academyCourses, academyVideos, mentorBookings, mentorProfiles, scoringCriteriaConfig } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations, events, eventSpeakers, attendanceRecords, academyCourses, academyVideos, mentorBookings, mentorProfiles, scoringCriteriaConfig, assets, assetVersions } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
@@ -948,9 +948,20 @@ export function registerRoutes(app: Express): Server {
 
   app.get('/api/projects/:id', isAuthenticated, canAccessProject, async (req: any, res) => {
     try {
-      // Project already attached to req by middleware
       const project = req.project;
-      res.json(project);
+      // Attach owner user info
+      let owner = null;
+      if (project.createdById) {
+        const [ownerUser] = await db.select({
+          id: users.id,
+          username: users.username,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        }).from(users).where(eq(users.id, project.createdById));
+        owner = ownerUser || null;
+      }
+      res.json({ ...project, owner });
     } catch (error) {
       console.error("Error fetching project:", error);
       res.status(500).json({ message: "Failed to fetch project" });
@@ -2481,6 +2492,41 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching workspace activity insights:', error);
       res.status(500).json({ error: 'Failed to fetch activity insights' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/admin/edit-history — AI output edit history for activity insights
+  app.get('/api/workspaces/:orgId/admin/edit-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const rows = await db
+        .select({
+          id: assetVersions.id,
+          label: assetVersions.label,
+          editedAt: assetVersions.createdAt,
+          assetTitle: assets.title,
+          assetKind: assets.kind,
+          projectId: projects.id,
+          projectTitle: projects.title,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          username: users.username,
+        })
+        .from(assetVersions)
+        .innerJoin(assets, eq(assets.id, assetVersions.assetId))
+        .innerJoin(projects, eq(projects.id, assets.projectId))
+        .innerJoin(users, eq(users.id, assets.createdById))
+        .where(eq(projects.orgId, orgId))
+        .orderBy(desc(assetVersions.createdAt))
+        .limit(200);
+
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching edit history:', error);
+      res.status(500).json({ error: 'Failed to fetch edit history' });
     }
   });
 

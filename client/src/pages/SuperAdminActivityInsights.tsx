@@ -4,7 +4,7 @@ import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart2, Users, Trophy, CheckCircle, XCircle, FileText, Activity, UserCog, UserMinus, Layers, CalendarClock } from "lucide-react";
+import { BarChart2, Users, Trophy, CheckCircle, XCircle, FileText, Activity, UserCog, UserMinus, Layers, CalendarClock, PencilLine } from "lucide-react";
 
 interface Totals {
   totalSubmissions: number;
@@ -67,6 +67,21 @@ interface InsightsData {
   activityLog: ActivityLogEntry[];
 }
 
+interface EditHistoryEntry {
+  id: string;
+  label: string;
+  editedAt: string;
+  assetTitle: string;
+  assetKind: string;
+  projectId: string;
+  projectTitle: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  username: string | null;
+  workspaceName?: string;
+}
+
 interface Workspace {
   id: string;
   name: string;
@@ -118,6 +133,22 @@ export default function SuperAdminActivityInsights() {
     queryFn: async () => {
       const res = await fetch(buildUrl(), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch insights");
+      return res.json();
+    },
+  });
+
+  const buildEditHistoryUrl = () => {
+    const params = new URLSearchParams();
+    if (selectedWorkspaceId !== "all") params.set("workspaceId", selectedWorkspaceId);
+    const qs = params.toString();
+    return `/api/super-admin/edit-history${qs ? `?${qs}` : ""}`;
+  };
+
+  const { data: editHistory = [] } = useQuery<EditHistoryEntry[]>({
+    queryKey: ["/api/super-admin/edit-history", selectedWorkspaceId],
+    queryFn: async () => {
+      const res = await fetch(buildEditHistoryUrl(), { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     },
   });
@@ -308,6 +339,53 @@ export default function SuperAdminActivityInsights() {
                               )}
                             </td>
                             <td className="px-4 py-2.5 text-xs text-muted-foreground">{entry.workspaceName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* AI Output Edit History */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <PencilLine className="w-4 h-4 text-violet-500" />
+                  AI Output Edit History
+                  <span className="text-xs font-normal text-muted-foreground ml-1">(latest 200 edits, all time)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {editHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-6 pb-5">No edits recorded yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left px-5 py-2.5 font-medium text-muted-foreground">Date</th>
+                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">User</th>
+                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Idea</th>
+                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Asset</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editHistory.map((entry) => (
+                          <tr key={entry.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                            <td className="px-5 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFull(entry.editedAt)}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="text-xs font-medium">{[entry.firstName, entry.lastName].filter(Boolean).join(" ") || "—"}</div>
+                              <div className="text-xs text-muted-foreground">{entry.email}</div>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs font-medium">{entry.projectTitle || "—"}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="text-xs font-medium">{entry.assetTitle}</div>
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-600 border border-violet-200">
+                                {entry.assetKind?.replace(/_/g, " ")}
+                              </span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
