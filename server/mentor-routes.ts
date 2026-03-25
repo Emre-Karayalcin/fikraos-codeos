@@ -222,7 +222,22 @@ router.post("/mentor-bookings", async (req: any, res) => {
     let initialMeetingLink: string | null = null;
     if (effectiveEventTypeUri) {
       const generated = await createCalendlySchedulingLink(effectiveEventTypeUri);
-      if (generated?.bookingUrl) initialMeetingLink = generated.bookingUrl;
+      if (generated?.bookingUrl) {
+        // Append date/time prefill so Calendly opens directly on the chosen slot
+        try {
+          const url = new URL(generated.bookingUrl);
+          if (bookedDate) {
+            url.searchParams.set('month', bookedDate.substring(0, 7)); // YYYY-MM
+            url.searchParams.set('date', bookedDate); // YYYY-MM-DD
+          }
+          if (bookedTime) url.searchParams.set('time', bookedTime); // HH:MM
+          if (memberName) url.searchParams.set('name', memberName);
+          if (req.user.email) url.searchParams.set('email', req.user.email);
+          initialMeetingLink = url.toString();
+        } catch {
+          initialMeetingLink = generated.bookingUrl;
+        }
+      }
     }
     // Fallback to prefill link from mentor's public Calendly URL
     if (!initialMeetingLink && normalizedCalendlyLink) {
