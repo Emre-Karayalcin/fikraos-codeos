@@ -84,7 +84,7 @@ export default function EntrepreneurDashboard() {
     },
     {
       id: 'academy',
-      title: 'Academy',
+      title: 'Training Modules',
       description: 'Learn essential business skills',
       icon: FiBookOpen,
       color: 'text-orange-600',
