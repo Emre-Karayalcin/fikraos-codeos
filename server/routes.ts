@@ -58,7 +58,7 @@ if (openai) {
 if (!openai) {
   console.warn("⚠️  Azure OpenAI credentials not set - OpenAI features will be disabled");
 }
-import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations, events, eventSpeakers, attendanceRecords, academyCourses, academyVideos, mentorBookings, mentorProfiles } from "@shared/schema";
+import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAssetSchema, insertPitchDeckGenerationSchema, organizationMembers, organizations, passwordResetTokens, challenges, memberApplications, mentorAssignments, users, projects, ideas, pitchDeckGenerations, platformEvents, courseProgress, ideaEvaluations, judgeEvaluations, events, eventSpeakers, attendanceRecords, academyCourses, academyVideos, mentorBookings, mentorProfiles, scoringCriteriaConfig } from "@shared/schema";
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
@@ -1383,6 +1383,48 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching rejected applications:', error);
       res.status(500).json({ error: 'Failed to fetch rejected applications' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/admin/scoring-criteria — PMO can read
+  app.get('/api/workspaces/:orgId/admin/scoring-criteria', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      const [pmo, judge] = await Promise.all([getScoringConfig('pmo'), getScoringConfig('judge')]);
+      res.json({ pmo, judge });
+    } catch (err) {
+      console.error('scoring-criteria GET error', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // PUT /api/workspaces/:orgId/admin/scoring-criteria/:type — PMO can edit
+  app.put('/api/workspaces/:orgId/admin/scoring-criteria/:type', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, type } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+      if (type !== 'pmo' && type !== 'judge') return res.status(400).json({ error: 'type must be pmo or judge' });
+      const config = req.body;
+      if (!config?.categories || !Array.isArray(config.categories)) {
+        return res.status(400).json({ error: 'Invalid config: categories array required' });
+      }
+      const totalWeight = config.categories.reduce((sum: number, cat: any) => {
+        return sum + cat.questions.reduce((s: number, q: any) => s + (q.weight || 0), 0);
+      }, 0);
+      if (Math.abs(totalWeight - 100) > 1) {
+        return res.status(400).json({ error: `Question weights must sum to 100 (got ${totalWeight})` });
+      }
+      const [existing] = await db.select().from(scoringCriteriaConfig).where(eq(scoringCriteriaConfig.type, type));
+      if (existing) {
+        await db.update(scoringCriteriaConfig).set({ config, updatedBy: req.user.id, updatedAt: new Date() }).where(eq(scoringCriteriaConfig.type, type));
+      } else {
+        await db.insert(scoringCriteriaConfig).values({ type, config, updatedBy: req.user.id });
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('scoring-criteria PUT error', err);
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 

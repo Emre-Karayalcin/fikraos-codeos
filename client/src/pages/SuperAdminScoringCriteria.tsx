@@ -102,9 +102,10 @@ interface EditableSectionProps {
   file: string;
   config: ScoringConfig;
   type: 'pmo' | 'judge';
+  apiBase: string; // e.g. '/api/super-admin' or '/api/workspaces/:orgId/admin'
 }
 
-function EditableScoringSection({ title, icon: Icon, headerColor, description, trigger, file, config, type }: EditableSectionProps) {
+function EditableScoringSection({ title, icon: Icon, headerColor, description, trigger, file, config, type, apiBase }: EditableSectionProps) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ScoringConfig>(config);
@@ -119,7 +120,7 @@ function EditableScoringSection({ title, icon: Icon, headerColor, description, t
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/super-admin/scoring-criteria/${type}`, {
+      const res = await fetch(`${apiBase}/scoring-criteria/${type}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
@@ -132,7 +133,7 @@ function EditableScoringSection({ title, icon: Icon, headerColor, description, t
     },
     onSuccess: () => {
       toast.success('Saved');
-      queryClient.invalidateQueries({ queryKey: ['scoring-criteria'] });
+      queryClient.invalidateQueries({ queryKey: ['scoring-criteria', apiBase] });
       setEditing(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -345,11 +346,11 @@ function AiScreeningSection() {
 
 // ─── Shared content ──────────────────────────────────────────────────────────────
 
-export function ScoringCriteriaContent() {
+export function ScoringCriteriaContent({ apiBase = '/api/super-admin' }: { apiBase?: string }) {
   const { data, isLoading, error } = useQuery<CriteriaData>({
-    queryKey: ['scoring-criteria'],
+    queryKey: ['scoring-criteria', apiBase],
     queryFn: async () => {
-      const res = await fetch('/api/super-admin/scoring-criteria', { credentials: 'include' });
+      const res = await fetch(`${apiBase}/scoring-criteria`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load criteria');
       return res.json();
     },
@@ -424,6 +425,7 @@ export function ScoringCriteriaContent() {
               file="server/routes.ts (POST /api/workspaces/:orgId/admin/idea-evaluations/:projectId)"
               config={data.pmo}
               type="pmo"
+              apiBase={apiBase}
             />
             <EditableScoringSection
               title="Judge Scoring"
@@ -434,6 +436,7 @@ export function ScoringCriteriaContent() {
               file="server/routes.ts (POST /api/workspaces/:orgId/judge/evaluations/:projectId)"
               config={data.judge}
               type="judge"
+              apiBase={apiBase}
             />
           </>
         )}
