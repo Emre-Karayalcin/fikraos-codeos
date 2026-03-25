@@ -1,82 +1,52 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Search } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import toast from "react-hot-toast";
-
-const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: "bg-blue-500/15 text-blue-400",
-  PRESENT: "bg-green-500/15 text-green-400",
-  ABSENT: "bg-red-500/15 text-red-400",
-  LATE: "bg-yellow-500/15 text-yellow-400",
-};
 
 export default function AdminAttendance() {
   const { slug } = useParams<{ slug: string }>();
-  const qc = useQueryClient();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterDate, setFilterDate] = useState("");
+  const [search, setSearch] = useState("");
 
   const { data: workspace } = useQuery<{ id: string }>({
     queryKey: [`/api/workspaces/${slug}`],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${slug}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch workspace");
+      if (!res.ok) throw new Error("Failed");
       return res.json();
     },
   });
   const orgId = workspace?.id;
 
-  const params = new URLSearchParams();
-  if (filterStatus && filterStatus !== "all") params.set("status", filterStatus);
-  if (filterDate) params.set("date", filterDate);
-
-  const { data: records = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/api/workspaces/${orgId}/admin/attendance`, filterStatus, filterDate],
+  const { data: logs = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/workspaces/${orgId}/admin/login-logs`],
     queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${orgId}/admin/attendance?${params}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch records");
+      const res = await fetch(`/api/workspaces/${orgId}/admin/login-logs`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
       return res.json();
     },
     enabled: !!orgId,
   });
 
-  const updateRecord = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
-      const res = await fetch(`/api/workspaces/${orgId}/admin/attendance/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/attendance`] });
-      toast.success("Record updated");
-    },
-    onError: () => toast.error("Failed to update record"),
+  const filtered = logs.filter((m) => {
+    const q = search.toLowerCase();
+    return (
+      !q ||
+      (m.firstName || "").toLowerCase().includes(q) ||
+      (m.lastName || "").toLowerCase().includes(q) ||
+      (m.username || "").toLowerCase().includes(q) ||
+      (m.email || "").toLowerCase().includes(q)
+    );
   });
 
-  const summary = {
-    total: records.length,
-    present: records.filter(r => r.status === "PRESENT").length,
-    absent: records.filter(r => r.status === "ABSENT").length,
-    scheduled: records.filter(r => r.status === "SCHEDULED").length,
-    rate: records.length > 0 ? Math.round((records.filter(r => r.status === "PRESENT").length / records.length) * 100) : 0,
-  };
+  const totalLogins = logs.reduce((sum, m) => sum + (m.loginCount ?? 0), 0);
+  const activeUsers = logs.filter((m) => (m.loginCount ?? 0) > 0).length;
 
   return (
     <div className="flex h-screen bg-background">
@@ -87,17 +57,16 @@ export default function AdminAttendance() {
             <ClipboardCheck className="w-8 h-8 text-primary" />
             <div>
               <h1 className="text-3xl font-bold">Attendance</h1>
-              <p className="text-muted-foreground">Track session check-in and attendance records</p>
+              <p className="text-muted-foreground">Platform sign-in logs per member</p>
             </div>
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { label: "Total", value: summary.total, color: "border-l-blue-500" },
-              { label: "Present", value: summary.present, color: "border-l-green-500" },
-              { label: "Absent", value: summary.absent, color: "border-l-red-500" },
-              { label: "Attendance Rate", value: `${summary.rate}%`, color: "border-l-purple-500" },
+              { label: "Total Members", value: logs.length, color: "border-l-blue-500" },
+              { label: "Active (signed in)", value: activeUsers, color: "border-l-green-500" },
+              { label: "Total Sign-ins", value: totalLogins, color: "border-l-purple-500" },
             ].map(({ label, value, color }) => (
               <Card key={label} className={`border-l-4 ${color}`}>
                 <CardContent className="p-4">
@@ -108,38 +77,21 @@ export default function AdminAttendance() {
             ))}
           </div>
 
-          {/* Filters */}
-          <div className="flex gap-3 flex-wrap">
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                <SelectItem value="PRESENT">Present</SelectItem>
-                <SelectItem value="ABSENT">Absent</SelectItem>
-                <SelectItem value="LATE">Late</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Search */}
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              type="date"
-              value={filterDate}
-              onChange={e => setFilterDate(e.target.value)}
-              className="w-44"
-              placeholder="Filter by date"
+              className="pl-9"
+              placeholder="Search members…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
-            {(filterStatus !== "all" || filterDate) && (
-              <Button variant="outline" size="sm" onClick={() => { setFilterStatus("all"); setFilterDate(""); }}>
-                Clear
-              </Button>
-            )}
           </div>
 
           {/* Table */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Attendance Records</CardTitle>
+              <CardTitle className="text-base">Member Sign-in Log</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {isLoading ? (
@@ -151,61 +103,38 @@ export default function AdminAttendance() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Member</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Check-in</TableHead>
-                      <TableHead>Check-out</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Username</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="text-right">Total Sign-ins</TableHead>
+                      <TableHead className="text-right">Last Sign-in</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.length === 0 ? (
+                    {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
-                          No attendance records found
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                          No members found
                         </TableCell>
                       </TableRow>
                     ) : (
-                      records.map((r: any) => (
-                        <TableRow key={r.id}>
+                      filtered.map((m: any) => (
+                        <TableRow key={m.userId}>
                           <TableCell className="font-medium">
-                            {r.memberFirstName} {r.memberLastName}
+                            {[m.firstName, m.lastName].filter(Boolean).join(" ") || "—"}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{r.scheduledDate}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{r.scheduledTime || "—"}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{m.username || "—"}</TableCell>
                           <TableCell>
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[r.status] || "bg-muted text-muted-foreground"}`}>
-                              {r.status}
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                              {m.role}
                             </span>
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {r.checkedInAt ? new Date(r.checkedInAt).toLocaleTimeString() : "—"}
+                          <TableCell className="text-right">
+                            <span className={`font-semibold ${(m.loginCount ?? 0) > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                              {m.loginCount ?? 0}
+                            </span>
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {r.checkedOutAt ? new Date(r.checkedOutAt).toLocaleTimeString() : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1 flex-wrap">
-                              {r.status === "SCHEDULED" && (
-                                <>
-                                  <Button size="sm" variant="outline" className="h-7 text-xs text-green-500 border-green-500/30 hover:bg-green-500/10"
-                                    onClick={() => updateRecord.mutate({ id: r.id, data: { status: "PRESENT", checkedInAt: new Date().toISOString() } })}>
-                                    Check In
-                                  </Button>
-                                  <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10"
-                                    onClick={() => updateRecord.mutate({ id: r.id, data: { status: "ABSENT" } })}>
-                                    Mark Absent
-                                  </Button>
-                                </>
-                              )}
-                              {r.status === "PRESENT" && !r.checkedOutAt && (
-                                <Button size="sm" variant="outline" className="h-7 text-xs"
-                                  onClick={() => updateRecord.mutate({ id: r.id, data: { checkedOutAt: new Date().toISOString() } })}>
-                                  Check Out
-                                </Button>
-                              )}
-                            </div>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleString() : "Never"}
                           </TableCell>
                         </TableRow>
                       ))

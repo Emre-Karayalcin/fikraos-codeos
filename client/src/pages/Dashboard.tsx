@@ -202,15 +202,26 @@ export default function Dashboard() {
     return (user as any).fullName || (user as any).firstName || (user as any).username || '';
   };
 
+  const isPmoOrOwner = userRole?.role === 'ADMIN' || userRole?.role === 'OWNER' || userIsAdmin;
+
   const cards: DashboardCard[] = [
-    {
-      id: 'my-ideas',
-      title: 'My Ideas',
-      description: 'View and develop your ideas',
-      icon: FiStar,
-      color: 'text-gray-600',
-      path: `/w/${slug}/my-ideas`,
-    },
+    isPmoOrOwner
+      ? {
+          id: 'pmo-panel',
+          title: 'PMO Panel',
+          description: 'Manage ideas, members & workspace',
+          icon: FiStar,
+          color: 'text-amber-600',
+          path: `/w/${slug}/admin`,
+        }
+      : {
+          id: 'my-ideas',
+          title: 'My Ideas',
+          description: 'View and develop your ideas',
+          icon: FiStar,
+          color: 'text-gray-600',
+          path: `/w/${slug}/my-ideas`,
+        },
     {
       id: 'challenges',
       title: 'Problem Statements',

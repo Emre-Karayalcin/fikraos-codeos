@@ -2072,6 +2072,35 @@ export function registerRoutes(app: Express): Server {
   });
 
   // ─── Attendance Tracking ───────────────────────────────────────────────────
+  // Login logs — workspace members with platform login counts
+  app.get('/api/workspaces/:orgId/admin/login-logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      const members = await db
+        .select({
+          userId: organizationMembers.userId,
+          role: organizationMembers.role,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          username: users.username,
+          email: users.email,
+          loginCount: (users as any).loginCount,
+          lastLoginAt: (users as any).lastLoginAt,
+        })
+        .from(organizationMembers)
+        .innerJoin(users, eq(organizationMembers.userId, users.id))
+        .where(eq(organizationMembers.orgId, orgId))
+        .orderBy(desc((users as any).lastLoginAt));
+
+      res.json(members);
+    } catch (error) {
+      console.error('Error fetching login logs:', error);
+      res.status(500).json({ error: 'Failed to fetch login logs' });
+    }
+  });
+
   app.get('/api/workspaces/:orgId/admin/attendance', isAuthenticated, async (req: any, res) => {
     try {
       const { orgId } = req.params;

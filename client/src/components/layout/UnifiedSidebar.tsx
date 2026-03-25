@@ -684,7 +684,7 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
-                  {!isMentor && !isJudge && (
+                  {!isMentor && !isJudge && !isAdmin && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -872,7 +872,7 @@ export function UnifiedSidebar() {
                     </div>
                   )}
 
-                  {!isMentor && !isJudge && (
+                  {!isMentor && !isJudge && !isAdmin && (
                   <div
                     className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                       location.includes("/my-ideas") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"

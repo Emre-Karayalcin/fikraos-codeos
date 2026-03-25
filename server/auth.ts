@@ -217,6 +217,12 @@ export function setupAuth(app: Express) {
         req.login(user, async (loginErr) => {
           if (loginErr) return next(loginErr);
 
+          // Track login count + last login time (fire-and-forget, non-fatal)
+          db.update(users)
+            .set({ loginCount: (user.loginCount ?? 0) + 1, lastLoginAt: new Date() } as any)
+            .where(eq(users.id, user.id))
+            .catch(console.error);
+
           // Fetch memberships so the client cache is fully populated on login
           let memberships: any[] = [];
           try {
