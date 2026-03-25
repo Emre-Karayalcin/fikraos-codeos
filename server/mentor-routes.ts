@@ -1037,4 +1037,46 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
   }
 });
 
+// GET /api/debug/calendly — test Calendly integration (dev only)
+router.get("/debug/calendly", async (req: any, res) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+  const token = process.env.CALENDLY_PAT_TOKEN;
+  const eventTypeUri = process.env.CALENDLY_EVENT_TYPE_URI;
+  const apiBase = CALENDLY_API_BASE;
+
+  const result: any = {
+    env: {
+      CALENDLY_PAT_TOKEN: token ? `set (${token.length} chars)` : "NOT SET",
+      CALENDLY_EVENT_TYPE_URI: eventTypeUri || "NOT SET",
+      CALENDLY_API_BASE: apiBase,
+    },
+  };
+
+  if (!token) {
+    return res.json({ ...result, error: "CALENDLY_PAT_TOKEN not set — restart server after updating .env" });
+  }
+  if (!eventTypeUri) {
+    return res.json({ ...result, error: "CALENDLY_EVENT_TYPE_URI not set" });
+  }
+
+  try {
+    const response = await fetch(`${apiBase}/scheduling_links`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ owner: eventTypeUri, owner_type: "EventType", max_event_count: 1 }),
+    });
+    const body = await response.json();
+    result.apiStatus = response.status;
+    result.apiResponse = body;
+    result.bookingUrl = body?.resource?.booking_url || null;
+    result.success = !!result.bookingUrl;
+  } catch (err: any) {
+    result.error = err.message;
+    result.success = false;
+  }
+
+  res.json(result);
+});
+
 export default router;
