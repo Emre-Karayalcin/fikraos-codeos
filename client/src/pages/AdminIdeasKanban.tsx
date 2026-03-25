@@ -224,6 +224,8 @@ export default function AdminIdeasKanban() {
   // delete confirmation state
   const [deleteIdeaId, setDeleteIdeaId] = useState<string | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  // view tabs
+  const [view, setView] = useState<'kanban' | 'leaderboard' | 'judge-leaderboard'>('kanban');
   // leaderboard modal state
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   // judge leaderboard modal state
@@ -310,7 +312,7 @@ export default function AdminIdeasKanban() {
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: !!workspace?.id && leaderboardOpen,
+    enabled: !!workspace?.id && (leaderboardOpen || view === 'leaderboard'),
   });
 
   // Fetch judge leaderboard (only when modal is open)
@@ -326,7 +328,7 @@ export default function AdminIdeasKanban() {
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: !!workspace?.id && judgeLeaderboardOpen,
+    enabled: !!workspace?.id && (judgeLeaderboardOpen || view === 'judge-leaderboard'),
   });
 
   // Fetch ideas (all or filtered by challenge)
@@ -527,7 +529,7 @@ export default function AdminIdeasKanban() {
         {/* Header */}
         <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-row">
+            <div className="flex items-center gap-4 flex-row">
               <Kanban className="w-8 h-8 text-primary" />
               <div>
                 <h1 className="text-3xl font-bold ltr:text-left rtl:text-right">
@@ -536,6 +538,30 @@ export default function AdminIdeasKanban() {
                 <p className="text-muted-foreground ltr:text-left rtl:text-right">
                   {t('admin.ideas.header.subtitle')}
                 </p>
+              </div>
+              {/* View tabs */}
+              <div className="flex items-center gap-1 ml-4 bg-muted rounded-lg p-1">
+                <button
+                  onClick={() => setView('kanban')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'kanban' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Kanban className="w-3.5 h-3.5" />
+                  Kanban
+                </button>
+                <button
+                  onClick={() => setView('leaderboard')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'leaderboard' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  PMO Leaderboard
+                </button>
+                <button
+                  onClick={() => setView('judge-leaderboard')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'judge-leaderboard' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  Judge Scores
+                </button>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -626,8 +652,132 @@ export default function AdminIdeasKanban() {
         </div>
         </div>
 
+        {/* PMO Leaderboard view */}
+        {view === 'leaderboard' && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                <h2 className="text-lg font-semibold">Pre-Demo Evaluation Leaderboard</h2>
+                <span className="text-sm text-muted-foreground">— SHORTLISTED ideas ranked by PMO evaluation score</span>
+              </div>
+              {leaderboardData.length === 0 ? (
+                <p className="text-center text-muted-foreground py-16 text-sm">No evaluated ideas yet. Use the PMO Evaluation tab on each idea to score them.</p>
+              ) : (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">Rank</TableHead>
+                        <TableHead>Idea</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead className="text-right">Score</TableHead>
+                        <TableHead className="text-right">Business</TableHead>
+                        <TableHead className="text-right">Technical</TableHead>
+                        <TableHead className="text-right">Strategic</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {leaderboardData.map((row, idx) => (
+                        <TableRow key={row.projectId} className={idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : ''}>
+                          <TableCell className="font-bold text-center">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</TableCell>
+                          <TableCell className="font-medium">{row.title}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.ownerName}</TableCell>
+                          <TableCell className="text-right font-bold">{row.totalScore ?? '—'}</TableCell>
+                          <TableCell className="text-right text-sm">{row.businessScore}</TableCell>
+                          <TableCell className="text-right text-sm">{row.technicalScore}</TableCell>
+                          <TableCell className="text-right text-sm">{row.strategicScore}</TableCell>
+                          <TableCell>
+                            <Button size="sm" variant="outline" className="text-xs h-7 whitespace-nowrap" disabled={moveToFinal.isPending} onClick={() => moveToFinal.mutate(row.projectId)}>
+                              → Demo Day
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Judge Leaderboard view */}
+        {view === 'judge-leaderboard' && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                <h2 className="text-lg font-semibold">Demo Day Judge Leaderboard</h2>
+                <span className="text-sm text-muted-foreground">— IN_INCUBATION ideas ranked by combined judge score</span>
+              </div>
+              {judgeLeaderboardData.length === 0 ? (
+                <p className="text-center text-muted-foreground py-16 text-sm">No judge evaluations yet. Judges can score ideas from their dashboard.</p>
+              ) : (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8"></TableHead>
+                        <TableHead className="w-10">Rank</TableHead>
+                        <TableHead>Idea</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Avg</TableHead>
+                        <TableHead className="text-right">Deck</TableHead>
+                        <TableHead className="text-right">Pitch</TableHead>
+                        <TableHead className="text-right">Eval</TableHead>
+                        <TableHead className="text-right"># Judges</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {judgeLeaderboardData.map((row, idx) => (
+                        <React.Fragment key={row.projectId}>
+                          <TableRow
+                            className={`cursor-pointer ${idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : ''}`}
+                            onClick={() => setExpandedJudgeRow(expandedJudgeRow === row.projectId ? null : row.projectId)}
+                          >
+                            <TableCell className="text-muted-foreground">{expandedJudgeRow === row.projectId ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</TableCell>
+                            <TableCell className="font-bold text-center">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</TableCell>
+                            <TableCell className="font-medium">{row.title}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{row.ownerName}</TableCell>
+                            <TableCell className="text-right font-bold text-primary">{row.totalCombined}</TableCell>
+                            <TableCell className="text-right text-sm">{row.avgScore ?? '—'}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{row.deckSum}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{row.pitchSum}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{row.evalSum}</TableCell>
+                            <TableCell className="text-right text-sm">{row.judgeCount}</TableCell>
+                          </TableRow>
+                          {expandedJudgeRow === row.projectId && (
+                            <TableRow className="bg-muted/30">
+                              <TableCell colSpan={10} className="p-0">
+                                <div className="px-8 py-3 space-y-1">
+                                  <p className="text-xs font-semibold text-muted-foreground mb-2">Per-Judge Breakdown</p>
+                                  {row.judges.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">No evaluations yet.</p>
+                                  ) : (
+                                    <table className="w-full text-xs">
+                                      <thead><tr className="text-muted-foreground"><th className="text-left pb-1 font-medium">Judge</th><th className="text-right pb-1 font-medium">Score</th><th className="text-right pb-1 font-medium">Deck (40%)</th><th className="text-right pb-1 font-medium">Pitch (30%)</th><th className="text-right pb-1 font-medium">Eval (30%)</th></tr></thead>
+                                      <tbody>{row.judges.map((j, ji) => (<tr key={ji} className="border-t border-border/50"><td className="py-1 font-medium">{j.judgeName}</td><td className="py-1 text-right font-bold">{j.score}</td><td className="py-1 text-right text-muted-foreground">{j.deckScore}</td><td className="py-1 text-right text-muted-foreground">{j.pitchScore}</td><td className="py-1 text-right text-muted-foreground">{j.evalScore}</td></tr>))}</tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Kanban Board */}
-        <DndContext
+        {view === 'kanban' && <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
@@ -743,7 +893,7 @@ export default function AdminIdeasKanban() {
               })}
             </div>
           </div>
-        </DndContext>
+        </DndContext>}
 
         {/* Loading overlay when navigating */}
         {isNavigating && (
