@@ -736,8 +736,8 @@ export default function AdminIdeaDetail() {
             <TabsContent value="evaluation" className="mt-6">
               <div className="space-y-8">
 
-              {/* ── AI Screening Evaluation ────────────────────────────── */}
-              <div>
+              {/* ── AI Screening Evaluation — hidden when idea is SHORTLISTED (Step 3) ── */}
+              <div className={idea?.status === 'SHORTLISTED' ? 'hidden' : ''}>
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
                   AI Screening Evaluation
