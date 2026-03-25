@@ -170,15 +170,21 @@ function BookingDetailModal({
               <p className="text-muted-foreground pt-1 border-t border-border">{booking.notes}</p>
             )}
             {booking.meetingLink && (
-              <a
-                href={booking.meetingLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-primary hover:underline pt-1"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open Meeting Link
-              </a>
+              <div className="pt-1 space-y-1.5 border-t border-border">
+                <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
+                  <span>When Calendly opens, please select <strong>{formatTime(booking.bookedTime)}</strong> to match your booked time.</span>
+                </div>
+                <a
+                  href={booking.meetingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-primary hover:underline text-sm"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open Meeting Link
+                </a>
+              </div>
             )}
             {!booking.meetingLink && booking.status === "CONFIRMED" && booking.meetingProvider === "CALENDLY" && (
               <p className="text-xs text-muted-foreground pt-1 border-t border-border">
