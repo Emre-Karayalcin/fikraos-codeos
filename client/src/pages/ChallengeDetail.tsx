@@ -206,6 +206,29 @@ export default function ChallengeDetail() {
     enabled: !!isAuthenticated,
   });
 
+  // Academy progress for submit gate
+  const { data: academyCourse } = useQuery<{ videos: { id: string }[] }>({
+    queryKey: ['/api/academy/courses/fikrahub-fundamentals'],
+    queryFn: async () => {
+      const res = await fetch('/api/academy/courses/fikrahub-fundamentals', { credentials: 'include' });
+      if (!res.ok) return { videos: [] };
+      return res.json();
+    },
+    enabled: !!isAuthenticated,
+  });
+  const { data: academyProgress = [] } = useQuery<{ completed: boolean }[]>({
+    queryKey: ['/api/academy/progress/fikrahub-fundamentals'],
+    queryFn: async () => {
+      const res = await fetch('/api/academy/progress/fikrahub-fundamentals', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!isAuthenticated,
+  });
+  const totalVideos = academyCourse?.videos?.length ?? 0;
+  const completedVideos = academyProgress.filter((p) => p.completed).length;
+  const academyComplete = totalVideos > 0 && completedVideos >= totalVideos;
+
   // Submit confirmation dialog
   const [submitConfirmProject, setSubmitConfirmProject] = useState<Project | null>(null);
   // Pitch deck edit dialog
@@ -400,7 +423,7 @@ export default function ChallengeDetail() {
     }
   };
 
-  const canSubmit = challenge.status === 'active' && daysLeft >= 0;
+  const canSubmit = !isMentor;
 
   return (
     <div className="h-screen w-full bg-background text-foreground overflow-hidden flex relative">
@@ -724,14 +747,22 @@ export default function ChallengeDetail() {
                                 </TableCell>
                                 <TableCell className="ltr:text-right rtl:text-left">
                                   <div className="flex items-center gap-2 ltr:justify-end rtl:justify-start">
-                                    {canSubmit && !isMentor && (
+                                    {canSubmit && (
                                       <Button
                                         variant="default"
                                         size="sm"
-                                        disabled={!project.pitchDeckUrl || !project.deploymentUrl}
+                                        disabled={!project.pitchDeckUrl || !project.deploymentUrl || !academyComplete}
                                         onClick={() => setSubmitConfirmProject(project)}
                                         className="h-8"
-                                        title={!project.pitchDeckUrl || !project.deploymentUrl ? 'Add pitch deck and prototype URL first' : ''}
+                                        title={
+                                          !project.pitchDeckUrl
+                                            ? 'Add a pitch deck first'
+                                            : !project.deploymentUrl
+                                            ? 'Add a prototype URL first'
+                                            : !academyComplete
+                                            ? 'Complete 100% of Academy training first'
+                                            : ''
+                                        }
                                       >
                                         <Send className="w-3 h-3 ltr:mr-1 rtl:ml-1" />
                                         Submit
