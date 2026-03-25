@@ -5,7 +5,7 @@ import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, desc, inArray } from "drizzle-orm";
-import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events, memberApplications, platformEvents } from "../shared/schema";
+import { organizations, organizationMembers, projects, challenges, assets, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, type ScoringConfig } from "../shared/schema";
 import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
 import { Resend } from "resend";
 import mustache from "mustache";
@@ -26,6 +26,77 @@ function isSuperAdmin(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ message: "Super admin access required" });
   }
   next();
+}
+
+// ── Default scoring configs (used as fallback when DB has no row) ─────────────
+const DEFAULT_PMO_CONFIG: ScoringConfig = {
+  categories: [
+    {
+      id: 'business', name: 'Business Maturity', weight: 40, color: 'emerald',
+      questions: [
+        { id: 'b1', label: 'Problem clearly defined', weight: 10 },
+        { id: 'b2', label: 'Target customer identified', weight: 8 },
+        { id: 'b3', label: 'Revenue model established', weight: 8 },
+        { id: 'b4', label: 'Traction / early validation', weight: 8 },
+        { id: 'b5', label: 'Scalability plan', weight: 6 },
+      ],
+    },
+    {
+      id: 'technical', name: 'Technical Maturity', weight: 30, color: 'violet',
+      questions: [
+        { id: 't1', label: 'Working prototype exists', weight: 10 },
+        { id: 't2', label: 'Technical feasibility demonstrated', weight: 8 },
+        { id: 't3', label: 'Scalability considered', weight: 6 },
+        { id: 't4', label: 'Risk mitigation planned', weight: 6 },
+      ],
+    },
+    {
+      id: 'strategic', name: 'Strategic Alignment', weight: 30, color: 'amber',
+      questions: [
+        { id: 's1', label: 'Alignment with program goals', weight: 12 },
+        { id: 's2', label: 'Sector / national priority fit', weight: 10 },
+        { id: 's3', label: 'Impact potential', weight: 8 },
+      ],
+    },
+  ],
+};
+
+const DEFAULT_JUDGE_CONFIG: ScoringConfig = {
+  categories: [
+    {
+      id: 'deck', name: 'Demo Deck Slides', weight: 40, color: 'orange',
+      questions: [
+        { id: 'd1', label: 'Problem statement', weight: 8 },
+        { id: 'd2', label: 'Solution statement', weight: 8 },
+        { id: 'd3', label: 'Prototype slide', weight: 8 },
+        { id: 'd4', label: 'Target audience', weight: 8 },
+        { id: 'd5', label: 'Revenue streams', weight: 8 },
+      ],
+    },
+    {
+      id: 'pitching', name: 'Pitching Quality', weight: 30, color: 'rose',
+      questions: [
+        { id: 'p1', label: 'Time allocated', weight: 8 },
+        { id: 'p2', label: 'Problem demonstrated', weight: 8 },
+        { id: 'p3', label: 'Solution demonstrated', weight: 8 },
+        { id: 'p4', label: 'Storytelling & body language', weight: 6 },
+      ],
+    },
+    {
+      id: 'evaluation', name: 'Project Evaluation', weight: 30, color: 'cyan',
+      questions: [
+        { id: 'e1', label: 'Market research evidence', weight: 10 },
+        { id: 'e2', label: 'Impact measurable', weight: 10 },
+        { id: 'e3', label: 'National/sector priorities', weight: 10 },
+      ],
+    },
+  ],
+};
+
+export async function getScoringConfig(type: 'pmo' | 'judge'): Promise<ScoringConfig> {
+  const [row] = await db.select().from(scoringCriteriaConfig).where(eq(scoringCriteriaConfig.type, type));
+  if (row) return row.config as ScoringConfig;
+  return type === 'pmo' ? DEFAULT_PMO_CONFIG : DEFAULT_JUDGE_CONFIG;
 }
 
 export function registerSuperAdminRoutes(app: Express) {
@@ -1176,6 +1247,51 @@ export function registerSuperAdminRoutes(app: Express) {
       content: fs.readFileSync(path.join(tplDir, f), 'utf8'),
     }));
     res.json(templates);
+  });
+
+  // ── Scoring Criteria Config ──────────────────────────────────────────────────
+
+  // GET /api/super-admin/scoring-criteria — returns pmo and judge configs
+  app.get('/api/super-admin/scoring-criteria', isAuthenticated, isSuperAdmin, async (_req, res) => {
+    try {
+      const [pmo, judge] = await Promise.all([getScoringConfig('pmo'), getScoringConfig('judge')]);
+      res.json({ pmo, judge });
+    } catch (err) {
+      console.error('scoring-criteria GET error', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // PUT /api/super-admin/scoring-criteria/:type — upsert config
+  app.put('/api/super-admin/scoring-criteria/:type', isAuthenticated, isSuperAdmin, async (req: any, res) => {
+    const { type } = req.params;
+    if (type !== 'pmo' && type !== 'judge') return res.status(400).json({ error: 'type must be pmo or judge' });
+    const config: ScoringConfig = req.body;
+    if (!config?.categories || !Array.isArray(config.categories)) {
+      return res.status(400).json({ error: 'Invalid config: categories array required' });
+    }
+    // Validate weights sum to 100
+    const totalWeight = config.categories.reduce((sum, cat) => {
+      const qSum = cat.questions.reduce((s, q) => s + (q.weight || 0), 0);
+      return sum + qSum;
+    }, 0);
+    if (Math.abs(totalWeight - 100) > 1) {
+      return res.status(400).json({ error: `Question weights must sum to 100 (got ${totalWeight})` });
+    }
+    try {
+      const [existing] = await db.select().from(scoringCriteriaConfig).where(eq(scoringCriteriaConfig.type, type));
+      if (existing) {
+        await db.update(scoringCriteriaConfig)
+          .set({ config, updatedBy: req.user.id, updatedAt: new Date() })
+          .where(eq(scoringCriteriaConfig.type, type));
+      } else {
+        await db.insert(scoringCriteriaConfig).values({ type, config, updatedBy: req.user.id });
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('scoring-criteria PUT error', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   // PUT /api/super-admin/email-templates/:name — update template content

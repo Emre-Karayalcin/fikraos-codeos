@@ -894,6 +894,34 @@ export const judgeEvaluations = pgTable("judge_evaluations", {
 
 export type JudgeEvaluation = typeof judgeEvaluations.$inferSelect;
 
+// ── Scoring Criteria Config (super-admin editable) ────────────────────────────
+export interface ScoringQuestion {
+  id: string;
+  label: string;
+  weight: number;
+}
+export interface ScoringCategory {
+  id: string;
+  name: string;
+  weight: number;
+  color: string;
+  questions: ScoringQuestion[];
+}
+export interface ScoringConfig {
+  categories: ScoringCategory[];
+}
+
+export const scoringCriteriaConfig = pgTable("scoring_criteria_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: varchar("type", { length: 20 }).notNull().unique(), // 'pmo' | 'judge'
+  config: jsonb("config").$type<ScoringConfig>().notNull(),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ScoringCriteriaConfig = typeof scoringCriteriaConfig.$inferSelect;
+
 // Event speakers
 export const eventSpeakers = pgTable("event_speakers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

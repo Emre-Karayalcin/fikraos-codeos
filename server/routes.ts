@@ -12,7 +12,7 @@ import mentorRoutes from "./mentor-routes";
 import { registerIdeaRoutes } from "./idea-routes";
 import { registerWorkspaceRoutes } from "./workspace-routes";
 import { registerChallengeRoutes } from "./challenge-routes";
-import { registerSuperAdminRoutes } from "./super-admin-routes";
+import { registerSuperAdminRoutes, getScoringConfig } from "./super-admin-routes";
 import { registerEventRoutes } from "./events-routes";
 import multer from 'multer'; // ✅ Add multer import
 import path from 'path'; // ✅ Add path import
@@ -1413,6 +1413,11 @@ export function registerRoutes(app: Express): Server {
       const tn1 = toNum(t1), tn2 = toNum(t2), tn3 = toNum(t3), tn4 = toNum(t4);
       const sn1 = toNum(s1), sn2 = toNum(s2), sn3 = toNum(s3);
 
+      // Load weights from DB (falls back to defaults if not configured)
+      const pmoConfig = await getScoringConfig('pmo');
+      const allQuestions = pmoConfig.categories.flatMap(c => c.questions);
+      const getW = (id: string) => allQuestions.find(q => q.id === id)?.weight ?? 0;
+
       const computeScore = (vals: (number | null)[], weights: number[]) => {
         let score = 0;
         for (let i = 0; i < vals.length; i++) {
@@ -1422,7 +1427,7 @@ export function registerRoutes(app: Express): Server {
       };
       const raw = computeScore(
         [bn1, bn2, bn3, bn4, bn5, tn1, tn2, tn3, tn4, sn1, sn2, sn3],
-        [10, 8, 8, 8, 6, 10, 8, 6, 6, 12, 10, 8]
+        ['b1','b2','b3','b4','b5','t1','t2','t3','t4','s1','s2','s3'].map(getW)
       );
       const totalScore = Math.round(raw);
 
@@ -1735,11 +1740,16 @@ export function registerRoutes(app: Express): Server {
       const pn1=toNum(p1), pn2=toNum(p2), pn3=toNum(p3), pn4=toNum(p4);
       const en1=toNum(e1), en2=toNum(e2), en3=toNum(e3);
 
+      // Load weights from DB
+      const judgeConfig = await getScoringConfig('judge');
+      const judgeQs = judgeConfig.categories.flatMap(c => c.questions);
+      const jw = (id: string) => judgeQs.find(q => q.id === id)?.weight ?? 0;
+
       const safe = (v: number | null, weight: number) => v != null ? (v / 5) * weight : 0;
       const totalScore = Math.round(
-        safe(dn1,8) + safe(dn2,8) + safe(dn3,8) + safe(dn4,8) + safe(dn5,8) +
-        safe(pn1,8) + safe(pn2,8) + safe(pn3,8) + safe(pn4,6) +
-        safe(en1,10) + safe(en2,10) + safe(en3,10)
+        safe(dn1,jw('d1')) + safe(dn2,jw('d2')) + safe(dn3,jw('d3')) + safe(dn4,jw('d4')) + safe(dn5,jw('d5')) +
+        safe(pn1,jw('p1')) + safe(pn2,jw('p2')) + safe(pn3,jw('p3')) + safe(pn4,jw('p4')) +
+        safe(en1,jw('e1')) + safe(en2,jw('e2')) + safe(en3,jw('e3'))
       );
 
       const [existing] = await db
