@@ -1,10 +1,114 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SuperAdminSidebar } from '@/components/admin/SuperAdminSidebar';
-import { Brain, ClipboardList, Trophy, ChevronDown, ChevronRight, Info, FileCode2, Cpu, Pencil, Save, X } from 'lucide-react';
+import { Brain, ClipboardList, Trophy, ChevronDown, ChevronRight, Info, FileCode2, Cpu, Pencil, Save, X, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
+
+// ─── Score level descriptions (0–5) per question ID ──────────────────────────
+
+const SCORE_DESCRIPTIONS: Record<string, string[]> = {
+  // Business Maturity
+  b1: [
+    'No clear problem statement and no evidence of market need.',
+    'Problem is vaguely stated; market need is assumed only.',
+    'Problem is somewhat defined; limited or anecdotal evidence of need.',
+    'Problem is clear; some research, interviews, or evidence supports demand.',
+    'Problem is well defined and supported by solid market research or validation.',
+    'Problem is exceptionally clear, urgent, and strongly validated by robust market evidence.',
+  ],
+  b2: [
+    'No clear target customer identified.',
+    'Customer definition is extremely broad or unclear.',
+    'Customer segment is partially identified but lacks specificity.',
+    'Target customer is reasonably clear, with some segmentation and rationale.',
+    'Target customer is clearly defined, specific, and well justified.',
+    'Target customer is highly specific, deeply understood, and supported by strong insight or evidence.',
+  ],
+  b3: [
+    'No revenue model presented.',
+    'Revenue model is unclear or unrealistic.',
+    'Basic revenue model provided, but assumptions are weak or incomplete.',
+    'Revenue model is clear and somewhat realistic, with reasonable assumptions.',
+    'Revenue model is well explained, realistic, and supported by sound assumptions.',
+    'Revenue model is highly credible, financially robust, and clearly linked to business viability.',
+  ],
+  b4: [
+    'No traction or validation evidence.',
+    'Minimal claims of interest with no real proof.',
+    'Early validation exists, such as conversations, surveys, or informal testing.',
+    'Some meaningful traction exists, such as pilots, early users, or partnership interest.',
+    'Strong traction exists, such as active pilots, paying users, signed partnerships, or measurable engagement.',
+    'Compelling traction exists with multiple strong validation signals and measurable market pull.',
+  ],
+  b5: [
+    'No scaling plan provided.',
+    'Scaling plan is vague and unrealistic.',
+    'Some scaling ideas are mentioned, but they lack detail or feasibility.',
+    'Scaling plan is reasonably clear and achievable.',
+    'Scaling plan is clear, realistic, and supported by logical growth steps.',
+    'Scaling plan is highly credible, well structured, and demonstrates strong understanding of growth levers and constraints.',
+  ],
+  // Technical Maturity
+  t1: [
+    'No prototype or proof of concept exists.',
+    'Only a concept or mockup exists.',
+    'Early prototype exists, but functionality is very limited.',
+    'A working prototype or proof of concept demonstrates core functionality.',
+    'A strong working prototype exists and demonstrates key use cases well.',
+    'A highly functional prototype exists, is tested, and clearly proves feasibility.',
+  ],
+  t2: [
+    'Technical feasibility is not demonstrated.',
+    'Feasibility appears doubtful or unsupported.',
+    'Feasibility is partially addressed, but significant uncertainty remains.',
+    'Feasibility is reasonably demonstrated based on current progress.',
+    'Feasibility is clearly demonstrated with solid technical progress.',
+    'Feasibility is strongly proven, with substantial progress and minimal uncertainty.',
+  ],
+  t3: [
+    'No consideration of technical scalability.',
+    'Major technical barriers are evident and unresolved.',
+    'Some scalability thinking exists, but major concerns remain.',
+    'Solution appears moderately scalable with manageable barriers.',
+    'Solution is designed with clear scalability considerations and limited barriers.',
+    'Solution shows strong technical scalability with a well considered architecture and low execution risk.',
+  ],
+  t4: [
+    'No technical risks identified.',
+    'Risks are barely acknowledged and no mitigation is provided.',
+    'Some risks are identified, but mitigation is weak or incomplete.',
+    'Key risks are identified with reasonable mitigation plans.',
+    'Risks are clearly identified and supported by strong, practical mitigation plans.',
+    'Risk management is comprehensive, proactive, and shows strong technical judgment.',
+  ],
+  // Strategic Alignment
+  s1: [
+    'No alignment with the Program Objective is shown.',
+    'Alignment is weak or asserted without explanation.',
+    'Some alignment exists, but the connection is not fully clear.',
+    'Project is reasonably aligned with the Program Objective.',
+    'Project is clearly and strongly aligned with the Program Objective.',
+    'Project is exceptionally well aligned and directly advances the Program Objective in a compelling way.',
+  ],
+  s2: [
+    'No impact is defined.',
+    'Impact is vague and not measurable.',
+    'Some intended impact is stated, but measures are weak or unclear.',
+    'Expected impact is clear and partially measurable.',
+    'Expected impact is clearly defined with strong measurable indicators.',
+    'Expected impact is highly clear, meaningful, and supported by specific, credible metrics.',
+  ],
+  s3: [
+    'No contribution to national or sector priorities is evident.',
+    'Contribution is claimed but not explained.',
+    'Some relevance exists, but the connection is weak or generic.',
+    'Solution shows reasonable contribution to relevant priorities.',
+    'Solution clearly contributes to important national or sector-level priorities.',
+    'Solution strongly advances strategic national or sector priorities in a clear and well evidenced way.',
+  ],
+};
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -246,6 +350,66 @@ function EditableScoringSection({ title, icon: Icon, headerColor, description, t
   );
 }
 
+const SCORE_COLORS = ['bg-red-100 text-red-700', 'bg-orange-100 text-orange-700', 'bg-yellow-100 text-yellow-700', 'bg-lime-100 text-lime-700', 'bg-green-100 text-green-700', 'bg-emerald-100 text-emerald-700'];
+
+function QuestionRow({ q, catIdx, qIdx, editing, color, maxW, onUpdateQuestion }: {
+  q: ScoringQuestion; catIdx: number; qIdx: number; editing: boolean; color: string; maxW: number;
+  onUpdateQuestion: (catIdx: number, qIdx: number, field: 'label' | 'weight', value: string | number) => void;
+}) {
+  const [descOpen, setDescOpen] = useState(false);
+  const descs = SCORE_DESCRIPTIONS[q.id];
+
+  return (
+    <div className="divide-y divide-border">
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${ACCENT[color]} opacity-70 shrink-0`}>{q.id}</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm">{q.label}</span>
+        </div>
+        {descs && !editing && (
+          <button
+            onClick={() => setDescOpen(v => !v)}
+            className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+            title="View score descriptions"
+          >
+            <BookOpen className="w-3 h-3" />
+            <span className="hidden sm:inline">Guide</span>
+            {descOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          </button>
+        )}
+        {editing ? (
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            value={q.weight}
+            onChange={e => onUpdateQuestion(catIdx, qIdx, 'weight', e.target.value)}
+            className="w-16 h-7 text-xs text-center px-1 shrink-0"
+          />
+        ) : (
+          <div className={`w-28 shrink-0 ${ACCENT[color].split(' ')[1]}`}>
+            <WeightBar weight={q.weight} max={maxW || 12} />
+          </div>
+        )}
+        {editing && <span className="text-xs text-muted-foreground w-4 shrink-0">%</span>}
+      </div>
+      {descOpen && descs && (
+        <div className="px-4 py-3 bg-muted/30">
+          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Score guide (0–5)</p>
+          <div className="space-y-1.5">
+            {descs.map((desc, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <span className={`shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center ${SCORE_COLORS[i]}`}>{i}</span>
+                <span className="text-xs text-muted-foreground leading-relaxed">{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CategoryBlock({ cat, catIdx, editing, onUpdateQuestion }: {
   cat: ScoringCategory; catIdx: number; editing: boolean;
   onUpdateQuestion: (catIdx: number, qIdx: number, field: 'label' | 'weight', value: string | number) => void;
@@ -265,25 +429,16 @@ function CategoryBlock({ cat, catIdx, editing, onUpdateQuestion }: {
       {open && (
         <div className="divide-y divide-border">
           {cat.questions.map((q, qIdx) => (
-            <div key={q.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${ACCENT[cat.color]} opacity-70`}>{q.id}</span>
-              <span className="flex-1 text-sm">{q.label}</span>
-              {editing ? (
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={q.weight}
-                  onChange={e => onUpdateQuestion(catIdx, qIdx, 'weight', e.target.value)}
-                  className="w-16 h-7 text-xs text-center px-1"
-                />
-              ) : (
-                <div className={`w-28 ${ACCENT[cat.color].split(' ')[1]}`}>
-                  <WeightBar weight={q.weight} max={maxW || 12} />
-                </div>
-              )}
-              {editing && <span className="text-xs text-muted-foreground w-4">%</span>}
-            </div>
+            <QuestionRow
+              key={q.id}
+              q={q}
+              catIdx={catIdx}
+              qIdx={qIdx}
+              editing={editing}
+              color={cat.color}
+              maxW={maxW}
+              onUpdateQuestion={onUpdateQuestion}
+            />
           ))}
         </div>
       )}
