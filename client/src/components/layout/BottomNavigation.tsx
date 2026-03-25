@@ -147,7 +147,7 @@ export function BottomNavigation() {
     {
       id: "academy",
       icon: GraduationCap,
-      label: "Academy",
+      label: "Training Modules",
       path: currentWorkspaceSlug ? `/w/${currentWorkspaceSlug}/academy` : "/academy",
       testId: "nav-academy",
       enabled: currentOrg?.academyEnabled !== false

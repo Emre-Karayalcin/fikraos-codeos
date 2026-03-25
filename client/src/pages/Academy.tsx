@@ -80,10 +80,10 @@ function AcademyHome() {
 
           <div className="relative z-10 px-6 py-8 sm:px-8 sm:py-10">
             <h1 className="text-2xl sm:text-3xl font-bold mb-3">
-              Learn Anything with FikraHub Academy
+              Learn Anything with FikraHub Training Modules
             </h1>
             <p className="text-sm sm:text-base text-white/90 max-w-2xl">
-              Unleash your potential with FikraHub Academy, our gateway to mastering essential skills and driving personal growth.
+              Unleash your potential with FikraHub Training Modules, our gateway to mastering essential skills and driving personal growth.
             </p>
           </div>
         </div>
@@ -192,7 +192,7 @@ function CourseContents({ courseSlug }: { courseSlug: string }) {
           className="mb-3"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Academy
+          Back to Training Modules
         </Button>
         <div className="flex items-center gap-3">
           <BookOpen className="w-6 h-6 text-primary" />
@@ -418,7 +418,7 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
           onClick={() => setLocation(`/w/${currentSlug}/academy`)}
           className="mt-4"
         >
-          Back to Academy
+          Back to Training Modules
         </Button>
       </div>
     );

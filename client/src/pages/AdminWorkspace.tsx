@@ -418,9 +418,9 @@ export default function AdminWorkspace() {
 
                 <div className="flex items-center justify-between flex-row">
                   <div className="space-y-0.5 ltr:text-left rtl:text-right">
-                    <Label htmlFor="academy">Academy</Label>
+                    <Label htmlFor="academy">Training Modules</Label>
                     <p className="text-sm text-muted-foreground">
-                      Show the Academy video tutorial library for workspace members
+                      Show the Training Modules video tutorial library for workspace members
                     </p>
                   </div>
                   <Switch

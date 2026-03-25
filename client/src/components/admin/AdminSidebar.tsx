@@ -114,7 +114,7 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           icon: Mail,
         },
         {
-          titleKey: 'Academy',
+          titleKey: 'Training Modules',
           href: `/w/${workspaceSlug}/admin/academy`,
           icon: Video,
         },

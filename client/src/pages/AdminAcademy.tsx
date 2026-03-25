@@ -98,7 +98,7 @@ export default function AdminAcademy() {
             <div className="flex items-center gap-3">
               <BookOpen className="w-8 h-8 text-primary" />
               <div>
-                <h1 className="text-3xl font-bold">Academy</h1>
+                <h1 className="text-3xl font-bold">Training Modules</h1>
                 <p className="text-muted-foreground">Manage courses and learning content</p>
               </div>
             </div>

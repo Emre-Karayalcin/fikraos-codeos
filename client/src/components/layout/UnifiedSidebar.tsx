@@ -797,7 +797,7 @@ export function UnifiedSidebar() {
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="right">
-                        <p>Academy</p>
+                        <p>Training Modules</p>
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -950,7 +950,7 @@ export function UnifiedSidebar() {
                       data-testid="nav-academy"
                     >
                       <GraduationCap className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
-                      <span className="text-sm font-medium">Academy</span>
+                      <span className="text-sm font-medium">Training Modules</span>
                     </div>
                   )}
 

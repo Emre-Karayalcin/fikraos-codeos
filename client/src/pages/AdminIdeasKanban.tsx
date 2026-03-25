@@ -162,7 +162,7 @@ function DraggableIdeaCard({ item, onClick, onDelete, academyPct, aiScore }: { i
               <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
                 <div className="flex items-center gap-1">
                   <GraduationCap className="w-3 h-3" />
-                  <span>Academy</span>
+                  <span>Training Modules</span>
                 </div>
                 <span className={academyPct === 100 ? 'text-green-600 font-medium' : ''}>{academyPct}%</span>
               </div>
