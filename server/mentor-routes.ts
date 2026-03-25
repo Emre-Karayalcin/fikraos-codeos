@@ -7,6 +7,8 @@ import { Resend } from "resend";
 const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const EMAIL_FROM = process.env.EMAIL_FROM || "no-reply@fikrahub.com";
 const CALENDLY_API_BASE = process.env.CALENDLY_API_BASE || "https://api.calendly.com";
+// Platform-wide fallback event type URI — used when mentor has no personal Calendly config
+const CALENDLY_DEFAULT_EVENT_TYPE_URI = process.env.CALENDLY_EVENT_TYPE_URI || null;
 
 const router = Router();
 
@@ -211,10 +213,21 @@ router.post("/mentor-bookings", async (req: any, res) => {
 
     const memberName = `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim();
     const normalizedCalendlyLink = normalizeCalendlyUrl(mentorProfile.calendlyLink);
-    const meetingProvider = normalizedCalendlyLink || mentorProfile.calendlyEventTypeUri ? "CALENDLY" : "INTERNAL";
-    const initialMeetingLink = normalizedCalendlyLink
-      ? buildCalendlyPrefillLink(normalizedCalendlyLink, memberName, req.user.email || "", bookedDate, bookedTime)
-      : null;
+
+    // Resolve which event type URI to use: mentor-specific → platform default
+    const effectiveEventTypeUri = mentorProfile.calendlyEventTypeUri || CALENDLY_DEFAULT_EVENT_TYPE_URI;
+    const meetingProvider = normalizedCalendlyLink || effectiveEventTypeUri ? "CALENDLY" : "INTERNAL";
+
+    // Try to generate a single-use scheduling link via Calendly API at booking time
+    let initialMeetingLink: string | null = null;
+    if (effectiveEventTypeUri) {
+      const generated = await createCalendlySchedulingLink(effectiveEventTypeUri);
+      if (generated?.bookingUrl) initialMeetingLink = generated.bookingUrl;
+    }
+    // Fallback to prefill link from mentor's public Calendly URL
+    if (!initialMeetingLink && normalizedCalendlyLink) {
+      initialMeetingLink = buildCalendlyPrefillLink(normalizedCalendlyLink, memberName, req.user.email || "", bookedDate, bookedTime);
+    }
 
     // Check for conflicts
     const [existing] = await db
@@ -630,8 +643,10 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
         .where(eq(users.id, booking.userId))
         .limit(1);
 
-      if (mentorConfig?.calendlyEventTypeUri) {
-        const generated = await createCalendlySchedulingLink(mentorConfig.calendlyEventTypeUri);
+      // Use mentor-specific URI or fall back to platform-wide default
+      const confirmEventTypeUri = mentorConfig?.calendlyEventTypeUri || CALENDLY_DEFAULT_EVENT_TYPE_URI;
+      if (confirmEventTypeUri) {
+        const generated = await createCalendlySchedulingLink(confirmEventTypeUri);
         if (generated?.bookingUrl) {
           meetingLink = generated.bookingUrl;
           calendlyEventUri = generated.resourceUri || null;
