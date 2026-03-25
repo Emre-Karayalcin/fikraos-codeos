@@ -1253,14 +1253,45 @@ export default function AdminIdeaDetail() {
             </TabsContent>
 
             {/* Pitch Decks Tab */}
-            <TabsContent value="pitch-decks" className="mt-6">
+            <TabsContent value="pitch-decks" className="mt-6 space-y-4">
+              {/* Uploaded pitch deck (from user submission) */}
+              {idea?.pitchDeckUrl && (
+                <Card className="border-blue-500/30 bg-blue-500/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <FileText className="w-4 h-4 text-blue-500" />
+                      Uploaded Pitch Deck
+                    </CardTitle>
+                    <CardDescription>Submitted by the idea owner</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between p-3 border border-blue-500/20 rounded-lg bg-background">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                        <span className="text-sm font-medium truncate">{idea.pitchDeckUrl}</span>
+                      </div>
+                      <a
+                        href={idea.pitchDeckUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline shrink-0 ml-3"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Open
+                      </a>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* AI-generated pitch decks */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="w-5 h-5" />
-                    Pitch Decks
+                    Generated Pitch Decks
                   </CardTitle>
-                  <CardDescription>Generated pitch decks for this idea</CardDescription>
+                  <CardDescription>AI-generated pitch decks for this idea</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {pitchDecks.length === 0 ? (
