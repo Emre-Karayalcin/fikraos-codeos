@@ -62,7 +62,7 @@ async function createCalendlySchedulingLink(eventTypeUri: string): Promise<{ boo
 
     if (!response.ok) {
       const body = await response.text();
-      console.warn("Calendly scheduling link generation failed:", response.status, body);
+      console.error("❌ Calendly scheduling link generation failed:", response.status, body);
       return null;
     }
 
@@ -75,7 +75,7 @@ async function createCalendlySchedulingLink(eventTypeUri: string): Promise<{ boo
       resourceUri: data?.resource?.owner,
     };
   } catch (error) {
-    console.warn("Calendly scheduling link generation error:", error);
+    console.error("❌ Calendly scheduling link generation error:", error);
     return null;
   }
 }
@@ -713,6 +713,80 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
     }
 
     res.json(updated);
+
+    // Fire-and-forget: notify member when booking is CONFIRMED or CANCELLED
+    if (resendClient && updated && (status === "CONFIRMED" || status === "CANCELLED")) {
+      (async () => {
+        try {
+          const [memberUser] = await db
+            .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+            .from(users)
+            .where(eq(users.id, updated.userId));
+
+          const [mentorUser] = await db
+            .select({ firstName: users.firstName, lastName: users.lastName })
+            .from(mentorProfiles)
+            .innerJoin(users, eq(mentorProfiles.userId, users.id))
+            .where(eq(mentorProfiles.id, updated.mentorProfileId));
+
+          if (!memberUser?.email) return;
+
+          const memberName = `${memberUser.firstName || ""} ${memberUser.lastName || ""}`.trim() || memberUser.email;
+          const mentorName = `${mentorUser?.firstName || ""} ${mentorUser?.lastName || ""}`.trim() || "your mentor";
+          const hostUrl = process.env.HOST_URL || "https://os.fikrahub.com";
+
+          if (status === "CONFIRMED") {
+            const meetingLinkRow = `
+              ${updated.meetingLink ? `<tr><td style="padding:10px 14px;color:#6b7280;font-size:13px;font-weight:600;white-space:nowrap">🔗 Meeting Link</td><td style="padding:10px 14px;font-size:14px"><a href="${updated.meetingLink}" style="color:#4f46e5;font-weight:600">Join Session</a></td></tr>` : ""}
+            `;
+            await resendClient.emails.send({
+              from: EMAIL_FROM,
+              to: memberUser.email,
+              subject: `✅ Your session with ${mentorName} is confirmed`,
+              html: `
+                <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+                  <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:28px 32px;border-radius:12px 12px 0 0">
+                    <h2 style="color:white;margin:0;font-size:22px">✅ Session Confirmed</h2>
+                    <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:14px">Your session with ${mentorName} is confirmed</p>
+                  </div>
+                  <div style="background:#f9fafb;padding:28px 32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none">
+                    <p style="color:#374151">Hi ${memberName},</p>
+                    <p style="color:#374151">Great news! <strong>${mentorName}</strong> has confirmed your mentoring session.</p>
+                    <table style="width:100%;border-collapse:collapse;margin:20px 0;background:white;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb">
+                      <tr style="background:#f3f4f6"><td style="padding:10px 14px;color:#6b7280;font-size:13px;font-weight:600;white-space:nowrap">📅 Date</td><td style="padding:10px 14px;color:#111827;font-size:14px">${updated.bookedDate}</td></tr>
+                      <tr><td style="padding:10px 14px;color:#6b7280;font-size:13px;font-weight:600;white-space:nowrap">🕐 Time</td><td style="padding:10px 14px;color:#111827;font-size:14px">${updated.bookedTime}</td></tr>
+                      <tr style="background:#f3f4f6"><td style="padding:10px 14px;color:#6b7280;font-size:13px;font-weight:600;white-space:nowrap">⏱ Duration</td><td style="padding:10px 14px;color:#111827;font-size:14px">${updated.durationMinutes} minutes</td></tr>
+                      ${meetingLinkRow}
+                    </table>
+                    ${updated.meetingLink
+                      ? `<div style="text-align:center;margin:24px 0"><a href="${updated.meetingLink}" style="background:#4f46e5;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">Join Session via Calendly</a></div>`
+                      : `<p style="color:#6b7280;font-size:13px">The meeting link will be shared by your mentor before the session.</p>`
+                    }
+                    <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from CodeOS.</p>
+                  </div>
+                </div>`,
+            });
+            console.log(`✅ Booking confirmation email sent to member: ${memberUser.email}`);
+          } else if (status === "CANCELLED") {
+            await resendClient.emails.send({
+              from: EMAIL_FROM,
+              to: memberUser.email,
+              subject: `Session with ${mentorName} has been cancelled`,
+              html: `
+                <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:28px 32px;background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb">
+                  <p>Hi ${memberName},</p>
+                  <p>Unfortunately, your session with <strong>${mentorName}</strong> on <strong>${updated.bookedDate} at ${updated.bookedTime}</strong> has been cancelled.</p>
+                  <p>You can book a new session from the <a href="${hostUrl}" style="color:#4f46e5">dashboard</a>.</p>
+                  <p style="color:#6b7280;font-size:12px">This is an automated notification from CodeOS.</p>
+                </div>`,
+            });
+            console.log(`✅ Booking cancellation email sent to member: ${memberUser.email}`);
+          }
+        } catch (emailErr) {
+          console.error("Failed to send booking status email:", emailErr);
+        }
+      })();
+    }
   } catch (error) {
     console.error("Error updating booking status:", error);
     res.status(500).json({ message: "Failed to update booking" });
