@@ -13,6 +13,7 @@ import {
   FiBookOpen,
   FiLogOut,
   FiSearch,
+  FiCalendar,
   FiStar,
 } from "react-icons/fi";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -231,12 +232,12 @@ export default function Dashboard() {
       path: `/w/${slug}/challenges`,
     },
     {
-      id: 'research',
-      title: 'Research',
-      description: 'Explore market insights',
-      icon: FiSearch,
+      id: 'events',
+      title: 'Events',
+      description: 'View upcoming events',
+      icon: FiCalendar,
       color: 'text-purple-600',
-      path: `/w/${slug}/research`,
+      path: `/w/${slug}/events`,
     },
     {
       id: 'experts',
