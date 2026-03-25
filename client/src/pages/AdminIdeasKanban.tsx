@@ -81,7 +81,7 @@ function DroppableColumn({ status, children }: { status: { id: string; label: st
 }
 
 // Draggable Card Component
-function DraggableIdeaCard({ item, onClick, onDelete, academyPct, aiScore, onAccept, onReject }: { item: Idea; onClick: () => void; onDelete: () => void; academyPct?: number; aiScore?: number | null; onAccept?: () => void; onReject?: () => void }) {
+function DraggableIdeaCard({ item, onClick, onDelete, academyPct, aiScore, isRejected }: { item: Idea; onClick: () => void; onDelete: () => void; academyPct?: number; aiScore?: number | null; isRejected?: boolean }) {
   const {
     attributes,
     listeners,
@@ -98,9 +98,9 @@ function DraggableIdeaCard({ item, onClick, onDelete, academyPct, aiScore, onAcc
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={isRejected ? 'opacity-50' : undefined}>
       <Card
-        className="cursor-move hover:shadow-md transition-shadow"
+        className={`cursor-move hover:shadow-md transition-shadow ${isRejected ? 'border-dashed' : ''}`}
         onClick={(e) => {
           console.log('🎯 Card clicked:', { ideaId: item.idea.id, isDragging, title: item.idea.title });
           if (!isDragging) {
@@ -189,25 +189,9 @@ function DraggableIdeaCard({ item, onClick, onDelete, academyPct, aiScore, onAcc
               )}
             </div>
           )}
-          {/* Accept / Reject buttons — shown only on BACKLOG cards */}
-          {(onAccept || onReject) && (
-            <div className="flex gap-1.5 pt-1" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-              {onAccept && (
-                <button
-                  onClick={onAccept}
-                  className="flex-1 text-[11px] font-medium py-1 rounded-md bg-green-500/10 text-green-700 border border-green-500/30 hover:bg-green-500/20 transition-colors"
-                >
-                  ✓ Accept
-                </button>
-              )}
-              {onReject && (
-                <button
-                  onClick={onReject}
-                  className="flex-1 text-[11px] font-medium py-1 rounded-md bg-red-500/10 text-red-700 border border-red-500/30 hover:bg-red-500/20 transition-colors"
-                >
-                  ✗ Reject
-                </button>
-              )}
+          {isRejected && (
+            <div className="pt-1">
+              <span className="inline-flex items-center text-[10px] font-medium bg-red-500/15 text-red-700 rounded-full px-2 py-0.5">✗ Application Rejected</span>
             </div>
           )}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
@@ -702,8 +686,7 @@ export default function AdminIdeasKanban() {
                               onDelete={() => { setDeleteIdeaId(item.idea.id); setIsDeleteOpen(true); }}
                               academyPct={academyProgress[item.owner.id]?.pct}
                               aiScore={aiScores[item.owner.id]?.aiScore}
-                              onAccept={status.id === 'BACKLOG' ? () => updateStatus.mutate({ id: item.idea.id, status: 'UNDER_REVIEW' }) : undefined}
-                              onReject={status.id === 'BACKLOG' ? () => updateStatus.mutate({ id: item.idea.id, status: 'ARCHIVED' }) : undefined}
+                              isRejected={status.id === 'BACKLOG' && aiScores[item.owner.id]?.appStatus === 'REJECTED'}
                             />
                           ))
                         )}
@@ -729,29 +712,6 @@ export default function AdminIdeasKanban() {
                         </div>
                       );
                     })()}
-
-                    {/* Rejected ideas ghost cards — ideas manually rejected by PMO (moved to ARCHIVED from BACKLOG) */}
-                    {status.id === 'BACKLOG' && getIdeasByStatus('ARCHIVED').length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-dashed border-border space-y-2">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Rejected Ideas ({getIdeasByStatus('ARCHIVED').length})</p>
-                        {getIdeasByStatus('ARCHIVED').map((item: Idea) => (
-                          <div key={item.idea.id} className="opacity-50 cursor-default">
-                            <Card className="border-dashed">
-                              <CardContent className="p-3 space-y-1">
-                                <p className="text-xs font-medium line-clamp-1">{item.idea.title}</p>
-                                <div className="flex items-center justify-between">
-                                  <span className="inline-flex items-center text-[10px] font-medium bg-red-500/15 text-red-700 rounded-full px-2 py-0.5">✗ Rejected</span>
-                                  <span className="text-[10px] text-muted-foreground">{item.owner.username}</span>
-                                </div>
-                                {item.idea.createdAt && (
-                                  <p className="text-[10px] text-muted-foreground">{new Date(item.idea.createdAt).toLocaleDateString()}</p>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </div>
-                        ))}
-                      </div>
-                    )}
 
                     {/* Rejected application ghost cards — shown only in Registration & Idea Evaluation column */}
                     {status.id === 'BACKLOG' && rejectedApps.length > 0 && (
