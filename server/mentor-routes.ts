@@ -230,7 +230,12 @@ router.post("/mentor-bookings", async (req: any, res) => {
             url.searchParams.set('month', bookedDate.substring(0, 7)); // YYYY-MM
             url.searchParams.set('date', bookedDate); // YYYY-MM-DD
           }
-          if (bookedTime) url.searchParams.set('time', bookedTime); // HH:MM
+          // Calendly expects ISO 8601 UTC timestamp for time prefill
+          // e.g. 2026-03-31T08:00:00.000000Z
+          if (bookedDate && bookedTime) {
+            const isoTime = `${bookedDate}T${bookedTime}:00.000000Z`;
+            url.searchParams.set('time', isoTime);
+          }
           if (memberName) url.searchParams.set('name', memberName);
           if (req.user.email) url.searchParams.set('email', req.user.email);
           initialMeetingLink = url.toString();
