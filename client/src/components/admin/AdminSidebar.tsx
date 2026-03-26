@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
   GraduationCap, ClipboardList, Mail, BarChart2, BookOpen, CalendarDays,
-  ClipboardCheck, MessageSquare, Video, Presentation,
+  ClipboardCheck, MessageSquare, Video, Presentation, Map,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -97,6 +97,16 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           titleKey: 'Mentor Feedback',
           href: `/w/${workspaceSlug}/admin/mentor-feedback`,
           icon: MessageSquare,
+        },
+      ],
+    },
+    {
+      label: 'Program',
+      items: [
+        {
+          titleKey: 'Program Roadmap',
+          href: `/w/${workspaceSlug}/admin/program-roadmap`,
+          icon: Map,
         },
       ],
     },

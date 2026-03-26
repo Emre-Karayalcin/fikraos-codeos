@@ -1073,6 +1073,83 @@ export const insertChallengeSubmissionSchema = createInsertSchema(challengeSubmi
   updatedAt: true,
 });
 
+// ── PMO Program Roadmap ───────────────────────────────────────────────────────
+// Unlock rules JSONB shape
+export interface UnlockCondition {
+  type: "requires_module" | "requires_score_gte" | "always_open";
+  moduleId?: string;   // for requires_module
+  scoreGte?: number;   // 0-100, for requires_score_gte
+}
+
+export interface ModuleUnlockRules {
+  mode: "all" | "any";
+  conditions: UnlockCondition[];
+}
+
+export const programModules = pgTable("program_modules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  titleAr: text("title_ar"),
+  description: text("description"),
+  descriptionAr: text("description_ar"),
+  stageIndex: integer("stage_index").notNull().default(1),  // which program step (1-4)
+  order: integer("order").notNull().default(0),             // position within the stage
+  status: text("status").notNull().default("draft"),        // draft | published | archived
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  location: text("location"),
+  locationType: text("location_type").notNull().default("online"), // online | in_person | hybrid
+  meetingLink: text("meeting_link"),
+  unlockRules: jsonb("unlock_rules").$type<ModuleUnlockRules>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ProgramModule = typeof programModules.$inferSelect;
+
+export const moduleResources = pgTable("module_resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  moduleId: varchar("module_id").notNull().references(() => programModules.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  type: text("type").notNull().default("link"), // pdf | video | link | doc | slides
+  url: text("url").notNull(),
+  description: text("description"),
+  order: integer("order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ModuleResource = typeof moduleResources.$inferSelect;
+
+export const moduleMentors = pgTable("module_mentors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  moduleId: varchar("module_id").notNull().references(() => programModules.id, { onDelete: "cascade" }),
+  mentorProfileId: varchar("mentor_profile_id").notNull().references(() => mentorProfiles.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("support"), // lead | support
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("module_mentors_unique").on(t.moduleId, t.mentorProfileId),
+]);
+
+export type ModuleMentor = typeof moduleMentors.$inferSelect;
+
+export const moduleConsultations = pgTable("module_consultations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  moduleId: varchar("module_id").notNull().references(() => programModules.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  durationMinutes: integer("duration_minutes").notNull().default(60),
+  mentorProfileId: varchar("mentor_profile_id").references(() => mentorProfiles.id, { onDelete: "set null" }),
+  maxAttendees: integer("max_attendees"),
+  location: text("location"),
+  meetingLink: text("meeting_link"),
+  notes: text("notes"),
+  status: text("status").notNull().default("scheduled"), // scheduled | completed | cancelled
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ModuleConsultation = typeof moduleConsultations.$inferSelect;
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
