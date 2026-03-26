@@ -342,7 +342,7 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
                   Connect your Calendly account so members get a personal scheduling link when booking sessions with you.
                 </p>
                 <a
-                  href="/api/mentor/calendly/connect"
+                  href={`/api/mentor/calendly/connect?returnTo=${encodeURIComponent(window.location.pathname)}`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
                 >
                   <Link2 className="w-4 h-4" /> Connect Calendly

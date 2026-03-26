@@ -1113,11 +1113,14 @@ router.get("/mentor/calendly/connect", async (req: any, res) => {
   if (!CALENDLY_CLIENT_ID || !CALENDLY_REDIRECT_URI) {
     return res.status(501).json({ message: "Calendly OAuth not configured (CALENDLY_CLIENT_ID / CALENDLY_REDIRECT_URI missing)" });
   }
+  // Encode returnTo in state: "userId|/w/slug/dashboard"
+  const returnTo = (req.query.returnTo as string) || "/";
+  const state = `${req.user.id}|${returnTo}`;
   const params = new URLSearchParams({
     client_id: CALENDLY_CLIENT_ID,
     response_type: "code",
     redirect_uri: CALENDLY_REDIRECT_URI,
-    state: req.user.id, // simple CSRF: verify on callback
+    state,
   });
   res.redirect(`https://auth.calendly.com/oauth/authorize?${params}`);
 });
@@ -1128,11 +1131,16 @@ router.get("/mentor/calendly/callback", async (req: any, res) => {
   if (!req.user) return res.redirect(`${frontendBase}?calendly=error&reason=unauthenticated`);
 
   const { code, state, error } = req.query as Record<string, string>;
-  if (error) return res.redirect(`${frontendBase}?calendly=error&reason=${encodeURIComponent(error)}`);
-  if (!code) return res.redirect(`${frontendBase}?calendly=error&reason=no_code`);
-  if (state !== req.user.id) return res.redirect(`${frontendBase}?calendly=error&reason=invalid_state`);
+  // Parse state: "userId|returnPath"
+  const [stateUserId, ...returnParts] = (state || "").split("|");
+  const returnPath = returnParts.join("|") || "/";
+  const returnBase = `${frontendBase}${returnPath}`;
+
+  if (error) return res.redirect(`${returnBase}?calendly=error&reason=${encodeURIComponent(error)}`);
+  if (!code) return res.redirect(`${returnBase}?calendly=error&reason=no_code`);
+  if (stateUserId !== req.user.id) return res.redirect(`${returnBase}?calendly=error&reason=invalid_state`);
   if (!CALENDLY_CLIENT_ID || !CALENDLY_CLIENT_SECRET || !CALENDLY_REDIRECT_URI) {
-    return res.redirect(`${frontendBase}?calendly=error&reason=misconfigured`);
+    return res.redirect(`${returnBase}?calendly=error&reason=misconfigured`);
   }
 
   try {
@@ -1151,7 +1159,7 @@ router.get("/mentor/calendly/callback", async (req: any, res) => {
     if (!tokenRes.ok) {
       const body = await tokenRes.text();
       console.error("❌ Calendly token exchange failed:", tokenRes.status, body);
-      return res.redirect(`${frontendBase}?calendly=error&reason=token_exchange`);
+      return res.redirect(`${returnBase}?calendly=error&reason=token_exchange`);
     }
     const tokenData: any = await tokenRes.json();
     const { access_token, refresh_token, expires_in } = tokenData;
@@ -1185,10 +1193,10 @@ router.get("/mentor/calendly/callback", async (req: any, res) => {
       })
       .where(eq(mentorProfiles.userId, req.user.id));
 
-    res.redirect(`${frontendBase}?calendly=connected`);
+    res.redirect(`${returnBase}?calendly=connected`);
   } catch (err) {
     console.error("❌ Calendly OAuth callback error:", err);
-    res.redirect(`${frontendBase}?calendly=error&reason=server_error`);
+    res.redirect(`${returnBase}?calendly=error&reason=server_error`);
   }
 });
 
