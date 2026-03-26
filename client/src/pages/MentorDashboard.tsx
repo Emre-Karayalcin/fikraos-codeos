@@ -920,8 +920,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X, Plus, Trash2 } from "lucide-react";
-import { useMutation as _useMutation, useQueryClient as _useQueryClient } from "@tanstack/react-query";
+import { useMutation as _useMutation, useQueryClient as _useQueryClient, useQuery as _useQuery } from "@tanstack/react-query";
 import { useToast as _useToast } from "@/hooks/use-toast";
+import { CheckCircle2, Link2, Unlink } from "lucide-react";
 
 const DAYS_OF_WEEK = [
   { label: "Monday", value: 1 },
@@ -962,6 +963,91 @@ function TagInput({ label, tags, onChange }: { label: string; tags: string[]; on
           placeholder={tags.length === 0 ? "Type and press Enter or comma" : ""}
           className="flex-1 min-w-[120px] bg-transparent text-text-primary text-sm outline-none placeholder:text-text-secondary" />
       </div>
+    </div>
+  );
+}
+
+function CalendlySection() {
+  const { toast } = _useToast();
+  const queryClient = _useQueryClient();
+
+  const { data: status, refetch } = _useQuery<any>({
+    queryKey: ["/api/mentor/calendly/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/mentor/calendly/status", { credentials: "include" });
+      if (!res.ok) return { connected: false };
+      return res.json();
+    },
+  });
+
+  const disconnectMutation = _useMutation({
+    mutationFn: () => _apiRequest("DELETE", "/api/mentor/calendly/disconnect"),
+    onSuccess: () => { refetch(); toast({ title: "Calendly disconnected" }); },
+  });
+
+  const selectEventTypeMutation = _useMutation({
+    mutationFn: (eventTypeUri: string) => _apiRequest("PUT", "/api/mentor/calendly/event-type", { eventTypeUri }),
+    onSuccess: () => { refetch(); queryClient.invalidateQueries({ queryKey: ["/api/mentor/calendly/status"] }); toast({ title: "Event type saved" }); },
+  });
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-6">
+      <h2 className="font-semibold text-text-primary mb-4">Calendly Integration</h2>
+      {status?.connected ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-700 dark:text-green-300">{status.name}</p>
+                <p className="text-xs text-green-600/70 dark:text-green-400/70">{status.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => disconnectMutation.mutate()}
+              className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-400 transition-colors"
+            >
+              <Unlink className="w-3.5 h-3.5" /> Disconnect
+            </button>
+          </div>
+
+          {status.eventTypes?.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-text-secondary mb-2">Select event type for bookings:</p>
+              <div className="space-y-2">
+                {status.eventTypes.map((et: any) => (
+                  <button
+                    key={et.uri}
+                    type="button"
+                    onClick={() => selectEventTypeMutation.mutate(et.uri)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                      status.selectedEventTypeUri === et.uri
+                        ? "border-green-500 bg-green-500/10 text-green-700 dark:text-green-300"
+                        : "border-border bg-muted/30 text-text-primary hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="font-medium">{et.name}</span>
+                    <span className="text-xs text-text-secondary ml-2">{et.duration} min</span>
+                    {status.selectedEventTypeUri === et.uri && <span className="text-xs text-green-600 dark:text-green-400 ml-2">✓ Active</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-text-secondary">
+            Connect your Calendly account so members receive a personal scheduling link when they book a session with you.
+          </p>
+          <a
+            href="/api/mentor/calendly/connect"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
+          >
+            <Link2 className="w-4 h-4" /> Connect Calendly
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -1083,6 +1169,8 @@ function ProfileTab({ profile, onSaved }: { profile: any; onSaved: () => void })
           </Button>
         </div>
       </div>
+
+      <CalendlySection />
     </div>
   );
 }
