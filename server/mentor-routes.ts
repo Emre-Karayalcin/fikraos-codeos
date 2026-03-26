@@ -1132,21 +1132,17 @@ router.get("/mentor/calendly/callback", async (req: any, res) => {
   const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "";
   const frontendBase = `${proto}://${host}`;
 
-  console.log("📅 Calendly callback hit — user:", req.user?.id, "query:", JSON.stringify(req.query));
-
-  if (!req.user) return res.redirect(`${frontendBase}?calendly=error&reason=unauthenticated`);
-
   const { code, state, error } = req.query as Record<string, string>;
-  // Parse state: "userId|returnPath"
+  // Parse state: "userId|returnPath" — state is the source of truth since session
+  // cookie is often absent on cross-site redirects (SameSite restrictions)
   const [stateUserId, ...returnParts] = (state || "").split("|");
   const returnPath = returnParts.join("|") || "/";
   const returnBase = `${frontendBase}${returnPath}`;
 
-  console.log("📅 state userId:", stateUserId, "| returnPath:", returnPath, "| req.user.id:", req.user?.id);
+  console.log("📅 Calendly callback — stateUserId:", stateUserId, "| returnPath:", returnPath);
 
   if (error) return res.redirect(`${returnBase}?calendly=error&reason=${encodeURIComponent(error)}`);
-  if (!code) return res.redirect(`${returnBase}?calendly=error&reason=no_code`);
-  if (stateUserId !== req.user.id) return res.redirect(`${returnBase}?calendly=error&reason=invalid_state`);
+  if (!code || !stateUserId) return res.redirect(`${frontendBase}?calendly=error&reason=no_code`);
   if (!CALENDLY_CLIENT_ID || !CALENDLY_CLIENT_SECRET || !CALENDLY_REDIRECT_URI) {
     return res.redirect(`${returnBase}?calendly=error&reason=misconfigured`);
   }
@@ -1190,8 +1186,8 @@ router.get("/mentor/calendly/callback", async (req: any, res) => {
       autoEventTypeUri = etData?.collection?.[0]?.uri || null;
     }
 
-    // Store in mentor_profiles (upsert via update on userId)
-    await db.update(mentorProfiles)
+    // Store in mentor_profiles using userId from state (session unavailable on cross-site redirect)
+    const updateResult = await db.update(mentorProfiles)
       .set({
         calendlyAccessToken: access_token,
         calendlyRefreshToken: refresh_token || null,
@@ -1199,7 +1195,10 @@ router.get("/mentor/calendly/callback", async (req: any, res) => {
         calendlyUserUri: calendlyUserUri || null,
         ...(autoEventTypeUri ? { calendlyEventTypeUri: autoEventTypeUri } : {}),
       })
-      .where(eq(mentorProfiles.userId, req.user.id));
+      .where(eq(mentorProfiles.userId, stateUserId))
+      .returning({ id: mentorProfiles.id });
+
+    console.log("📅 Calendly tokens saved for", stateUserId, "— rows updated:", updateResult.length);
 
     res.redirect(`${returnBase}?calendly=connected`);
   } catch (err) {
