@@ -1096,7 +1096,7 @@ function ProfileTab({ profile, onSaved }: { profile: any; onSaved: () => void })
   const inputClass = "w-full rounded-lg px-3 py-2.5 text-text-primary text-sm outline-none placeholder:text-text-secondary bg-background border border-border focus:border-primary/50 transition-colors";
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
       <div className="bg-card border border-border rounded-lg p-4 sm:p-6">
         <h2 className="font-semibold text-text-primary mb-5">Edit Profile</h2>
         <div className="space-y-5">
