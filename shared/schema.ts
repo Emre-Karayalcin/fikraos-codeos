@@ -87,6 +87,8 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   status: userStatusEnum("status").default("ACTIVE"),
   profileImageUrl: varchar("profile_image_url"),
+  loginCount: integer("login_count").default(0),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
