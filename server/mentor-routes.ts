@@ -1127,7 +1127,13 @@ router.get("/mentor/calendly/connect", async (req: any, res) => {
 
 // GET /api/mentor/calendly/callback — handle OAuth redirect from Calendly
 router.get("/mentor/calendly/callback", async (req: any, res) => {
-  const frontendBase = process.env.FRONTEND_URL || process.env.APP_URL || "http://localhost:5000";
+  // Derive base URL from request — works in both dev and production
+  const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+  const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "";
+  const frontendBase = `${proto}://${host}`;
+
+  console.log("📅 Calendly callback hit — user:", req.user?.id, "query:", JSON.stringify(req.query));
+
   if (!req.user) return res.redirect(`${frontendBase}?calendly=error&reason=unauthenticated`);
 
   const { code, state, error } = req.query as Record<string, string>;
@@ -1135,6 +1141,8 @@ router.get("/mentor/calendly/callback", async (req: any, res) => {
   const [stateUserId, ...returnParts] = (state || "").split("|");
   const returnPath = returnParts.join("|") || "/";
   const returnBase = `${frontendBase}${returnPath}`;
+
+  console.log("📅 state userId:", stateUserId, "| returnPath:", returnPath, "| req.user.id:", req.user?.id);
 
   if (error) return res.redirect(`${returnBase}?calendly=error&reason=${encodeURIComponent(error)}`);
   if (!code) return res.redirect(`${returnBase}?calendly=error&reason=no_code`);
