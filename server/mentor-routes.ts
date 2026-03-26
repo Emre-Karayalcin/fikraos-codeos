@@ -1212,6 +1212,7 @@ router.get("/mentor/calendly/status", async (req: any, res) => {
   if (!req.user) return res.status(401).json({ message: "Unauthorized" });
   const [profile] = await db
     .select({
+      id: mentorProfiles.id,
       calendlyUserUri: mentorProfiles.calendlyUserUri,
       calendlyAccessToken: mentorProfiles.calendlyAccessToken,
       calendlyTokenExpiry: mentorProfiles.calendlyTokenExpiry,
@@ -1225,13 +1226,14 @@ router.get("/mentor/calendly/status", async (req: any, res) => {
   }
 
   try {
-    const token = await getMentorCalendlyToken(profile.calendlyUserUri ? profile.calendlyUserUri : "");
-    const effectiveToken = profile.calendlyAccessToken; // use stored token for status check
+    // Get a valid token — refresh if expired
+    const effectiveToken = await getMentorCalendlyToken(profile.id) || profile.calendlyAccessToken;
 
     // Fetch user info
     const meRes = await fetch(`${CALENDLY_API_BASE}/users/me`, {
       headers: { Authorization: `Bearer ${effectiveToken}` },
     });
+    if (!meRes.ok) return res.json({ connected: false });
     const meData: any = await meRes.json();
     const userInfo = meData?.resource;
 
