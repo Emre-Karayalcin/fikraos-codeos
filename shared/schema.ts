@@ -704,6 +704,11 @@ export const mentorProfiles = pgTable("mentor_profiles", {
   website: varchar("website", { length: 500 }),
   calendlyLink: varchar("calendly_link", { length: 500 }),
   calendlyEventTypeUri: varchar("calendly_event_type_uri", { length: 500 }),
+  // Calendly OAuth — per-mentor tokens
+  calendlyAccessToken: text("calendly_access_token"),
+  calendlyRefreshToken: text("calendly_refresh_token"),
+  calendlyTokenExpiry: timestamp("calendly_token_expiry"),
+  calendlyUserUri: varchar("calendly_user_uri", { length: 500 }),
   expertise: jsonb("expertise").$type<string[]>().default(sql`'[]'::jsonb`),
   industries: jsonb("industries").$type<string[]>().default(sql`'[]'::jsonb`),
   sessionDurationMinutes: integer("session_duration_minutes").default(60),

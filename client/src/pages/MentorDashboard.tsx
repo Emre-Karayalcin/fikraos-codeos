@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
@@ -176,6 +176,24 @@ export default function MentorDashboard() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"overview" | "calendar" | "feedback" | "profile" | "participants">("overview");
   const [setupOpen, setSetupOpen] = useState(false);
+
+  // Handle Calendly OAuth redirect result (?calendly=connected|error)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const calendly = params.get("calendly");
+    if (!calendly) return;
+    // Clean the URL
+    const clean = window.location.pathname;
+    window.history.replaceState({}, "", clean);
+    if (calendly === "connected") {
+      toast({ title: "Calendly connected!", description: "Your Calendly account is now linked. Select an event type in your profile." });
+      setSetupOpen(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/mentor/calendly/status"] });
+    } else {
+      const reason = params.get("reason") || "unknown";
+      toast({ title: "Calendly connection failed", description: reason, variant: "destructive" });
+    }
+  }, []);
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
   const [showAllBookings, setShowAllBookings] = useState(false);

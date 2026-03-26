@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, CheckCircle2, Link2, Unlink } from "lucide-react";
 
 const DAYS_OF_WEEK = [
   { label: "Monday", value: 1 },
@@ -121,6 +121,27 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
     },
     retry: false,
     enabled: open,
+  });
+
+  const { data: calendlyStatus, refetch: refetchCalendly } = useQuery<any>({
+    queryKey: ["/api/mentor/calendly/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/mentor/calendly/status", { credentials: "include" });
+      if (!res.ok) return { connected: false };
+      return res.json();
+    },
+    enabled: open,
+    refetchOnWindowFocus: true,
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/mentor/calendly/disconnect"),
+    onSuccess: () => { refetchCalendly(); toast({ title: "Calendly disconnected" }); },
+  });
+
+  const selectEventTypeMutation = useMutation({
+    mutationFn: (eventTypeUri: string) => apiRequest("PUT", "/api/mentor/calendly/event-type", { eventTypeUri }),
+    onSuccess: () => { refetchCalendly(); toast({ title: "Event type saved" }); },
   });
 
   const [title, setTitle] = useState("");
@@ -268,34 +289,66 @@ export default function MentorProfileSetup({ open, onOpenChange }: Props) {
             />
           </div>
 
-          {/* Calendly link */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Calendly Link</label>
-            <input
-              value={calendlyLink}
-              onChange={(e) => setCalendlyLink(e.target.value)}
-              placeholder="https://calendly.com/your-handle/intro-call"
-              className={inputClass}
-              style={inputStyle}
-            />
-            <p className="text-[11px] text-gray-500 mt-1">
-              Used as the participant-facing booking/meeting link.
-            </p>
-          </div>
+          {/* Calendly OAuth */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-300">Calendly Integration</label>
 
-          {/* Calendly event type URI */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Calendly Event Type URI (advanced)</label>
-            <input
-              value={calendlyEventTypeUri}
-              onChange={(e) => setCalendlyEventTypeUri(e.target.value)}
-              placeholder="https://api.calendly.com/event_types/XXXXXXXX"
-              className={inputClass}
-              style={inputStyle}
-            />
-            <p className="text-[11px] text-gray-500 mt-1">
-              Optional. Enables one-time scheduling link generation with Calendly API token.
-            </p>
+            {calendlyStatus?.connected ? (
+              <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-green-300">{calendlyStatus.name || "Connected"}</p>
+                      <p className="text-xs text-green-400/70">{calendlyStatus.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => disconnectMutation.mutate()}
+                    className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    <Unlink className="w-3 h-3" /> Disconnect
+                  </button>
+                </div>
+
+                {/* Event type selector */}
+                {calendlyStatus.eventTypes?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1.5">Select which event type to use for bookings:</p>
+                    <div className="space-y-1.5">
+                      {calendlyStatus.eventTypes.map((et: any) => (
+                        <button
+                          key={et.uri}
+                          type="button"
+                          onClick={() => selectEventTypeMutation.mutate(et.uri)}
+                          className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                            calendlyStatus.selectedEventTypeUri === et.uri
+                              ? "border-green-500 bg-green-500/20 text-green-300"
+                              : "border-white/10 bg-white/5 text-gray-300 hover:border-white/20"
+                          }`}
+                        >
+                          <span className="font-medium">{et.name}</span>
+                          <span className="text-xs text-gray-400 ml-2">{et.duration} min</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
+                <p className="text-xs text-gray-400">
+                  Connect your Calendly account so members get a personal scheduling link when booking sessions with you.
+                </p>
+                <a
+                  href="/api/mentor/calendly/connect"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+                >
+                  <Link2 className="w-4 h-4" /> Connect Calendly
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Expertise */}

@@ -9,6 +9,9 @@ const EMAIL_FROM = process.env.EMAIL_FROM || "no-reply@fikrahub.com";
 const CALENDLY_API_BASE = process.env.CALENDLY_API_BASE || "https://api.calendly.com";
 // Platform-wide fallback event type URI — used when mentor has no personal Calendly config
 const CALENDLY_DEFAULT_EVENT_TYPE_URI = process.env.CALENDLY_EVENT_TYPE_URI || null;
+const CALENDLY_CLIENT_ID = process.env.CALENDLY_CLIENT_ID || null;
+const CALENDLY_CLIENT_SECRET = process.env.CALENDLY_CLIENT_SECRET || null;
+const CALENDLY_REDIRECT_URI = process.env.CALENDLY_REDIRECT_URI || null;
 
 const router = Router();
 
@@ -42,8 +45,45 @@ function buildCalendlyPrefillLink(
   return url.toString();
 }
 
-async function createCalendlySchedulingLink(eventTypeUri: string): Promise<{ bookingUrl: string; resourceUri?: string } | null> {
-  const calendlyToken = process.env.CALENDLY_PAT_TOKEN;
+async function refreshCalendlyToken(mentorProfileId: string, refreshToken: string): Promise<string | null> {
+  if (!CALENDLY_CLIENT_ID || !CALENDLY_CLIENT_SECRET) return null;
+  try {
+    const res = await fetch("https://auth.calendly.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: CALENDLY_CLIENT_ID,
+        client_secret: CALENDLY_CLIENT_SECRET,
+      }),
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const expiry = new Date(Date.now() + (data.expires_in || 7200) * 1000);
+    await db.update(mentorProfiles)
+      .set({ calendlyAccessToken: data.access_token, calendlyRefreshToken: data.refresh_token, calendlyTokenExpiry: expiry })
+      .where(eq(mentorProfiles.id, mentorProfileId));
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+async function getMentorCalendlyToken(mentorProfileId: string): Promise<string | null> {
+  const [profile] = await db
+    .select({ accessToken: mentorProfiles.calendlyAccessToken, refreshToken: mentorProfiles.calendlyRefreshToken, tokenExpiry: mentorProfiles.calendlyTokenExpiry })
+    .from(mentorProfiles)
+    .where(eq(mentorProfiles.id, mentorProfileId));
+  if (!profile?.accessToken) return null;
+  if (profile.tokenExpiry && new Date() > profile.tokenExpiry && profile.refreshToken) {
+    return refreshCalendlyToken(mentorProfileId, profile.refreshToken);
+  }
+  return profile.accessToken;
+}
+
+async function createCalendlySchedulingLink(eventTypeUri: string, mentorToken?: string | null): Promise<{ bookingUrl: string; resourceUri?: string } | null> {
+  const calendlyToken = mentorToken || process.env.CALENDLY_PAT_TOKEN;
   if (!calendlyToken || !eventTypeUri) return null;
 
   try {
@@ -202,6 +242,9 @@ router.post("/mentor-bookings", async (req: any, res) => {
         id: mentorProfiles.id,
         calendlyLink: mentorProfiles.calendlyLink,
         calendlyEventTypeUri: mentorProfiles.calendlyEventTypeUri,
+        calendlyAccessToken: mentorProfiles.calendlyAccessToken,
+        calendlyRefreshToken: mentorProfiles.calendlyRefreshToken,
+        calendlyTokenExpiry: mentorProfiles.calendlyTokenExpiry,
       })
       .from(mentorProfiles)
       .where(eq(mentorProfiles.id, mentorProfileId))
@@ -218,10 +261,13 @@ router.post("/mentor-bookings", async (req: any, res) => {
     const effectiveEventTypeUri = mentorProfile.calendlyEventTypeUri || CALENDLY_DEFAULT_EVENT_TYPE_URI;
     const meetingProvider = normalizedCalendlyLink || effectiveEventTypeUri ? "CALENDLY" : "INTERNAL";
 
+    // Prefer mentor's personal OAuth token, fall back to platform PAT
+    const mentorToken = await getMentorCalendlyToken(mentorProfile.id);
+
     // Try to generate a single-use scheduling link via Calendly API at booking time
     let initialMeetingLink: string | null = null;
     if (effectiveEventTypeUri) {
-      const generated = await createCalendlySchedulingLink(effectiveEventTypeUri);
+      const generated = await createCalendlySchedulingLink(effectiveEventTypeUri, mentorToken);
       if (generated?.bookingUrl) {
         // Append date/time prefill so Calendly opens directly on the chosen slot
         try {
@@ -646,6 +692,7 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
     if (status === "CONFIRMED") {
       const [mentorConfig] = await db
         .select({
+          id: mentorProfiles.id,
           calendlyLink: mentorProfiles.calendlyLink,
           calendlyEventTypeUri: mentorProfiles.calendlyEventTypeUri,
         })
@@ -665,8 +712,9 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
 
       // Use mentor-specific URI or fall back to platform-wide default
       const confirmEventTypeUri = mentorConfig?.calendlyEventTypeUri || CALENDLY_DEFAULT_EVENT_TYPE_URI;
+      const confirmMentorToken = mentorConfig?.id ? await getMentorCalendlyToken(mentorConfig.id) : null;
       if (confirmEventTypeUri) {
-        const generated = await createCalendlySchedulingLink(confirmEventTypeUri);
+        const generated = await createCalendlySchedulingLink(confirmEventTypeUri, confirmMentorToken);
         if (generated?.bookingUrl) {
           meetingLink = generated.bookingUrl;
           calendlyEventUri = generated.resourceUri || null;
@@ -1055,6 +1103,171 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
     console.error("Error fetching mentor feedback:", error);
     res.status(500).json({ message: "Failed to fetch mentor feedback" });
   }
+});
+
+// ─── Calendly OAuth endpoints ─────────────────────────────────────────────────
+
+// GET /api/mentor/calendly/connect — redirect mentor to Calendly OAuth page
+router.get("/mentor/calendly/connect", async (req: any, res) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+  if (!CALENDLY_CLIENT_ID || !CALENDLY_REDIRECT_URI) {
+    return res.status(501).json({ message: "Calendly OAuth not configured (CALENDLY_CLIENT_ID / CALENDLY_REDIRECT_URI missing)" });
+  }
+  const params = new URLSearchParams({
+    client_id: CALENDLY_CLIENT_ID,
+    response_type: "code",
+    redirect_uri: CALENDLY_REDIRECT_URI,
+    state: req.user.id, // simple CSRF: verify on callback
+  });
+  res.redirect(`https://auth.calendly.com/oauth/authorize?${params}`);
+});
+
+// GET /api/mentor/calendly/callback — handle OAuth redirect from Calendly
+router.get("/mentor/calendly/callback", async (req: any, res) => {
+  const frontendBase = process.env.FRONTEND_URL || process.env.APP_URL || "http://localhost:5000";
+  if (!req.user) return res.redirect(`${frontendBase}?calendly=error&reason=unauthenticated`);
+
+  const { code, state, error } = req.query as Record<string, string>;
+  if (error) return res.redirect(`${frontendBase}?calendly=error&reason=${encodeURIComponent(error)}`);
+  if (!code) return res.redirect(`${frontendBase}?calendly=error&reason=no_code`);
+  if (state !== req.user.id) return res.redirect(`${frontendBase}?calendly=error&reason=invalid_state`);
+  if (!CALENDLY_CLIENT_ID || !CALENDLY_CLIENT_SECRET || !CALENDLY_REDIRECT_URI) {
+    return res.redirect(`${frontendBase}?calendly=error&reason=misconfigured`);
+  }
+
+  try {
+    // Exchange code for tokens
+    const tokenRes = await fetch("https://auth.calendly.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: CALENDLY_REDIRECT_URI,
+        client_id: CALENDLY_CLIENT_ID,
+        client_secret: CALENDLY_CLIENT_SECRET,
+      }),
+    });
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text();
+      console.error("❌ Calendly token exchange failed:", tokenRes.status, body);
+      return res.redirect(`${frontendBase}?calendly=error&reason=token_exchange`);
+    }
+    const tokenData: any = await tokenRes.json();
+    const { access_token, refresh_token, expires_in } = tokenData;
+    const tokenExpiry = new Date(Date.now() + (expires_in || 7200) * 1000);
+
+    // Get the Calendly user URI and first event type
+    const meRes = await fetch(`${CALENDLY_API_BASE}/users/me`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const meData: any = await meRes.json();
+    const calendlyUserUri: string = meData?.resource?.uri || "";
+
+    // Fetch their event types and auto-pick the first active one
+    let autoEventTypeUri: string | null = null;
+    if (calendlyUserUri) {
+      const etRes = await fetch(`${CALENDLY_API_BASE}/event_types?user=${encodeURIComponent(calendlyUserUri)}&active=true`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const etData: any = await etRes.json();
+      autoEventTypeUri = etData?.collection?.[0]?.uri || null;
+    }
+
+    // Store in mentor_profiles (upsert via update on userId)
+    await db.update(mentorProfiles)
+      .set({
+        calendlyAccessToken: access_token,
+        calendlyRefreshToken: refresh_token || null,
+        calendlyTokenExpiry: tokenExpiry,
+        calendlyUserUri: calendlyUserUri || null,
+        ...(autoEventTypeUri ? { calendlyEventTypeUri: autoEventTypeUri } : {}),
+      })
+      .where(eq(mentorProfiles.userId, req.user.id));
+
+    res.redirect(`${frontendBase}?calendly=connected`);
+  } catch (err) {
+    console.error("❌ Calendly OAuth callback error:", err);
+    res.redirect(`${frontendBase}?calendly=error&reason=server_error`);
+  }
+});
+
+// GET /api/mentor/calendly/status — return connection status + event types
+router.get("/mentor/calendly/status", async (req: any, res) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+  const [profile] = await db
+    .select({
+      calendlyUserUri: mentorProfiles.calendlyUserUri,
+      calendlyAccessToken: mentorProfiles.calendlyAccessToken,
+      calendlyTokenExpiry: mentorProfiles.calendlyTokenExpiry,
+      calendlyEventTypeUri: mentorProfiles.calendlyEventTypeUri,
+    })
+    .from(mentorProfiles)
+    .where(eq(mentorProfiles.userId, req.user.id));
+
+  if (!profile?.calendlyAccessToken) {
+    return res.json({ connected: false });
+  }
+
+  try {
+    const token = await getMentorCalendlyToken(profile.calendlyUserUri ? profile.calendlyUserUri : "");
+    const effectiveToken = profile.calendlyAccessToken; // use stored token for status check
+
+    // Fetch user info
+    const meRes = await fetch(`${CALENDLY_API_BASE}/users/me`, {
+      headers: { Authorization: `Bearer ${effectiveToken}` },
+    });
+    const meData: any = await meRes.json();
+    const userInfo = meData?.resource;
+
+    // Fetch event types
+    let eventTypes: any[] = [];
+    if (profile.calendlyUserUri) {
+      const etRes = await fetch(`${CALENDLY_API_BASE}/event_types?user=${encodeURIComponent(profile.calendlyUserUri)}&active=true`, {
+        headers: { Authorization: `Bearer ${effectiveToken}` },
+      });
+      const etData: any = await etRes.json();
+      eventTypes = (etData?.collection || []).map((et: any) => ({
+        uri: et.uri,
+        name: et.name,
+        duration: et.duration,
+        schedulingUrl: et.scheduling_url,
+      }));
+    }
+
+    return res.json({
+      connected: true,
+      name: userInfo?.name || "",
+      email: userInfo?.email || "",
+      avatarUrl: userInfo?.avatar_url || null,
+      selectedEventTypeUri: profile.calendlyEventTypeUri || null,
+      eventTypes,
+    });
+  } catch {
+    return res.json({ connected: false });
+  }
+});
+
+// PUT /api/mentor/calendly/event-type — mentor selects which event type to use
+router.put("/mentor/calendly/event-type", async (req: any, res) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+  const { eventTypeUri } = req.body;
+  if (!eventTypeUri) return res.status(400).json({ message: "eventTypeUri required" });
+
+  await db.update(mentorProfiles)
+    .set({ calendlyEventTypeUri: eventTypeUri })
+    .where(eq(mentorProfiles.userId, req.user.id));
+
+  return res.json({ ok: true });
+});
+
+// DELETE /api/mentor/calendly/disconnect — revoke OAuth connection
+router.delete("/mentor/calendly/disconnect", async (req: any, res) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+  await db.update(mentorProfiles)
+    .set({ calendlyAccessToken: null, calendlyRefreshToken: null, calendlyTokenExpiry: null, calendlyUserUri: null })
+    .where(eq(mentorProfiles.userId, req.user.id));
+  return res.json({ ok: true });
 });
 
 // GET /api/debug/calendly — test Calendly integration (dev only)
