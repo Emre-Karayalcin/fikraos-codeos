@@ -89,7 +89,9 @@ export function setupAuth(app: Express) {
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      // "lax" allows session cookie on cross-site top-level GET redirects (OAuth flows).
+      // "strict" breaks OAuth because Calendly's redirect is cross-site.
+      sameSite: "lax",
       maxAge: sessionTtl,
       // SECURITY FIX (P2): Set explicit domain for production cookie security
       domain: process.env.COOKIE_DOMAIN || undefined,
