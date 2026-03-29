@@ -36,20 +36,31 @@ import {
   ChevronRight,
   FileText,
   Lightbulb,
+  Lock,
+  Send,
+  MessageSquare,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────
+type LifecycleStatus = "DRAFT" | "PENDING_REVIEW" | "REVIEWED" | "SUBMITTED" | "REJECTED";
+
 interface PitchDeck {
   id: string;
   projectId: string;
   taskId: string;
   status: "GENERATING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  lifecycleStatus: LifecycleStatus;
   template: string;
   theme: string;
   downloadUrl: string | null;
   errorMessage: string | null;
+  isLocked: boolean;
+  lockedReason: string | null;
+  submittedAt: string | null;
+  draftNotes: string | null;
+  latestReview?: { reviewStatus: string; feedback: string | null } | null;
   createdById: string;
   createdAt: string;
   updatedAt: string;
@@ -106,16 +117,43 @@ function StatusBadge({ status }: { status: PitchDeck["status"] }) {
   );
 }
 
+// ── Lifecycle badge ─────────────────────────────────────────────────────────
+const LIFECYCLE_MAP: Record<LifecycleStatus, { label: string; className: string }> = {
+  DRAFT:          { label: "Draft",          className: "bg-muted text-muted-foreground" },
+  PENDING_REVIEW: { label: "In Review",      className: "bg-yellow-500/15 text-yellow-500" },
+  REVIEWED:       { label: "Reviewed",       className: "bg-blue-500/15 text-blue-400" },
+  SUBMITTED:      { label: "Submitted",      className: "bg-green-500/15 text-green-400" },
+  REJECTED:       { label: "Rejected",       className: "bg-red-500/15 text-red-400" },
+};
+
+function LifecycleBadge({ status }: { status: LifecycleStatus }) {
+  const cfg = LIFECYCLE_MAP[status] ?? LIFECYCLE_MAP.DRAFT;
+  return (
+    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
 // ── PitchCard ──────────────────────────────────────────────────────────────
 function PitchCard({
   deck,
   onDelete,
   onView,
+  onRequestReview,
+  onSubmit,
 }: {
   deck: PitchDeck;
   onDelete: (id: string) => void;
   onView: (deck: PitchDeck) => void;
+  onRequestReview: (id: string) => void;
+  onSubmit: (id: string) => void;
 }) {
+  const lifecycle = deck.lifecycleStatus ?? "DRAFT";
+  const canRequestReview = deck.status === "COMPLETED" && !deck.isLocked &&
+    (lifecycle === "DRAFT" || lifecycle === "REJECTED");
+  const canSubmit = deck.status === "COMPLETED" && !deck.isLocked && lifecycle === "REVIEWED";
+
   return (
     <div
       className="group relative flex flex-col gap-4 rounded-xl border-2 border-transparent bg-card p-5 shadow-sm hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
@@ -126,15 +164,24 @@ function PitchCard({
         <div className="rounded-md bg-muted p-2">
           <PresentationIcon className="w-5 h-5 text-primary" />
         </div>
-        <button
-          className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-50"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(deck.id);
-          }}
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {deck.isLocked && (
+            <span title={deck.lockedReason ?? "Locked"} className="text-orange-400">
+              <Lock className="w-3.5 h-3.5" />
+            </span>
+          )}
+          {!deck.isLocked && (
+            <button
+              className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(deck.id);
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Title */}
@@ -148,8 +195,18 @@ function PitchCard({
         </div>
       </div>
 
-      {/* Status */}
-      <StatusBadge status={deck.status} />
+      {/* Status row */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <StatusBadge status={deck.status} />
+        {deck.status === "COMPLETED" && <LifecycleBadge status={lifecycle} />}
+      </div>
+
+      {/* Mentor feedback note */}
+      {deck.latestReview?.feedback && lifecycle === "REJECTED" && (
+        <p className="text-xs text-muted-foreground border border-border rounded-md px-2 py-1.5 line-clamp-2">
+          {deck.latestReview.feedback}
+        </p>
+      )}
 
       {/* Actions */}
       {deck.status === "COMPLETED" && deck.downloadUrl && (
@@ -181,6 +238,33 @@ function PitchCard({
         <div className="flex items-center gap-2 text-xs text-amber-600">
           <Loader2 className="w-3 h-3 animate-spin" />
           Generating your deck…
+        </div>
+      )}
+
+      {/* Lifecycle actions */}
+      {(canRequestReview || canSubmit) && (
+        <div className="border-t border-border pt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+          {canRequestReview && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1 flex-1"
+              onClick={() => onRequestReview(deck.id)}
+            >
+              <MessageSquare className="w-3 h-3" />
+              Request Review
+            </Button>
+          )}
+          {canSubmit && (
+            <Button
+              size="sm"
+              className="h-7 text-xs gap-1 flex-1"
+              onClick={() => onSubmit(deck.id)}
+            >
+              <Send className="w-3 h-3" />
+              Submit Final
+            </Button>
+          )}
         </div>
       )}
     </div>
@@ -1071,6 +1155,36 @@ export default function Pitch() {
     },
   });
 
+  const requestReviewMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/pitch-decks/${id}/request-review`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+    },
+    onSuccess: () => {
+      toast.success("Review requested");
+      qc.invalidateQueries({ queryKey: ["/api/my-pitch-decks"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/pitch-decks/${id}/submit`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+    },
+    onSuccess: () => {
+      toast.success("Pitch deck submitted successfully!");
+      qc.invalidateQueries({ queryKey: ["/api/my-pitch-decks"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const handleView = (deck: PitchDeck) => {
     if (deck.downloadUrl) {
       setLocation(`/w/${currentWorkspaceSlug}/pitch/${deck.id}`);
@@ -1126,6 +1240,8 @@ export default function Pitch() {
                   deck={deck}
                   onDelete={(id) => setDeleteTargetId(id)}
                   onView={handleView}
+                  onRequestReview={(id) => requestReviewMutation.mutate(id)}
+                  onSubmit={(id) => submitMutation.mutate(id)}
                 />
               ))}
             </div>

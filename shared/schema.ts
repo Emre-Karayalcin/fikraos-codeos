@@ -271,9 +271,23 @@ export const assetKindEnum = pgEnum("asset_kind", [
 
 export const pitchDeckStatusEnum = pgEnum("pitch_deck_status", [
   "GENERATING",
-  "COMPLETED", 
+  "COMPLETED",
   "FAILED",
   "CANCELLED"
+]);
+
+export const pitchDeckLifecycleEnum = pgEnum("pitch_deck_lifecycle", [
+  "DRAFT",
+  "PENDING_REVIEW",
+  "REVIEWED",
+  "SUBMITTED",
+  "REJECTED",
+]);
+
+export const pitchDeckReviewStatusEnum = pgEnum("pitch_deck_review_status", [
+  "APPROVED",
+  "REJECTED",
+  "NEEDS_REVISION",
 ]);
 
 export const assetLanguageEnum = pgEnum("asset_language", ["en", "ar"]);
@@ -313,9 +327,39 @@ export const pitchDeckGenerations = pgTable("pitch_deck_generations", {
   fontFamily: varchar("font_family").default("Inter"),
   downloadUrl: varchar("download_url"),
   errorMessage: text("error_message"),
+  // Lifecycle
+  lifecycleStatus: pitchDeckLifecycleEnum("lifecycle_status").default("DRAFT"),
+  draftNotes: text("draft_notes"),
+  lastAutoSavedAt: timestamp("last_auto_saved_at"),
+  submittedAt: timestamp("submitted_at"),
+  submittedById: varchar("submitted_by_id").references(() => users.id),
+  isLocked: boolean("is_locked").default(false),
+  lockedAt: timestamp("locked_at"),
+  lockedReason: text("locked_reason"),
+  lockedById: varchar("locked_by_id").references(() => users.id),
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const pitchDeckVersions = pgTable("pitch_deck_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pitchDeckId: varchar("pitch_deck_id").notNull().references(() => pitchDeckGenerations.id, { onDelete: "cascade" }),
+  label: varchar("label", { length: 255 }).notNull(), // e.g. "Auto-save · Mar 15, 2:34 PM"
+  snapshotUrl: varchar("snapshot_url"),                // download URL at time of save
+  notes: text("notes"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pitchDeckReviews = pgTable("pitch_deck_reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pitchDeckId: varchar("pitch_deck_id").notNull().references(() => pitchDeckGenerations.id, { onDelete: "cascade" }),
+  reviewerId: varchar("reviewer_id").notNull().references(() => users.id),
+  reviewStatus: pitchDeckReviewStatusEnum("review_status").notNull(),
+  feedback: text("feedback"),
+  reviewedAt: timestamp("reviewed_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Idea Management Tables
