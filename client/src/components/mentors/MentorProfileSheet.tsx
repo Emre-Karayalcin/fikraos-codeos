@@ -180,6 +180,14 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
     setSelectedTime("");
   };
 
+  const { data: bookedSlots = [] } = useQuery<{ bookedTime: string; durationMinutes: number }[]>({
+    queryKey: [`/api/mentors/${mentor.id}/booked-slots`, selectedDate],
+    queryFn: () =>
+      fetch(`/api/mentors/${mentor.id}/booked-slots?date=${selectedDate}`, { credentials: "include" })
+        .then((r) => r.json()),
+    enabled: !!selectedDate && open,
+  });
+
   const timeSlots = useMemo(() => {
     if (!selectedDate) return [];
     const d = new Date(selectedDate);
@@ -188,6 +196,23 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
     if (!slot) return [];
     return generateTimeSlots(slot.startTime, slot.endTime, mentorDetail?.sessionDurationMinutes ?? 60);
   }, [selectedDate, availability, mentorDetail]);
+
+  // A slot is taken if any existing booking overlaps its time window
+  const isSlotTaken = (time: string): boolean => {
+    const duration = mentorDetail?.sessionDurationMinutes ?? 60;
+    const slotStart = timeToMinutes(time);
+    const slotEnd = slotStart + duration;
+    return bookedSlots.some(({ bookedTime, durationMinutes }) => {
+      const existStart = timeToMinutes(bookedTime);
+      const existEnd = existStart + (durationMinutes ?? 60);
+      return existStart < slotEnd && existEnd > slotStart;
+    });
+  };
+
+  function timeToMinutes(t: string): number {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  }
 
   const handleBook = () => {
     if (!selectedDate || !selectedTime) {
@@ -524,11 +549,14 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
                     <SelectValue placeholder="Pick a time slot…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {timeSlots.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
+                    {timeSlots.map((t) => {
+                      const taken = isSlotTaken(t);
+                      return (
+                        <SelectItem key={t} value={t} disabled={taken}>
+                          {t}{taken ? " — Booked" : ""}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

@@ -15,6 +15,12 @@ const CALENDLY_REDIRECT_URI = process.env.CALENDLY_REDIRECT_URI || null;
 
 const router = Router();
 
+// Convert "HH:MM" to total minutes
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
 function normalizeCalendlyUrl(raw?: string | null): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -230,6 +236,33 @@ router.get("/mentors/:id", async (req: any, res) => {
   }
 });
 
+// GET /api/mentors/:mentorId/booked-slots?date=YYYY-MM-DD
+// Returns non-cancelled bookings for a date so the frontend can grey out taken slots
+router.get("/mentors/:mentorId/booked-slots", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const { mentorId } = req.params;
+    const { date } = req.query as { date?: string };
+    if (!date) return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
+
+    const booked = await db
+      .select({ bookedTime: mentorBookings.bookedTime, durationMinutes: mentorBookings.durationMinutes })
+      .from(mentorBookings)
+      .where(
+        and(
+          eq(mentorBookings.mentorProfileId, mentorId),
+          eq(mentorBookings.bookedDate, date),
+          inArray(mentorBookings.status, ["PENDING", "CONFIRMED", "COMPLETED"])
+        )
+      );
+
+    res.json(booked);
+  } catch (error) {
+    console.error("Error fetching booked slots:", error);
+    res.status(500).json({ message: "Failed to fetch booked slots" });
+  }
+});
+
 // POST /api/mentor-bookings - Create booking
 router.post("/mentor-bookings", async (req: any, res) => {
   try {
@@ -295,20 +328,50 @@ router.post("/mentor-bookings", async (req: any, res) => {
       initialMeetingLink = buildCalendlyPrefillLink(normalizedCalendlyLink, memberName, req.user.email || "", bookedDate, bookedTime);
     }
 
-    // Check for conflicts
-    const [existing] = await db
+    // ── 1. Validate mentor availability (day-of-week + time window) ──────────
+    const availSlots = await db
       .select()
+      .from(mentorAvailability)
+      .where(eq(mentorAvailability.mentorProfileId, mentorProfileId));
+
+    // Use noon UTC to avoid date-boundary timezone issues
+    const bookingDow = new Date(`${bookedDate}T12:00:00Z`).getUTCDay();
+    const matchingSlot = availSlots.find((a) => a.dayOfWeek === bookingDow);
+
+    if (!matchingSlot) {
+      return res.status(400).json({ message: "Mentor is not available on this day" });
+    }
+
+    const sessionDuration = durationMinutes || 60;
+    const newStart = timeToMinutes(bookedTime);
+    const newEnd = newStart + sessionDuration;
+    const slotStart = timeToMinutes(matchingSlot.startTime);
+    const slotEnd = timeToMinutes(matchingSlot.endTime);
+
+    if (newStart < slotStart || newEnd > slotEnd) {
+      return res.status(400).json({
+        message: `Selected time is outside mentor's available hours (${matchingSlot.startTime}–${matchingSlot.endTime})`,
+      });
+    }
+
+    // ── 2. Duration-aware overlap check (ignore cancelled bookings) ──────────
+    const existingBookings = await db
+      .select({ bookedTime: mentorBookings.bookedTime, durationMinutes: mentorBookings.durationMinutes })
       .from(mentorBookings)
       .where(
         and(
           eq(mentorBookings.mentorProfileId, mentorProfileId),
           eq(mentorBookings.bookedDate, bookedDate),
-          eq(mentorBookings.bookedTime, bookedTime)
+          inArray(mentorBookings.status, ["PENDING", "CONFIRMED", "COMPLETED"])
         )
       );
 
-    if (existing) {
-      return res.status(409).json({ message: "This time slot is already booked" });
+    for (const existing of existingBookings) {
+      const existStart = timeToMinutes(existing.bookedTime);
+      const existEnd = existStart + (existing.durationMinutes ?? 60);
+      if (existStart < newEnd && existEnd > newStart) {
+        return res.status(409).json({ message: "This time slot overlaps with an existing booking" });
+      }
     }
 
     const [booking] = await db
