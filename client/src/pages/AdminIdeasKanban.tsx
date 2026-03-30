@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Kanban, Plus, User, Trash2, GraduationCap, Trophy, ChevronDown, ChevronRight } from 'lucide-react';
+import { Kanban, Plus, User, Trash2, GraduationCap, Trophy, ChevronDown, ChevronRight, Megaphone } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -304,8 +304,43 @@ export default function AdminIdeasKanban() {
     enabled: !!workspace?.id,
   });
 
+  const [confirmFinalists, setConfirmFinalists] = useState(false);
+  const [confirmWinners, setConfirmWinners] = useState(false);
+
+  const publishFinalists = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspace!.id}/admin/leaderboard/publish-finalists`, {
+        method: 'POST', credentials: 'include',
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      return res.json();
+    },
+    onSuccess: (d) => {
+      toast.success(`${d.published} finalist(s) published and notified!`);
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces/admin/leaderboard', workspace?.id] });
+      setConfirmFinalists(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const publishWinners = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspace!.id}/admin/judge-leaderboard/publish-winners`, {
+        method: 'POST', credentials: 'include',
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      return res.json();
+    },
+    onSuccess: (d) => {
+      toast.success(`${d.published} winner(s) published and notified!`);
+      queryClient.invalidateQueries({ queryKey: ['/api/workspaces/admin/judge-leaderboard', workspace?.id] });
+      setConfirmWinners(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   // Fetch leaderboard (only when modal is open)
-  const { data: leaderboardData = [] } = useQuery<{ projectId: string; title: string; ownerName: string; totalScore: number | null; businessScore: number; technicalScore: number; strategicScore: number }[]>({
+  const { data: leaderboardData = [] } = useQuery<{ projectId: string; title: string; ownerName: string; totalScore: number | null; publishStatus: string; businessScore: number; technicalScore: number; strategicScore: number }[]>({
     queryKey: ['/api/workspaces/admin/leaderboard', workspace?.id],
     queryFn: async () => {
       const response = await fetch(`/api/workspaces/${workspace!.id}/admin/leaderboard`, { credentials: 'include' });
@@ -318,6 +353,7 @@ export default function AdminIdeasKanban() {
   // Fetch judge leaderboard (only when modal is open)
   const { data: judgeLeaderboardData = [] } = useQuery<{
     projectId: string; title: string; ownerName: string;
+    publishStatus: string;
     totalCombined: number; avgScore: number | null; judgeCount: number;
     deckSum: number; pitchSum: number; evalSum: number;
     judges: { judgeName: string; score: number; deckScore: number; pitchScore: number; evalScore: number }[];
@@ -656,10 +692,23 @@ export default function AdminIdeasKanban() {
         {view === 'leaderboard' && (
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-4">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-500" />
-                <h2 className="text-lg font-semibold">Pre-Demo Evaluation Leaderboard</h2>
-                <span className="text-sm text-muted-foreground">— SHORTLISTED ideas ranked by PMO evaluation score</span>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  <h2 className="text-lg font-semibold">Pre-Demo Evaluation Leaderboard</h2>
+                  <span className="text-sm text-muted-foreground">— top 7 qualify as Finalists</span>
+                </div>
+                {leaderboardData.length > 0 && (
+                  <Button
+                    size="sm"
+                    className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
+                    onClick={() => setConfirmFinalists(true)}
+                    disabled={publishFinalists.isPending}
+                  >
+                    <Megaphone className="w-3.5 h-3.5" />
+                    Publish Top 7 as Finalists
+                  </Button>
+                )}
               </div>
               {leaderboardData.length === 0 ? (
                 <p className="text-center text-muted-foreground py-16 text-sm">No evaluated ideas yet. Use the PMO Evaluation tab on each idea to score them.</p>
@@ -680,9 +729,19 @@ export default function AdminIdeasKanban() {
                     </TableHeader>
                     <TableBody>
                       {leaderboardData.map((row, idx) => (
-                        <TableRow key={row.projectId} className={idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : ''}>
+                        <TableRow key={row.projectId} className={idx < 7 ? (idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : 'bg-violet-500/5') : ''}>
                           <TableCell className="font-bold text-center">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</TableCell>
-                          <TableCell className="font-medium">{row.title}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {row.title}
+                              {row.publishStatus === 'FINALIST' && (
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-500">Finalist</span>
+                              )}
+                              {row.publishStatus === 'WINNER' && (
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500">Winner</span>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">{row.ownerName}</TableCell>
                           <TableCell className="text-right font-bold">{row.totalScore ?? '—'}</TableCell>
                           <TableCell className="text-right text-sm">{row.businessScore}</TableCell>
@@ -707,10 +766,23 @@ export default function AdminIdeasKanban() {
         {view === 'judge-leaderboard' && (
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-4">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-500" />
-                <h2 className="text-lg font-semibold">Demo Day Judge Leaderboard</h2>
-                <span className="text-sm text-muted-foreground">— IN_INCUBATION ideas ranked by combined judge score</span>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  <h2 className="text-lg font-semibold">Demo Day Judge Leaderboard</h2>
+                  <span className="text-sm text-muted-foreground">— top 3 qualify as Winners</span>
+                </div>
+                {judgeLeaderboardData.length > 0 && (
+                  <Button
+                    size="sm"
+                    className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                    onClick={() => setConfirmWinners(true)}
+                    disabled={publishWinners.isPending}
+                  >
+                    <Megaphone className="w-3.5 h-3.5" />
+                    Publish Top 3 as Winners
+                  </Button>
+                )}
               </div>
               {judgeLeaderboardData.length === 0 ? (
                 <p className="text-center text-muted-foreground py-16 text-sm">No judge evaluations yet. Judges can score ideas from their dashboard.</p>
@@ -735,12 +807,22 @@ export default function AdminIdeasKanban() {
                       {judgeLeaderboardData.map((row, idx) => (
                         <React.Fragment key={row.projectId}>
                           <TableRow
-                            className={`cursor-pointer ${idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : ''}`}
+                            className={`cursor-pointer ${idx === 0 ? 'bg-yellow-500/10' : idx === 1 ? 'bg-gray-400/10' : idx === 2 ? 'bg-amber-700/10' : idx < 3 ? 'bg-amber-500/5' : ''}`}
                             onClick={() => setExpandedJudgeRow(expandedJudgeRow === row.projectId ? null : row.projectId)}
                           >
                             <TableCell className="text-muted-foreground">{expandedJudgeRow === row.projectId ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</TableCell>
                             <TableCell className="font-bold text-center">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</TableCell>
-                            <TableCell className="font-medium">{row.title}</TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                {row.title}
+                                {row.publishStatus === 'WINNER' && (
+                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500">Winner</span>
+                                )}
+                                {row.publishStatus === 'FINALIST' && (
+                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-500">Finalist</span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-muted-foreground text-sm">{row.ownerName}</TableCell>
                             <TableCell className="text-right font-bold text-primary">{row.totalCombined}</TableCell>
                             <TableCell className="text-right text-sm">{row.avgScore ?? '—'}</TableCell>
@@ -1041,6 +1123,56 @@ export default function AdminIdeasKanban() {
                 </Table>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirm: Publish Top 7 as Finalists */}
+        <Dialog open={confirmFinalists} onOpenChange={setConfirmFinalists}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-violet-500" />
+                Publish Top 7 as Finalists
+              </DialogTitle>
+              <DialogDescription>
+                This will mark the top 7 ideas on the PMO Leaderboard as <strong>Finalists</strong> and send an automatic email notification to each of their owners. Any previously published statuses will be reset first.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmFinalists(false)}>Cancel</Button>
+              <Button
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+                onClick={() => publishFinalists.mutate()}
+                disabled={publishFinalists.isPending}
+              >
+                {publishFinalists.isPending ? 'Publishing...' : 'Publish & Notify'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirm: Publish Top 3 as Winners */}
+        <Dialog open={confirmWinners} onOpenChange={setConfirmWinners}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-amber-500" />
+                Publish Top 3 as Winners
+              </DialogTitle>
+              <DialogDescription>
+                This will mark the top 3 ideas on the Judge Leaderboard as <strong>Winners</strong> and send an automatic email notification with their placement (1st, 2nd, 3rd) to each of their owners. Any previously published statuses will be reset first.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmWinners(false)}>Cancel</Button>
+              <Button
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={() => publishWinners.mutate()}
+                disabled={publishWinners.isPending}
+              >
+                {publishWinners.isPending ? 'Publishing...' : 'Publish & Notify'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

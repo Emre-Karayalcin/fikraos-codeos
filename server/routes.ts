@@ -1585,6 +1585,7 @@ export function registerRoutes(app: Express): Server {
           ownerLastName: users.lastName,
           ownerUsername: users.username,
           totalScore: ideaEvaluations.totalScore,
+          publishStatus: projects.publishStatus,
           b1: ideaEvaluations.b1, b2: ideaEvaluations.b2, b3: ideaEvaluations.b3, b4: ideaEvaluations.b4, b5: ideaEvaluations.b5,
           t1: ideaEvaluations.t1, t2: ideaEvaluations.t2, t3: ideaEvaluations.t3, t4: ideaEvaluations.t4,
           s1: ideaEvaluations.s1, s2: ideaEvaluations.s2, s3: ideaEvaluations.s3,
@@ -1612,6 +1613,7 @@ export function registerRoutes(app: Express): Server {
           title: r.title,
           ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
           totalScore: r.totalScore,
+          publishStatus: r.publishStatus ?? 'NONE',
           businessScore,
           technicalScore,
           strategicScore,
@@ -1879,6 +1881,7 @@ export function registerRoutes(app: Express): Server {
           ownerFirstName: users.firstName,
           ownerLastName: users.lastName,
           ownerUsername: users.username,
+          publishStatus: projects.publishStatus,
           totalCombined: drizzleSql<number>`coalesce(sum(${judgeEvaluations.totalScore}), 0)`,
           avgScore: avg(judgeEvaluations.totalScore),
           judgeCount: drizzleSql<number>`count(${judgeEvaluations.id})`,
@@ -1947,6 +1950,7 @@ export function registerRoutes(app: Express): Server {
         projectId: r.projectId,
         title: r.title,
         ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
+        publishStatus: r.publishStatus ?? 'NONE',
         totalCombined: Number(r.totalCombined),
         avgScore: r.avgScore != null ? Math.round(Number(r.avgScore)) : null,
         judgeCount: Number(r.judgeCount),
@@ -1960,6 +1964,185 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching judge leaderboard:', error);
       res.status(500).json({ error: 'Failed to fetch judge leaderboard' });
+    }
+  });
+
+  // ─── Publish finalists / winners ─────────────────────────────────────────────
+
+  // Shared email helper (reuse loadTpl pattern from PMO evaluation)
+  function loadTpl(name: string, vars: Record<string, string>): string {
+    const candidates = [
+      path.join(__dirname, 'email-templates', `${name}.html`),
+      path.join(process.cwd(), 'server', 'email-templates', `${name}.html`),
+    ];
+    const found = candidates.find((p) => { try { return fs.existsSync(p); } catch { return false; } });
+    if (!found) return '';
+    try { return mustache.render(fs.readFileSync(found, 'utf8'), vars); } catch { return ''; }
+  }
+
+  // POST /api/workspaces/:orgId/admin/leaderboard/publish-finalists
+  // Marks top 7 SHORTLISTED/IN_INCUBATION ideas (by PMO score) as FINALIST and emails each owner.
+  app.post('/api/workspaces/:orgId/admin/leaderboard/publish-finalists', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      // Fetch ordered leaderboard
+      const rows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          ownerId: projects.createdById,
+          ownerEmail: users.email,
+          ownerFirstName: users.firstName,
+          totalScore: ideaEvaluations.totalScore,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(ideaEvaluations, eq(projects.id, ideaEvaluations.projectId))
+        .where(and(eq(projects.orgId, orgId), inArray(projects.status, ['SHORTLISTED', 'IN_INCUBATION'])))
+        .orderBy(desc(ideaEvaluations.totalScore));
+
+      const top7 = rows.slice(0, 7);
+      if (top7.length === 0) return res.status(400).json({ error: 'No eligible ideas to publish' });
+
+      const now = new Date();
+      const publisherId = req.user.id;
+
+      // Mark all eligible ideas as NONE first (reset previous run), then mark top 7 as FINALIST
+      const allIds = rows.map((r) => r.projectId);
+      await db.update(projects)
+        .set({ publishStatus: 'NONE', publishedAt: null, publishedById: null })
+        .where(inArray(projects.id, allIds));
+
+      await db.update(projects)
+        .set({ publishStatus: 'FINALIST', publishedAt: now, publishedById: publisherId })
+        .where(inArray(projects.id, top7.map((r) => r.projectId)));
+
+      // Load org info for emails
+      const [orgRecord] = await db
+        .select({ name: organizations.name, slug: organizations.slug })
+        .from(organizations)
+        .where(eq(organizations.id, orgId));
+      const orgName = orgRecord?.name || orgId;
+      const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
+
+      // Fire-and-forget emails
+      setImmediate(async () => {
+        try {
+          const resendApiKey = process.env.RESEND_API_KEY;
+          if (!resendApiKey) return;
+          const resendClient = new Resend(resendApiKey);
+          for (const r of top7) {
+            if (!r.ownerEmail) continue;
+            const html = loadTpl('finalist-announced', {
+              orgName,
+              userName: r.ownerFirstName || r.ownerEmail,
+              ideaTitle: r.title,
+              dashboardUrl: `${hostUrl}/w/${orgRecord?.slug || orgId}/my-ideas`,
+            });
+            if (!html) continue;
+            await resendClient.emails.send({
+              from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+              to: r.ownerEmail,
+              subject: `🏆 You're a Finalist! — ${orgName}`,
+              html,
+            });
+          }
+        } catch (emailErr) {
+          console.error('Failed to send finalist emails:', emailErr);
+        }
+      });
+
+      res.json({ published: top7.length, projectIds: top7.map((r) => r.projectId) });
+    } catch (error) {
+      console.error('Error publishing finalists:', error);
+      res.status(500).json({ error: 'Failed to publish finalists' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/admin/judge-leaderboard/publish-winners
+  // Marks top 3 IN_INCUBATION ideas (by judge score) as WINNER and emails each owner.
+  app.post('/api/workspaces/:orgId/admin/judge-leaderboard/publish-winners', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      // Fetch ordered judge leaderboard (aggregate scores)
+      const rows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          ownerEmail: users.email,
+          ownerFirstName: users.firstName,
+          totalCombined: drizzleSql<number>`coalesce(sum(${judgeEvaluations.totalScore}), 0)`,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(judgeEvaluations, eq(judgeEvaluations.projectId, projects.id))
+        .where(and(eq(projects.orgId, orgId), eq(projects.status, 'IN_INCUBATION')))
+        .groupBy(projects.id, users.email, users.firstName)
+        .orderBy(drizzleSql`coalesce(sum(${judgeEvaluations.totalScore}), 0) desc`);
+
+      const top3 = rows.slice(0, 3);
+      if (top3.length === 0) return res.status(400).json({ error: 'No eligible ideas to publish' });
+
+      const now = new Date();
+      const publisherId = req.user.id;
+      const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place'];
+      const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+
+      // Reset previous winners in this org, then mark top 3
+      const allIds = rows.map((r) => r.projectId);
+      await db.update(projects)
+        .set({ publishStatus: 'NONE', publishedAt: null, publishedById: null })
+        .where(inArray(projects.id, allIds));
+
+      await db.update(projects)
+        .set({ publishStatus: 'WINNER', publishedAt: now, publishedById: publisherId })
+        .where(inArray(projects.id, top3.map((r) => r.projectId)));
+
+      // Load org info for emails
+      const [orgRecord] = await db
+        .select({ name: organizations.name, slug: organizations.slug })
+        .from(organizations)
+        .where(eq(organizations.id, orgId));
+      const orgName = orgRecord?.name || orgId;
+      const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
+
+      setImmediate(async () => {
+        try {
+          const resendApiKey = process.env.RESEND_API_KEY;
+          if (!resendApiKey) return;
+          const resendClient = new Resend(resendApiKey);
+          for (let i = 0; i < top3.length; i++) {
+            const r = top3[i];
+            if (!r.ownerEmail) continue;
+            const html = loadTpl('winner-announced', {
+              orgName,
+              userName: r.ownerFirstName || r.ownerEmail,
+              ideaTitle: r.title,
+              rankMedal: RANK_MEDALS[i],
+              rankLabel: RANK_LABELS[i],
+              dashboardUrl: `${hostUrl}/w/${orgRecord?.slug || orgId}/my-ideas`,
+            });
+            if (!html) continue;
+            await resendClient.emails.send({
+              from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+              to: r.ownerEmail,
+              subject: `${RANK_MEDALS[i]} You're a Winner! — ${orgName}`,
+              html,
+            });
+          }
+        } catch (emailErr) {
+          console.error('Failed to send winner emails:', emailErr);
+        }
+      });
+
+      res.json({ published: top3.length, projectIds: top3.map((r) => r.projectId) });
+    } catch (error) {
+      console.error('Error publishing winners:', error);
+      res.status(500).json({ error: 'Failed to publish winners' });
     }
   });
 

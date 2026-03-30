@@ -196,6 +196,8 @@ export const projectStatusEnum = pgEnum("project_status", [
   "ARCHIVED"
 ]);
 
+export const publishStatusEnum = pgEnum("publish_status", ["NONE", "FINALIST", "WINNER"]);
+
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
@@ -208,6 +210,9 @@ export const projects = pgTable("projects", {
   deploymentUrl: varchar("deployment_url"), // Store Vercel deployment URL
   pitchDeckUrl: varchar("pitch_deck_url"), // URL of selected/uploaded pitch deck for this project
   submitted: boolean("submitted").default(false), // Track if project has been submitted to challenge
+  publishStatus: publishStatusEnum("publish_status").default("NONE"),
+  publishedAt: timestamp("published_at"),
+  publishedById: varchar("published_by_id").references(() => users.id),
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   verscale_chat_id: varchar("verscale_chat_id"),
   tags: text("tags").array().default([]),

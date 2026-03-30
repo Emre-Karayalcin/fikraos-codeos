@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>You're a Finalist — {{orgName}}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--bg:#f6f8fb;--card:#ffffff;--accent:#7c3aed;--muted:#6b7280}
+    body{margin:0;background:var(--bg);font-family:Inter,system-ui,Arial,sans-serif;color:#111}
+    .wrap{max-width:680px;margin:28px auto;padding:24px}
+    .card{background:var(--card);border-radius:12px;box-shadow:0 6px 30px rgba(16,24,40,0.06);overflow:hidden}
+    .header{display:flex;gap:16px;align-items:center;padding:28px 32px;border-bottom:1px solid #f1f5f9}
+    .logo{margin-right:10px;height:64px;flex:0 0 64px;border-radius:12px;background:#f3f6ff;display:flex;align-items:center;justify-content:center}
+    .logo img{height:auto;display:block}
+    .title{font-size:18px;font-weight:600}
+    .body{padding:28px 32px;line-height:1.6;color:#0f172a}
+    .greeting{margin:0 0 12px;font-size:16px}
+    .muted{color:var(--muted);font-size:14px;margin:8px 0}
+    .badge{display:inline-flex;align-items:center;gap:8px;background:#7c3aed;color:#fff;border-radius:8px;padding:10px 18px;font-weight:700;font-size:15px;margin:16px 0}
+    .cta{display:inline-block;margin:20px 0;padding:12px 20px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600}
+    .small{font-size:13px;color:#64748b}
+    .footer{padding:20px 32px;background:#fbfdff;border-top:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:13px}
+    @media (prefers-color-scheme: dark) {
+      :root{--bg:#0f172a;--card:#1e293b;--muted:#94a3b8}
+      body{color:#f1f5f9}
+      .header{border-bottom-color:#334155}
+      .body{color:#e2e8f0}
+      .footer{background:#1e293b;border-top-color:#334155;color:#94a3b8}
+      .logo{background:#1e293b}
+    }
+    @media (max-width:520px){.wrap{padding:12px}.header,.body,.footer{padding:18px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <div class="logo">
+          <img src="https://codeos-dev.infinitepltesting.com/logo-code.jpeg" alt="FikraHub" width="48" height="48" style="border-radius:8px" />
+        </div>
+        <div>
+          <div class="title">🎉 You're a Finalist — <strong>{{orgName}}</strong></div>
+          <div class="muted">Demo Day Qualification</div>
+        </div>
+      </div>
+
+      <div class="body">
+        <p class="greeting">Congratulations, {{userName}}!</p>
+
+        <p>
+          We are thrilled to announce that your idea <strong>"{{ideaTitle}}"</strong> has been selected as a
+          <strong>finalist</strong> in the <strong>{{orgName}}</strong> program.
+        </p>
+
+        <div style="text-align:center">
+          <span class="badge">🏆 Finalist — Demo Day Qualifier</span>
+        </div>
+
+        <p>
+          As a finalist, you are invited to participate in <strong>Demo Day</strong>.
+          This is your opportunity to present your idea to judges, mentors, and potential investors.
+          Please check the platform for Demo Day details and preparation materials.
+        </p>
+
+        <p style="text-align:center">
+          <a class="cta" href="{{dashboardUrl}}">View your idea on the platform</a>
+        </p>
+
+        <p class="small">
+          If the button doesn't work, copy &amp; paste this link into your browser:<br/>
+          <a href="{{dashboardUrl}}" style="color:#7c3aed;word-break:break-all">{{dashboardUrl}}</a>
+        </p>
+
+        <p class="small" style="margin-top:18px">
+          We look forward to seeing you at Demo Day. Keep up the great work!
+        </p>
+      </div>
+
+      <div class="footer">
+        © 2025 FikraHub — <span style="color:#334155">All rights reserved</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
