@@ -16,7 +16,7 @@ async function requireOrgAdmin(req: Request, res: Response, orgId: string): Prom
   const [membership] = await db
     .select({ role: organizationMembers.role })
     .from(organizationMembers)
-    .where(and(eq(organizationMembers.organizationId, orgId), eq(organizationMembers.userId, userId)));
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
 
   if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
     res.status(403).json({ error: "Forbidden" });
@@ -332,7 +332,7 @@ export function registerPitchLifecycleRoutes(app: Express) {
         ) AS "versionCount"
       FROM pitch_deck_generations pdg
       JOIN projects p ON p.id = pdg.project_id
-      JOIN organization_members om ON om.organization_id = $1 AND om.user_id = p.created_by_id
+      JOIN organization_members om ON om.org_id = $1 AND om.user_id = p.created_by_id
       JOIN users u ON u.id = pdg.created_by_id
       ORDER BY pdg.created_at DESC
     `, [orgId]);
