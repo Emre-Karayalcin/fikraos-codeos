@@ -280,6 +280,30 @@ export function registerPitchLifecycleRoutes(app: Express) {
     return res.json({ ok: true });
   });
 
+  // ── GET /api/workspaces/:orgId/admin/pitch-decks/:deckId/versions — admin version history (no ownership check)
+  app.get("/api/workspaces/:orgId/admin/pitch-decks/:deckId/versions", isAuthenticated, async (req: Request, res: Response) => {
+    const { orgId, deckId } = req.params;
+    if (!(await requireOrgAdmin(req, res, orgId))) return;
+
+    const versions = await db
+      .select({
+        id: pitchDeckVersions.id,
+        label: pitchDeckVersions.label,
+        snapshotUrl: pitchDeckVersions.snapshotUrl,
+        notes: pitchDeckVersions.notes,
+        createdAt: pitchDeckVersions.createdAt,
+        createdByFirstName: users.firstName,
+        createdByLastName: users.lastName,
+        createdByUsername: users.username,
+      })
+      .from(pitchDeckVersions)
+      .leftJoin(users, eq(pitchDeckVersions.createdById, users.id))
+      .where(eq(pitchDeckVersions.pitchDeckId, deckId))
+      .orderBy(desc(pitchDeckVersions.createdAt));
+
+    return res.json(versions);
+  });
+
   // ── GET /api/workspaces/:orgId/admin/pitch-decks — admin list (existing endpoint, enriched)
   // This replaces the existing endpoint defined in routes.ts so we override here — skip if already defined
   // Instead, provide a separate enriched endpoint:

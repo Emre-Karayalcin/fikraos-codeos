@@ -7,9 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2, ExternalLink, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
+import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2, ExternalLink, ChevronDown, ChevronRight, BookOpen, History, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AllAIOutputsView } from '@/components/idea/AllAIOutputsView';
+import BusinessModel from '@/components/assets/BusinessModel';
+import LeanCanvas from '@/components/assets/LeanCanvas';
+import Personas from '@/components/assets/Personas';
+import Swot from '@/components/assets/Swot';
+import TamSamSom from '@/components/assets/TamSamSom';
 import {
   Dialog,
   DialogContent,
@@ -94,6 +99,61 @@ export default function AdminIdeaDetail() {
     const next = new Set(prev);
     next.has(key) ? next.delete(key) : next.add(key);
     return next;
+  });
+  // version history panel state — which deck's versions are expanded
+  const [expandedVersionDeckId, setExpandedVersionDeckId] = useState<string | null>(null);
+
+  // Fetch workspace (needed for admin version history endpoint)
+  const { data: workspace } = useQuery({
+    queryKey: ['/api/workspaces', slug],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${slug}`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!slug,
+  });
+
+  // Fetch version history for the expanded pitch deck (admin bypass — no ownership check)
+  const { data: deckVersions = [], isLoading: versionsLoading } = useQuery<{
+    id: string; label: string; snapshotUrl: string | null; notes: string | null;
+    createdAt: string; createdByFirstName: string | null; createdByLastName: string | null; createdByUsername: string | null;
+  }[]>({
+    queryKey: ['/api/admin/pitch-deck-versions', expandedVersionDeckId, workspace?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspace!.id}/admin/pitch-decks/${expandedVersionDeckId}/versions`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!expandedVersionDeckId && !!workspace?.id,
+  });
+
+  // ── Asset History Tab ─────────────────────────────────────────────────────
+  const [selectedHistoryAsset, setSelectedHistoryAsset] = useState<any | null>(null);
+  const [selectedHistoryVersion, setSelectedHistoryVersion] = useState<any | null>(null);
+
+  // Fetch all assets for this idea (history tab)
+  const { data: ideaAssets = [] } = useQuery<any[]>({
+    queryKey: ['/api/projects', ideaId, 'assets'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${ideaId}/assets`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!ideaId && activeTab === 'history',
+  });
+
+  // Fetch versions for the selected asset
+  const { data: assetVersions = [], isLoading: assetVersionsLoading } = useQuery<{
+    id: string; label: string; createdAt: string; data: any;
+  }[]>({
+    queryKey: ['/api/assets', selectedHistoryAsset?.id, 'versions'],
+    queryFn: async () => {
+      const res = await fetch(`/api/assets/${selectedHistoryAsset!.id}/versions`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedHistoryAsset?.id,
   });
 
   // Fetch idea details (from projects API since ideas are stored as projects)
@@ -484,7 +544,7 @@ export default function AdminIdeaDetail() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <Info className="w-4 h-4" />
                 Overview
@@ -500,6 +560,10 @@ export default function AdminIdeaDetail() {
               <TabsTrigger value="pitch-decks" className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 Pitch Decks
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center gap-2">
+                <History className="w-4 h-4" />
+                History
               </TabsTrigger>
               <TabsTrigger value="comments" className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
@@ -1301,38 +1365,240 @@ export default function AdminIdeaDetail() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {pitchDecks.map((deck: any) => (
-                        <div key={deck.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">{deck.template || 'Pitch Deck'}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(deck.createdAt).toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                              deck.status === 'COMPLETED' ? 'bg-green-500/15 text-green-500' :
-                              deck.status === 'FAILED' ? 'bg-red-500/15 text-red-500' :
-                              'bg-yellow-500/15 text-yellow-500'
-                            }`}>{deck.status}</span>
-                            {deck.downloadUrl && (
-                              <a
-                                href={deck.downloadUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs text-primary hover:underline"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                Download
-                              </a>
+                      {pitchDecks.map((deck: any) => {
+                        const isVersionsOpen = expandedVersionDeckId === deck.id;
+                        return (
+                          <div key={deck.id} className="border border-border rounded-lg overflow-hidden">
+                            {/* Deck row */}
+                            <div className="flex items-center justify-between p-4">
+                              <div>
+                                <p className="font-medium text-sm">{deck.template || 'Pitch Deck'}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(deck.createdAt).toLocaleString()}
+                                </p>
+                                {deck.lifecycleStatus && (
+                                  <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                    deck.lifecycleStatus === 'SUBMITTED' ? 'bg-green-500/15 text-green-600' :
+                                    deck.lifecycleStatus === 'PENDING_REVIEW' ? 'bg-blue-500/15 text-blue-600' :
+                                    deck.lifecycleStatus === 'REVIEWED' ? 'bg-purple-500/15 text-purple-600' :
+                                    deck.lifecycleStatus === 'REJECTED' ? 'bg-red-500/15 text-red-600' :
+                                    'bg-muted text-muted-foreground'
+                                  }`}>{deck.lifecycleStatus}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                  deck.status === 'COMPLETED' ? 'bg-green-500/15 text-green-500' :
+                                  deck.status === 'FAILED' ? 'bg-red-500/15 text-red-500' :
+                                  'bg-yellow-500/15 text-yellow-500'
+                                }`}>{deck.status}</span>
+                                {deck.downloadUrl && (
+                                  <a
+                                    href={deck.downloadUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    Download
+                                  </a>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`h-7 px-2 gap-1.5 text-xs ${isVersionsOpen ? 'text-primary' : 'text-muted-foreground'}`}
+                                  onClick={() => setExpandedVersionDeckId(isVersionsOpen ? null : deck.id)}
+                                >
+                                  <History className="w-3.5 h-3.5" />
+                                  Version History
+                                  {isVersionsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Version history panel */}
+                            {isVersionsOpen && (
+                              <div className="border-t border-border bg-muted/30 px-4 py-3">
+                                <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                                  Version History
+                                </p>
+                                {versionsLoading ? (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    Loading versions...
+                                  </div>
+                                ) : deckVersions.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-2">No versions saved yet.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {deckVersions.map((v, vi) => (
+                                      <div key={v.id} className="flex items-start justify-between gap-4 p-3 bg-background rounded-lg border border-border">
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-medium">{v.label}</span>
+                                            {vi === 0 && (
+                                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary">Latest</span>
+                                            )}
+                                          </div>
+                                          {v.notes && (
+                                            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{v.notes}</p>
+                                          )}
+                                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                                            {new Date(v.createdAt).toLocaleString()}
+                                            {(v.createdByFirstName || v.createdByUsername) && (
+                                              <> · {[v.createdByFirstName, v.createdByLastName].filter(Boolean).join(' ') || v.createdByUsername}</>
+                                            )}
+                                          </p>
+                                        </div>
+                                        {v.snapshotUrl && (
+                                          <a
+                                            href={v.snapshotUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                                          >
+                                            <Download className="w-3 h-3" />
+                                            Download
+                                          </a>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* History Tab */}
+            <TabsContent value="history" className="mt-6">
+              <div className="flex gap-0 border border-border rounded-lg overflow-hidden" style={{ minHeight: 480 }}>
+                {/* Left pane: asset list */}
+                <div className="w-64 shrink-0 border-r border-border flex flex-col bg-muted/20">
+                  <div className="p-3 border-b border-border bg-muted/40">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {ideaAssets.length} Asset{ideaAssets.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  {ideaAssets.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground px-4 text-center py-10">
+                      <History className="w-8 h-8 mb-2 opacity-30" />
+                      <p className="text-sm">No AI outputs yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-y-auto flex-1">
+                      {ideaAssets.map((asset: any) => {
+                        const isSelected = selectedHistoryAsset?.id === asset.id;
+                        const kindLabel = asset.title || asset.kind?.replace(/_/g, ' ') || 'Asset';
+                        return (
+                          <button
+                            key={asset.id}
+                            onClick={() => {
+                              setSelectedHistoryAsset(asset);
+                              setSelectedHistoryVersion(null);
+                            }}
+                            className={`w-full text-left px-4 py-3 text-sm border-b border-border/50 transition-colors hover:bg-muted/60 ${isSelected ? 'bg-primary/10 border-l-2 border-l-primary font-medium' : ''}`}
+                          >
+                            <p className="truncate">{kindLabel}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {new Date(asset.updatedAt || asset.createdAt).toLocaleDateString()}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Middle pane: version list for selected asset */}
+                {selectedHistoryAsset && (
+                  <div className="w-56 shrink-0 border-r border-border flex flex-col bg-background">
+                    <div className="p-3 border-b border-border bg-muted/20">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        {assetVersionsLoading ? 'Loading...' : `${assetVersions.length} Version${assetVersions.length !== 1 ? 's' : ''} Saved`}
+                      </p>
+                    </div>
+                    {assetVersionsLoading ? (
+                      <div className="flex items-center justify-center flex-1 gap-2 text-muted-foreground text-sm">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    ) : assetVersions.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground px-4 text-center py-10">
+                        <History className="w-7 h-7 mb-2 opacity-30" />
+                        <p className="text-xs">No versions yet</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-y-auto flex-1 divide-y divide-border/50">
+                        {assetVersions.map((v: any) => {
+                          const isVSelected = selectedHistoryVersion?.id === v.id;
+                          return (
+                            <button
+                              key={v.id}
+                              onClick={() => setSelectedHistoryVersion(v)}
+                              className={`w-full text-left px-4 py-3 hover:bg-muted/40 transition-colors ${isVSelected ? 'bg-blue-50 dark:bg-blue-950/30 border-l-2 border-l-blue-500' : ''}`}
+                            >
+                              <p className="text-sm font-medium truncate">{v.label}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Click to preview</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Right pane: version preview */}
+                <div className="flex-1 overflow-y-auto p-5 bg-muted/10">
+                  {!selectedHistoryAsset ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-20">
+                      <History className="w-10 h-10 mb-3 opacity-20" />
+                      <p className="text-sm">Select an asset on the left to view its history</p>
+                    </div>
+                  ) : !selectedHistoryVersion ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-20">
+                      <History className="w-10 h-10 mb-3 opacity-20" />
+                      <p className="text-sm">Select a version to preview</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold">{selectedHistoryVersion.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {new Date(selectedHistoryVersion.createdAt).toLocaleString()} · Read-only preview
+                          </p>
+                        </div>
+                      </div>
+                      <div className="border border-border rounded-lg overflow-hidden bg-background">
+                        {(() => {
+                          const kind = (selectedHistoryAsset.kind || '').toUpperCase().replace(/-/g, '_');
+                          const data = selectedHistoryVersion.data;
+                          switch (kind) {
+                            case 'BUSINESS_MODEL': case 'BUSINESSMODEL': return <BusinessModel data={data} />;
+                            case 'LEAN_CANVAS': case 'LEANCANVAS': return <LeanCanvas data={data} />;
+                            case 'PERSONA': case 'PERSONAS': return <Personas data={data} />;
+                            case 'SWOT': return <Swot data={data} />;
+                            case 'TAM_SAM_SOM': case 'TAMSAMSOM': return <TamSamSom data={data} />;
+                            default: return (
+                              <div className="p-4">
+                                <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono overflow-auto max-h-96">
+                                  {JSON.stringify(data, null, 2)}
+                                </pre>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </TabsContent>
 
             {/* Comments Tab */}
