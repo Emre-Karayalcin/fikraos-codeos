@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { db } from "./db";
 import { pitchDeckGenerations, pitchDeckVersions, pitchDeckReviews, users, organizationMembers } from "../shared/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { isAuthenticated } from "./auth";
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -311,7 +311,7 @@ export function registerPitchLifecycleRoutes(app: Express) {
     const { orgId } = req.params;
     if (!(await requireOrgAdmin(req, res, orgId))) return;
 
-    const result = await db.execute(`
+    const result = await db.execute(sql`
       SELECT
         pdg.*,
         p.title AS "projectTitle",
@@ -332,10 +332,10 @@ export function registerPitchLifecycleRoutes(app: Express) {
         ) AS "versionCount"
       FROM pitch_deck_generations pdg
       JOIN projects p ON p.id = pdg.project_id
-      JOIN organization_members om ON om.org_id = $1 AND om.user_id = p.created_by_id
+      JOIN organization_members om ON om.org_id = ${orgId} AND om.user_id = p.created_by_id
       JOIN users u ON u.id = pdg.created_by_id
       ORDER BY pdg.created_at DESC
-    `, [orgId]);
+    `);
 
     return res.json(result.rows);
   });
