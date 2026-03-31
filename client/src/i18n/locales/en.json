@@ -1477,6 +1477,10 @@
         "title": "Members",
         "description": "Manage team members"
       },
+      "mentors": {
+        "title": "Mentors",
+        "description": "Manage mentors"
+      },
       "challenges": {
         "title": "Sectors",
         "description": "Manage sectors"
