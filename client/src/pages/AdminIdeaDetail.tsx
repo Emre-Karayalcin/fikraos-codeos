@@ -1575,7 +1575,7 @@ export default function AdminIdeaDetail() {
                           </p>
                         </div>
                       </div>
-                      <div className="border border-border rounded-lg overflow-hidden bg-background">
+                      <div className="overflow-hidden bg-background">
                         {(() => {
                           const kind = (selectedHistoryAsset.kind || '').toUpperCase().replace(/-/g, '_');
                           const data = selectedHistoryVersion.data;
