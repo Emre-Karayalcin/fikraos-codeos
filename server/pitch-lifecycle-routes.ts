@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { db } from "./db";
 import { pitchDeckGenerations, pitchDeckVersions, pitchDeckReviews, users, organizationMembers } from "../shared/schema";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { isAuthenticated } from "./auth";
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -9,9 +9,6 @@ import { isAuthenticated } from "./auth";
 async function requireOrgAdmin(req: Request, res: Response, orgId: string): Promise<boolean> {
   const userId = (req.user as any)?.id;
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return false; }
-
-  const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
-  if (user?.role === "super_admin") return true;
 
   const [membership] = await db
     .select({ role: organizationMembers.role })
@@ -33,9 +30,7 @@ async function getDeckAndCheckOwner(req: Request, res: Response): Promise<any | 
   const [deck] = await db.select().from(pitchDeckGenerations).where(eq(pitchDeckGenerations.id, deckId));
   if (!deck) { res.status(404).json({ error: "Pitch deck not found" }); return null; }
 
-  const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
-
-  if (deck.createdById !== userId && user?.role !== "super_admin") {
+  if (deck.createdById !== userId) {
     res.status(403).json({ error: "Forbidden" });
     return null;
   }
@@ -52,7 +47,7 @@ function makeVersionLabel(prefix: string = "Saved"): string {
 // ── Route registration ────────────────────────────────────────────────────────
 
 export function registerPitchLifecycleRoutes(app: Express) {
-  console.log("[pitch-lifecycle] routes registered (v3 — try-catch + sql template)");
+  console.log("[pitch-lifecycle] routes registered (v4 — removed users.role references)");
 
   // ── GET /api/pitch-decks/:deckId — deck detail with versions + latest review
   app.get("/api/pitch-decks/:deckId", isAuthenticated, async (req: Request, res: Response) => {
@@ -63,8 +58,7 @@ export function registerPitchLifecycleRoutes(app: Express) {
       const [deck] = await db.select().from(pitchDeckGenerations).where(eq(pitchDeckGenerations.id, deckId));
       if (!deck) return res.status(404).json({ error: "Not found" });
 
-      const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
-      if (deck.createdById !== userId && user?.role !== "super_admin") {
+      if (deck.createdById !== userId) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -235,9 +229,7 @@ export function registerPitchLifecycleRoutes(app: Express) {
 
       const [deck] = await db.select().from(pitchDeckGenerations).where(eq(pitchDeckGenerations.id, deckId));
       if (!deck) return res.status(404).json({ error: "Not found" });
-
-      const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
-      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const { reviewStatus, feedback } = req.body;
       if (!["APPROVED", "REJECTED", "NEEDS_REVISION"].includes(reviewStatus)) {
@@ -284,10 +276,7 @@ export function registerPitchLifecycleRoutes(app: Express) {
 
       const [deck] = await db.select().from(pitchDeckGenerations).where(eq(pitchDeckGenerations.id, deckId));
       if (!deck) return res.status(404).json({ error: "Not found" });
-
-      const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
-      if (!user) return res.status(401).json({ error: "Unauthorized" });
-      if (user.role !== "super_admin") return res.status(403).json({ error: "Forbidden" });
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const { locked, reason } = req.body;
       const now = new Date();
