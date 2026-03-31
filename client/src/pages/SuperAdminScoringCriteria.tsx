@@ -127,7 +127,7 @@ const AI_SCREENING = {
   trigger: 'Triggered automatically on application submission (fire-and-forget via setImmediate). Can also be re-run with admin-provided context ("Refine with context" in the Applications view).',
   file: 'server/lib/applicationScreening.ts',
   categories: [
-    { name: 'Business Maturity', weight: 40, color: 'emerald', description: 'Clarity of problem, market differentiation, user understanding', inputs: ['Idea Name', 'Sector', 'Problem Statement', 'Differentiator', 'Target User'] },
+    { name: 'Business Maturity', weight: 40, color: 'emerald', description: 'Clarity of problem, market differentiation, user understanding', inputs: ['Idea Name', 'Sector', 'Sector', 'Differentiator', 'Target User'] },
     { name: 'Technical Maturity', weight: 30, color: 'violet', description: 'Solution completeness, feasibility, validation evidence', inputs: ['Solution Description', 'Has Validation', 'Validation Details', 'Relevant Skills'] },
     { name: 'Strategic Alignment', weight: 30, color: 'amber', description: 'Relevance to competition brief, sector fit, strategic potential', inputs: ['Sector', 'Challenge Evaluation Criteria (if applicable)', 'Previous Winner status'] },
   ],

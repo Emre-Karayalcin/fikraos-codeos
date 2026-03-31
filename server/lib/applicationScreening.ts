@@ -111,7 +111,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
   const userPrompt = `Application Details:
 Idea Name: ${app.ideaName || 'N/A'}
 Sector: ${app.sector || 'N/A'}
-Problem Statement: ${app.problemStatement || 'N/A'}
+Sector: ${app.problemStatement || 'N/A'}
 Solution Description: ${app.solutionDescription || 'N/A'}
 Differentiator: ${app.differentiator || 'N/A'}
 Target User: ${app.targetUser || 'N/A'}
@@ -192,7 +192,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
     const userPrompt = `Application Details:
 Idea Name: ${app.ideaName || 'N/A'}
 Sector: ${app.sector || 'N/A'}
-Problem Statement: ${app.problemStatement || 'N/A'}
+Sector: ${app.problemStatement || 'N/A'}
 Solution Description: ${app.solutionDescription || 'N/A'}
 Differentiator: ${app.differentiator || 'N/A'}
 Target User: ${app.targetUser || 'N/A'}

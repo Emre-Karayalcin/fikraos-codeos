@@ -78,7 +78,7 @@ export default function AdminWorkspace() {
   const editableRoutesDefault = [
     { key: 'navigation.dashboard', prefix: 'dashboard', path: '/dashboard', label: { en: 'Dashboard', ar: 'لوحة القيادة' } },
     { key: 'navigation.myIdeas', prefix: 'myIdeas', path: '/my-ideas', label: { en: 'My Ideas', ar: 'أفكاري' }, desc: { en: 'Manage and track all your project ideas', ar: 'إدارة وتتبع جميع أفكار مشاريعك' } },
-    { key: 'navigation.challenges', prefix: 'challenges', path: '/challenges', label: { en: 'Problem Statements', ar: 'بيانات المشكلة' }, desc: { en: 'Join innovative problem statements and compete with entrepreneurs across the MENA region', ar: 'انضم إلى بيانات مشكلة مبتكرة وتنافس مع رواد الأعمال في منطقة الشرق الأوسط وشمال أفريقيا' } },
+    { key: 'navigation.challenges', prefix: 'challenges', path: '/challenges', label: { en: 'Sectors', ar: 'القطاعات' }, desc: { en: 'Join innovative sectors and compete with entrepreneurs across the MENA region', ar: 'انضم إلى قطاعات مبتكرة وتنافس مع رواد الأعمال في منطقة الشرق الأوسط وشمال أفريقيا' } },
     { key: 'navigation.radar', prefix: 'radar', path: '/radar', label: { en: 'Radar', ar: 'الرادار' }, desc: { en: 'Stay updated with the latest developments in MENA technology, innovation, and business', ar: 'ابقَ على اطلاع بأحدث التطورات في تكنولوجيا وابتكار وأعمال منطقة الشرق الأوسط وشمال أفريقيا' } },
     { key: 'navigation.experts', prefix: 'experts', path: '/experts', title: { en: 'Talk to Experts', ar: 'تحدث إلى الخبراء' }, label: { en: 'Experts', ar: 'الخبراء' }, desc: { en: 'Get personalized advice from industry specialists', ar: 'احصل على نصائح شخصية من المتخصصين في الصناعة' } }
   ];

@@ -132,7 +132,7 @@ export function ApplicationDetailModal({ row, onClose, onUpdate, onRescreen, onR
   const qaItems = [
     { label: "Idea Name", value: app.ideaName },
     { label: "Sector", value: app.sector },
-    { label: "Problem Statement", value: app.problemStatement },
+    { label: "Sector", value: app.problemStatement },
     { label: "Solution Description", value: app.solutionDescription },
     { label: "Differentiator", value: app.differentiator },
     { label: "Target User", value: app.targetUser },

@@ -401,7 +401,7 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === "create" ? "New Problem Statement" : `Edit — ${challenge?.title}`}
+            {mode === "create" ? "New Sector" : `Edit — ${challenge?.title}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -467,7 +467,7 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
             <Input
               value={form.title}
               onChange={(e) => handleTitleChange(e.target.value)}
-              placeholder="Problem statement title"
+              placeholder="Sector title"
             />
           </div>
 
@@ -502,7 +502,7 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
             <Textarea
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
-              placeholder="Full description of the problem statement…"
+              placeholder="Full description of the sector…"
               rows={4}
             />
           </div>
@@ -568,7 +568,7 @@ function ChallengeModal({ mode, challenge, orgId, onClose, onSubmit, isPending }
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={!isValid || isPending || !!criteriaError}>
-            {isPending ? "Saving…" : mode === "create" ? "Create Problem Statement" : "Save Changes"}
+            {isPending ? "Saving…" : mode === "create" ? "Create Sector" : "Save Changes"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -644,7 +644,7 @@ export default function AdminChallenges() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/challenges", workspace?.id] });
-      toast.success("Problem statement created");
+      toast.success("Sector created");
       setModal(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -782,7 +782,7 @@ export default function AdminChallenges() {
             <div className="flex items-center gap-3">
               <Target className="w-8 h-8 text-primary" />
               <div>
-                <h1 className="text-3xl font-bold">Problem Statements</h1>
+                <h1 className="text-3xl font-bold">Sectors</h1>
                 <p className="text-muted-foreground">
                   Create and manage challenges for your workspace
                 </p>
@@ -790,7 +790,7 @@ export default function AdminChallenges() {
             </div>
             <Button onClick={() => setModal({ mode: "create" })}>
               <Plus className="w-4 h-4 mr-2" />
-              New Problem Statement
+              New Sector
             </Button>
           </div>
 
@@ -815,7 +815,7 @@ export default function AdminChallenges() {
           <Card className="border border-border/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
-                All Problem Statements
+                All Sectors
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
                 Drag rows to reorder. Use the actions menu to publish or archive.
@@ -829,8 +829,8 @@ export default function AdminChallenges() {
               ) : sortedRows.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <Target className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p className="font-medium">No problem statements yet</p>
-                  <p className="text-sm mt-1">Click "New Problem Statement" to get started.</p>
+                  <p className="font-medium">No sectors yet</p>
+                  <p className="text-sm mt-1">Click "New Sector" to get started.</p>
                 </div>
               ) : (
                 <DndContext
@@ -910,7 +910,7 @@ export default function AdminChallenges() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{deleteTarget?.title}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes the problem statement and all its submissions. This action cannot be undone.
+              This permanently deletes the sector and all its submissions. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

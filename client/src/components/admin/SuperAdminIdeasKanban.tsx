@@ -341,7 +341,7 @@ export function SuperAdminIdeasKanban({ workspaces }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground font-medium">Problem Statement:</span>
+          <span className="text-sm text-muted-foreground font-medium">Sector:</span>
           <Select
             value={selectedChallengeId}
             onValueChange={setSelectedChallengeId}
@@ -365,11 +365,11 @@ export function SuperAdminIdeasKanban({ workspaces }: Props) {
         </Badge>
       </div>
 
-      {/* Problem Statement banner (when a challenge is selected) */}
+      {/* Sector banner (when a challenge is selected) */}
       {selectedChallenge?.problemStatement && (
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-            Problem Statement — {selectedChallenge.title}
+            Sector — {selectedChallenge.title}
           </p>
           <p className="text-sm text-foreground leading-relaxed">
             {selectedChallenge.problemStatement}

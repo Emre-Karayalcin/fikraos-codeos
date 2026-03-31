@@ -71,7 +71,7 @@ interface LeaderboardRow {
 // ─── Scoring form constants ────────────────────────────────────────────────────
 
 const DEMO_DECK_QUESTIONS = [
-  { key: "d1", label: "Problem statement", weight: 8 },
+  { key: "d1", label: "Sector", weight: 8 },
   { key: "d2", label: "Solution statement", weight: 8 },
   { key: "d3", label: "Prototype slide", weight: 8 },
   { key: "d4", label: "Target audience", weight: 8 },

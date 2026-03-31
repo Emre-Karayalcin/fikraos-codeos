@@ -1067,13 +1067,13 @@
     "deletionFailedDesc": "Failed to delete account."
   },
   "challenges": {
-    "title": "Problem Statements",
-    "subtitle": "Join innovative problem statements and compete with entrepreneurs across the MENA region",
-    "activeChallenges": "{{count}} Active Problem Statements",
+    "title": "Sectors",
+    "subtitle": "Join innovative sectors and compete with entrepreneurs across the MENA region",
+    "activeChallenges": "{{count}} Active Sectors",
     "upcomingChallenges": "{{count}} Upcoming",
     "submissions": "{{count}} submissions",
     "submissionsLabel": "Submissions",
-    "errorFetch": "Failed to fetch problem statements",
+    "errorFetch": "Failed to fetch sectors",
     "status": {
       "active": "Active",
       "upcoming": "Upcoming",
@@ -1081,11 +1081,11 @@
       "draft": "Draft"
     },
     "delete": {
-      "button": "Delete problem statement",
-      "confirm": "Are you sure you want to delete this problem statement? This action cannot be undone.",
-      "successTitle": "Problem statement deleted",
-      "successDesc": "The problem statement has been successfully deleted.",
-      "errorGeneric": "Failed to delete problem statement"
+      "button": "Delete sector",
+      "confirm": "Are you sure you want to delete this sector? This action cannot be undone.",
+      "successTitle": "Sector deleted",
+      "successDesc": "The sector has been successfully deleted.",
+      "errorGeneric": "Failed to delete sector"
     },
     "timeLeft": {
       "ended": "Ended",
@@ -1095,23 +1095,23 @@
       "daysLeft": "{{days}} days left"
     },
     "filters": {
-      "all": "All Problem Statements",
+      "all": "All Sectors",
       "active": "Active",
       "upcoming": "Upcoming",
       "ended": "Ended"
     },
     "empty": {
-      "title": "No problem statements found",
-      "noCreated": "No problem statements have been created yet",
-      "tryFilters": "Try adjusting your filters to see more problem statements"
+      "title": "No sectors found",
+      "noCreated": "No sectors have been created yet",
+      "tryFilters": "Try adjusting your filters to see more sectors"
     },
     "create": {
-      "button": "Create Problem Statement",
-      "title": "Create New Problem Statement",
-      "description": "Create a new innovation problem statement for your competition",
-      "successTitle": "Problem Statement Created",
-      "successDesc": "Your problem statement has been created successfully",
-      "errorGeneric": "Failed to create problem statement",
+      "button": "Create Sector",
+      "title": "Create New Sector",
+      "description": "Create a new innovation sector for your competition",
+      "successTitle": "Sector Created",
+      "successDesc": "Your sector has been created successfully",
+      "errorGeneric": "Failed to create sector",
       "missingFieldsTitle": "Missing Fields",
       "missingFieldsDesc": "Please fill in all required fields"
     },
@@ -1121,9 +1121,9 @@
       "slug": "URL Slug",
       "slugPlaceholder": "neom-smart-city",
       "shortDescription": "Short Description",
-      "shortDescriptionPlaceholder": "Brief one-liner about the problem statement",
+      "shortDescriptionPlaceholder": "Brief one-liner about the sector",
       "description": "Description",
-      "descriptionPlaceholder": "Detailed description of the problem statement...",
+      "descriptionPlaceholder": "Detailed description of the sector...",
       "deadline": "Deadline",
       "date": "Date",
       "time": "Time",
@@ -1213,25 +1213,25 @@
     }
   },
   "challenge": {
-    "notFound": "Problem Statement Not Found",
-    "backToChallenges": "Back to Problem Statements",
+    "notFound": "Sector Not Found",
+    "backToChallenges": "Back to Sectors",
     "deadline": "Deadline",
     "daysLeft": "{{count}} days left",
     "daysLeft_one": "{{count}} day left",
     "ended": "Ended",
     "submissions": "{{count}} submissions",
     "submissions_one": "{{count}} submission",
-    "description": "Problem Statement Description",
-    "myIdeas": "My Problem Statement Ideas ({{count}})",
+    "description": "Sector Description",
+    "myIdeas": "My Sector Ideas ({{count}})",
     "creating": "Creating...",
     "createIdea": "Create Idea",
     "noIdeasYet": "No ideas yet. Create your first one!",
     "delete": {
-      "button": "Delete problem statement",
-      "confirm": "Are you sure you want to delete this problem statement? This will also delete all associated projects and submissions. This action cannot be undone.",
-      "successTitle": "Problem statement deleted",
-      "successDesc": "The problem statement and all associated projects have been successfully deleted.",
-      "errorGeneric": "Failed to delete problem statement"
+      "button": "Delete sector",
+      "confirm": "Are you sure you want to delete this sector? This will also delete all associated projects and submissions. This action cannot be undone.",
+      "successTitle": "Sector deleted",
+      "successDesc": "The sector and all associated projects have been successfully deleted.",
+      "errorGeneric": "Failed to delete sector"
     },
     "table": {
       "title": "Title",
@@ -1245,7 +1245,7 @@
     "noSubmissionsYet": "No submissions yet. Be the first to submit!",
     "submissionProgress": "Submission Progress",
     "capacity": "Capacity",
-    "challengeStatus": "Problem Statement Status",
+    "challengeStatus": "Sector Status",
     "statusLabel": "Status",
     "timeLeft": "Time Left",
     "days": "d",
@@ -1257,12 +1257,12 @@
     },
     "submitSolution": "Submit Your Solution",
     "submitYourSolution": "Submit Your Solution",
-    "submitDescription": "Share your innovative solution to this problem statement",
+    "submitDescription": "Share your innovative solution to this sector",
     "form": {
       "title": "Solution Title *",
       "titlePlaceholder": "My Smart City Solution",
       "description": "Description *",
-      "descriptionPlaceholder": "Describe your solution and how it addresses the problem statement...",
+      "descriptionPlaceholder": "Describe your solution and how it addresses the sector...",
       "demoUrl": "Demo URL (optional)"
     },
     "submitSolutionButton": "Submit Solution",
@@ -1297,31 +1297,31 @@
     "optional": "optional",
     "title": "Title",
     "url": "URL",
-    "reviewSubmissionNote": "Please review your idea carefully. You can edit it later before submitting to the problem statement.",
+    "reviewSubmissionNote": "Please review your idea carefully. You can edit it later before submitting to the sector.",
     "back": "Back",
     "next": "Next",
     "titleRequired": "Title is required",
     "descriptionMinLength": "Description must be at least 50 characters",
     "submitting": "Submitting...",
     "creatingIdea": "Creating...",
-    "submitToChallenge": "Submit to Problem Statement",
+    "submitToChallenge": "Submit to Sector",
     "createIdeaButton": "Create Idea",
     "projectSubmitted": "Project submitted successfully!",
     "submissionCreated": "Submission created successfully!",
     "submissionFailed": "Failed to create submission",
-    "confirmSubmit": "Submit this project to the problem statement? This action cannot be undone.",
+    "confirmSubmit": "Submit this project to the sector? This action cannot be undone.",
     "submit": "Submit",
     "chooseCreationMethod": "How would you like to create your idea?",
-    "chooseMethodDescription": "Choose your preferred method for developing your problem statement submission",
+    "chooseMethodDescription": "Choose your preferred method for developing your sector submission",
     "buildWithAI": "Build with AI",
     "buildWithAIDescription": "Use our AI assistant to help develop your idea through an interactive chat experience. Perfect for brainstorming and iterative development.",
     "submitViaForm": "Submit via Form",
-    "submitViaFormDescription": "Fill out a quick 3-step form to create your idea. Once created, you can click Submit to enter the problem statement.",
+    "submitViaFormDescription": "Fill out a quick 3-step form to create your idea. Once created, you can click Submit to enter the sector.",
     "buildManually": "Build Manually",
     "buildManuallyDescription": "Fill out a structured 4-step form to define your idea comprehensively. Includes idea description, location, uniqueness, and naming.",
     "submissionDisabled": "Submission options are currently disabled for this competition. Please contact your competition administrator.",
     "descriptionPlaceholder": "Describe your idea in detail (minimum 50 characters)",
-    "ideaCreated": "Idea created successfully! Click Submit to enter the problem statement.",
+    "ideaCreated": "Idea created successfully! Click Submit to enter the sector.",
     "ideaCreationFailed": "Failed to create idea",
     "viewDetails": "View Details",
     "submittedBy": "Submitted by",
@@ -1478,8 +1478,8 @@
         "description": "Manage team members"
       },
       "challenges": {
-        "title": "Problem Statements",
-        "description": "Manage problem statements"
+        "title": "Sectors",
+        "description": "Manage sectors"
       },
       "settings": {
         "title": "Settings",

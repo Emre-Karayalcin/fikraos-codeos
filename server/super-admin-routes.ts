@@ -66,7 +66,7 @@ const DEFAULT_JUDGE_CONFIG: ScoringConfig = {
     {
       id: 'deck', name: 'Demo Deck Slides', weight: 40, color: 'orange',
       questions: [
-        { id: 'd1', label: 'Problem statement', weight: 8 },
+        { id: 'd1', label: 'Sector', weight: 8 },
         { id: 'd2', label: 'Solution statement', weight: 8 },
         { id: 'd3', label: 'Prototype slide', weight: 8 },
         { id: 'd4', label: 'Target audience', weight: 8 },

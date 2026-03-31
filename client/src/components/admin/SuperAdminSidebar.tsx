@@ -26,7 +26,7 @@ const navSections = [
     items: [
       { title: "Competitions",       href: "/admin/workspaces",       icon: Building2 },
       { title: "Applications",       href: "/admin/applications",     icon: ClipboardList },
-      { title: "Problem Statements", href: "/admin/challenges",       icon: Target },
+      { title: "Sectors", href: "/admin/challenges",       icon: Target },
       { title: "Idea Management",    href: "/admin/ideas",            icon: Kanban },
     ],
   },
