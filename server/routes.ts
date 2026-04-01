@@ -2133,7 +2133,7 @@ export function registerRoutes(app: Express): Server {
         .from(projects)
         .innerJoin(users, eq(projects.createdById, users.id))
         .leftJoin(judgeEvaluations, eq(judgeEvaluations.projectId, projects.id))
-        .where(and(eq(projects.orgId, orgId), eq(projects.status, 'IN_INCUBATION')))
+        .where(and(eq(projects.orgId, orgId), inArray(projects.status, ['IN_INCUBATION', 'ARCHIVED'])))
         .groupBy(projects.id, users.email, users.firstName)
         .orderBy(drizzleSql`coalesce(sum(${judgeEvaluations.totalScore}), 0) desc`);
 
@@ -2145,12 +2145,13 @@ export function registerRoutes(app: Express): Server {
       const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place'];
       const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
-      // Reset previous winners in this org, then mark top 3
+      // Reset previous winners: clear publishStatus and return to IN_INCUBATION
       const allIds = rows.map((r) => r.projectId);
       await db.update(projects)
-        .set({ publishStatus: 'NONE', publishedAt: null, publishedById: null })
+        .set({ publishStatus: 'NONE', publishedAt: null, publishedById: null, status: 'IN_INCUBATION' })
         .where(inArray(projects.id, allIds));
 
+      // Mark top 3 as WINNER and move to Results Published
       await db.update(projects)
         .set({ publishStatus: 'WINNER', publishedAt: now, publishedById: publisherId, status: 'ARCHIVED' })
         .where(inArray(projects.id, top3.map((r) => r.projectId)));
