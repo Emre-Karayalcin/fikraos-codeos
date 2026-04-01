@@ -159,15 +159,17 @@ function ReviewDialog({
 
 function VersionHistoryDialog({
   deck,
+  orgId,
   onClose,
 }: {
   deck: DeckRow;
+  orgId: string;
   onClose: () => void;
 }) {
   const { data: versions = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/api/pitch-decks/${deck.id}/versions`],
+    queryKey: [`/api/workspaces/${orgId}/admin/pitch-decks/${deck.id}/versions`],
     queryFn: async () => {
-      const res = await fetch(`/api/pitch-decks/${deck.id}/versions`, { credentials: "include" });
+      const res = await fetch(`/api/workspaces/${orgId}/admin/pitch-decks/${deck.id}/versions`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -193,6 +195,11 @@ function VersionHistoryDialog({
               <div key={v.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border">
                 <div>
                   <p className="text-sm font-medium">{v.label}</p>
+                  {(v.createdByFirstName || v.createdByUsername) && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      by {v.createdByFirstName ? `${v.createdByFirstName} ${v.createdByLastName ?? ''}`.trim() : v.createdByUsername}
+                    </p>
+                  )}
                   {v.notes && <p className="text-xs text-muted-foreground mt-0.5">{v.notes}</p>}
                 </div>
                 {v.snapshotUrl && (
@@ -428,8 +435,8 @@ export default function AdminPitchDecks() {
       {reviewDeck && orgId && (
         <ReviewDialog deck={reviewDeck} orgId={orgId} onClose={() => setReviewDeck(null)} />
       )}
-      {historyDeck && (
-        <VersionHistoryDialog deck={historyDeck} onClose={() => setHistoryDeck(null)} />
+      {historyDeck && orgId && (
+        <VersionHistoryDialog deck={historyDeck} orgId={orgId} onClose={() => setHistoryDeck(null)} />
       )}
     </div>
   );
