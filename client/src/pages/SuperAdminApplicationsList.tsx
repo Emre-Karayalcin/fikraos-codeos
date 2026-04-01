@@ -82,7 +82,7 @@ async function apiFetch(url: string, options?: RequestInit) {
 export default function SuperAdminApplicationsList() {
   const qc = useQueryClient();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("__all__");
   const [selectedApplication, setSelectedApplication] = useState<SuperAdminApplication | null>(null);
   const [confirmBulkAccept, setConfirmBulkAccept] = useState(false);
   const [confirmBulkReject, setConfirmBulkReject] = useState(false);
@@ -106,7 +106,7 @@ export default function SuperAdminApplicationsList() {
   const { data: stats, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ["/api/super-admin/workspaces", selectedOrgId, "applications/stats"],
     queryFn: () => apiFetch(`/api/super-admin/workspaces/${selectedOrgId}/applications/stats`),
-    enabled: !!selectedOrgId,
+    enabled: selectedOrgId !== "__all__",
   });
 
   const updateApplication = useMutation({
@@ -118,7 +118,7 @@ export default function SuperAdminApplicationsList() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/super-admin/applications"] });
-      if (selectedOrgId) refetchStats();
+      if (selectedOrgId !== "__all__") refetchStats();
       toast.success("Application updated");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -201,7 +201,7 @@ export default function SuperAdminApplicationsList() {
   });
 
   // Filtered applications for the table (and leaderboard derivation)
-  const wsApplications = selectedOrgId
+  const wsApplications = selectedOrgId !== "__all__"
     ? allApplications.filter((r) => r.application.orgId === selectedOrgId)
     : allApplications;
 
@@ -241,12 +241,12 @@ export default function SuperAdminApplicationsList() {
                 <p className="text-muted-foreground">Review all member applications</p>
               </div>
             </div>
-            <Select value={selectedOrgId} onValueChange={(v) => { setSelectedOrgId(v); setConfirmBulkAccept(false); setConfirmBulkReject(false); setEditingCapacity(false); }}>
+            <Select value={selectedOrgId} onValueChange={(v) => { setSelectedOrgId(v); setConfirmBulkAccept(false); setConfirmBulkReject(false); setEditingCapacity(false); setCapacityInput(""); }}>
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="All workspaces" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All workspaces</SelectItem>
+                <SelectItem value="__all__">All workspaces</SelectItem>
                 {workspaces.map((w) => (
                   <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                 ))}
@@ -255,7 +255,7 @@ export default function SuperAdminApplicationsList() {
           </div>
 
           {/* Workspace management panels — only when a workspace is selected */}
-          {selectedOrgId && (
+          {selectedOrgId !== "__all__" && (
             <>
               {/* Capacity bar + editor */}
               <Card className="border border-border/50">
@@ -444,7 +444,7 @@ export default function SuperAdminApplicationsList() {
           <Card className="border border-border/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
-                {selectedOrgId ? `${wsApplications.length} applications in selected workspace` : "All Member Applications"}
+                {selectedOrgId !== "__all__" ? `${wsApplications.length} applications in selected workspace` : "All Member Applications"}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
