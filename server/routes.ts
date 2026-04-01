@@ -2152,7 +2152,7 @@ export function registerRoutes(app: Express): Server {
         .where(inArray(projects.id, allIds));
 
       await db.update(projects)
-        .set({ publishStatus: 'WINNER', publishedAt: now, publishedById: publisherId })
+        .set({ publishStatus: 'WINNER', publishedAt: now, publishedById: publisherId, status: 'ARCHIVED' })
         .where(inArray(projects.id, top3.map((r) => r.projectId)));
 
       // Load org info for emails
