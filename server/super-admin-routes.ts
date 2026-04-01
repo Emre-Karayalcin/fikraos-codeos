@@ -5,7 +5,7 @@ import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, desc, inArray, count, isNull } from "drizzle-orm";
-import { organizations, organizationMembers, projects, challenges, assets, assetVersions, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, type ScoringConfig } from "../shared/schema";
+import { organizations, organizationMembers, projects, challenges, assets, assetVersions, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, pitchDeckVersions, type ScoringConfig } from "../shared/schema";
 import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
 import { Resend } from "resend";
 import mustache from "mustache";
@@ -1673,5 +1673,76 @@ export function registerSuperAdminRoutes(app: Express) {
     if (!filePath.startsWith(tplDir)) return res.status(400).json({ error: 'Invalid path' });
     fs.writeFileSync(filePath, content, 'utf8');
     res.json({ ok: true });
+  });
+
+  // ── GET /api/super-admin/pitch-decks — list all pitch decks across all workspaces
+  app.get("/api/super-admin/pitch-decks", isAuthenticated, isSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          pdg.id,
+          pdg.template,
+          pdg.status,
+          pdg.lifecycle_status AS "lifecycleStatus",
+          pdg.download_url AS "downloadUrl",
+          pdg.is_locked AS "isLocked",
+          pdg.locked_reason AS "lockedReason",
+          pdg.submitted_at AS "submittedAt",
+          pdg.created_at AS "createdAt",
+          p.title AS "projectTitle",
+          o.name AS "workspaceName",
+          o.slug AS "workspaceSlug",
+          u.first_name AS "creatorFirstName",
+          u.last_name AS "creatorLastName",
+          u.email AS "creatorEmail",
+          (
+            SELECT row_to_json(r.*)
+            FROM pitch_deck_reviews r
+            WHERE r.pitch_deck_id = pdg.id
+            ORDER BY r.reviewed_at DESC
+            LIMIT 1
+          ) AS "latestReview",
+          (
+            SELECT COUNT(*)::int
+            FROM pitch_deck_versions v
+            WHERE v.pitch_deck_id = pdg.id
+          ) AS "versionCount"
+        FROM pitch_deck_generations pdg
+        JOIN projects p ON p.id = pdg.project_id
+        JOIN organizations o ON o.id = p.org_id
+        JOIN users u ON u.id = pdg.created_by_id
+        ORDER BY pdg.created_at DESC
+      `);
+      return res.json(result.rows);
+    } catch (e) {
+      console.error("[super-admin] GET /pitch-decks error:", e);
+      return res.status(500).json({ error: "Failed to fetch pitch decks" });
+    }
+  });
+
+  // ── GET /api/super-admin/pitch-decks/:deckId/versions — version history (no org check)
+  app.get("/api/super-admin/pitch-decks/:deckId/versions", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { deckId } = req.params;
+      const versions = await db
+        .select({
+          id: pitchDeckVersions.id,
+          label: pitchDeckVersions.label,
+          snapshotUrl: pitchDeckVersions.snapshotUrl,
+          notes: pitchDeckVersions.notes,
+          createdAt: pitchDeckVersions.createdAt,
+          createdByFirstName: users.firstName,
+          createdByLastName: users.lastName,
+          createdByUsername: users.username,
+        })
+        .from(pitchDeckVersions)
+        .leftJoin(users, eq(pitchDeckVersions.createdById, users.id))
+        .where(eq(pitchDeckVersions.pitchDeckId, deckId))
+        .orderBy(desc(pitchDeckVersions.createdAt));
+      return res.json(versions);
+    } catch (e) {
+      console.error("[super-admin] GET /pitch-decks/:deckId/versions error:", e);
+      return res.status(500).json({ error: "Failed to fetch version history" });
+    }
   });
 }

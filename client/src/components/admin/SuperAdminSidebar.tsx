@@ -2,7 +2,7 @@ import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, ChevronLeft, ChevronRight, LogOut,
   Kanban, BarChart2, Building2, Users, Target,
-  CalendarDays, ClipboardList, Mail, BookOpen, Brain,
+  CalendarDays, ClipboardList, Mail, BookOpen, Brain, Presentation,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ const navSections = [
       { title: "Applications",       href: "/admin/applications",     icon: ClipboardList },
       { title: "Sectors", href: "/admin/challenges",       icon: Target },
       { title: "Idea Management",    href: "/admin/ideas",            icon: Kanban },
+      { title: "Pitch Decks",        href: "/admin/pitch-decks",      icon: Presentation },
     ],
   },
   {
