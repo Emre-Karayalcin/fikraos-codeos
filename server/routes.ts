@@ -7147,14 +7147,17 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
       const [application] = await db.select().from(memberApplications).where(and(eq(memberApplications.id, id), eq(memberApplications.orgId, orgId)));
       if (!application) return res.status(404).json({ error: 'Application not found' });
 
-      // Enforce 280-seat capacity cap for approvals
+      // Enforce per-workspace capacity cap for approvals
       if (status === 'APPROVED' && application.status !== 'APPROVED') {
+        const [org] = await db.select({ acceptanceCapacity: organizations.acceptanceCapacity })
+          .from(organizations).where(eq(organizations.id, orgId)).limit(1);
+        const capacity = org?.acceptanceCapacity ?? 280;
         const [{ value: approvedCount }] = await db
           .select({ value: count() })
           .from(memberApplications)
-          .where(eq(memberApplications.status, 'APPROVED'));
-        if (approvedCount >= 280) {
-          return res.status(409).json({ error: 'Capacity full — 280 applicants have already been accepted.' });
+          .where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'APPROVED')));
+        if (approvedCount >= capacity) {
+          return res.status(409).json({ error: `Capacity full — ${capacity} applicants have already been accepted for this workspace.` });
         }
       }
 
@@ -7261,12 +7264,16 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
       const { orgId } = req.params;
       if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
 
+      const [org] = await db.select({ acceptanceCapacity: organizations.acceptanceCapacity })
+        .from(organizations).where(eq(organizations.id, orgId)).limit(1);
+      const capacity = org?.acceptanceCapacity ?? 280;
+
       const [{ approved }] = await db.select({ approved: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'APPROVED')));
       const [{ rejected }] = await db.select({ rejected: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'REJECTED')));
       const [{ pendingEmail }] = await db.select({ pendingEmail: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'APPROVED'), isNull(memberApplications.acceptanceEmailSentAt)));
       const [{ pendingRejEmail }] = await db.select({ pendingRejEmail: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'REJECTED'), isNull(memberApplications.rejectionEmailSentAt)));
 
-      res.json({ approved, rejected, capacity: 280, pendingAcceptanceEmail: pendingEmail, pendingRejectionEmail: pendingRejEmail });
+      res.json({ approved, rejected, capacity, pendingAcceptanceEmail: pendingEmail, pendingRejectionEmail: pendingRejEmail });
     } catch (error) {
       console.error('Error fetching application stats:', error);
       res.status(500).json({ error: 'Failed to fetch stats' });

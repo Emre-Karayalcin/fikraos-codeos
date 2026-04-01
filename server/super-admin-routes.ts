@@ -849,14 +849,17 @@ export function registerSuperAdminRoutes(app: Express) {
       const [app] = await db.select().from(memberApplications).where(eq(memberApplications.id, id));
       if (!app) return res.status(404).json({ message: "Application not found" });
 
-      // Enforce 280-seat capacity cap for approvals
+      // Enforce per-workspace capacity cap for approvals
       if (status === "APPROVED" && app.status !== "APPROVED") {
+        const [org] = await db.select({ acceptanceCapacity: organizations.acceptanceCapacity })
+          .from(organizations).where(eq(organizations.id, app.orgId)).limit(1);
+        const capacity = org?.acceptanceCapacity ?? 280;
         const [{ value: approvedCount }] = await db
           .select({ value: count() })
           .from(memberApplications)
-          .where(eq(memberApplications.status, "APPROVED"));
-        if (approvedCount >= 280) {
-          return res.status(409).json({ message: "Capacity full — 280 applicants have already been accepted." });
+          .where(and(eq(memberApplications.orgId, app.orgId), eq(memberApplications.status, "APPROVED")));
+        if (approvedCount >= capacity) {
+          return res.status(409).json({ message: `Capacity full — ${capacity} applicants have already been accepted for this workspace.` });
         }
       }
 
@@ -1132,6 +1135,156 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching application stats:", error);
       res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // ── Per-workspace application management (Super Admin) ───────────────────
+
+  // GET /api/super-admin/workspaces/:orgId/applications/stats
+  app.get("/api/super-admin/workspaces/:orgId/applications/stats", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      const [org] = await db.select({ acceptanceCapacity: organizations.acceptanceCapacity, name: organizations.name })
+        .from(organizations).where(eq(organizations.id, orgId)).limit(1);
+      if (!org) return res.status(404).json({ message: "Workspace not found" });
+
+      const capacity = org.acceptanceCapacity ?? 280;
+      const [{ approved }] = await db.select({ approved: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, "APPROVED")));
+      const [{ rejected }] = await db.select({ rejected: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, "REJECTED")));
+      const [{ pendingEmail }] = await db.select({ pendingEmail: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, "APPROVED"), isNull(memberApplications.acceptanceEmailSentAt)));
+      const [{ pendingRejEmail }] = await db.select({ pendingRejEmail: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, "REJECTED"), isNull(memberApplications.rejectionEmailSentAt)));
+
+      res.json({ approved, rejected, capacity, pendingAcceptanceEmail: pendingEmail, pendingRejectionEmail: pendingRejEmail });
+    } catch (error) {
+      console.error("Error fetching workspace application stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // PATCH /api/super-admin/workspaces/:orgId/acceptance-capacity
+  app.patch("/api/super-admin/workspaces/:orgId/acceptance-capacity", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      const { capacity } = req.body as { capacity: number };
+      if (!Number.isInteger(capacity) || capacity < 1) {
+        return res.status(400).json({ message: "capacity must be a positive integer" });
+      }
+      const [updated] = await db.update(organizations)
+        .set({ acceptanceCapacity: capacity, updatedAt: new Date() })
+        .where(eq(organizations.id, orgId))
+        .returning({ id: organizations.id, acceptanceCapacity: organizations.acceptanceCapacity });
+      if (!updated) return res.status(404).json({ message: "Workspace not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating acceptance capacity:", error);
+      res.status(500).json({ message: "Failed to update capacity" });
+    }
+  });
+
+  // POST /api/super-admin/workspaces/:orgId/applications/bulk-accept-email
+  app.post("/api/super-admin/workspaces/:orgId/applications/bulk-accept-email", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const resend = resendApiKey ? new Resend(resendApiKey) : null;
+      if (!resend) return res.status(503).json({ message: "Email service not configured" });
+
+      const [org] = await db.select({ acceptanceCapacity: organizations.acceptanceCapacity })
+        .from(organizations).where(eq(organizations.id, orgId)).limit(1);
+      const capacity = org?.acceptanceCapacity ?? 280;
+      const hostUrl = process.env.HOST_URL || "https://os.fikrahub.com";
+
+      const candidates = await db
+        .select({
+          id: memberApplications.id,
+          ideaName: memberApplications.ideaName,
+          aiScore: memberApplications.aiScore,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          orgName: organizations.name,
+          orgSlug: organizations.slug,
+        })
+        .from(memberApplications)
+        .innerJoin(users, eq(users.id, memberApplications.userId))
+        .innerJoin(organizations, eq(organizations.id, memberApplications.orgId))
+        .where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, "APPROVED"), isNull(memberApplications.acceptanceEmailSentAt)))
+        .orderBy(desc(memberApplications.aiScore))
+        .limit(capacity);
+
+      const loadTemplate = (name: string, vars: Record<string, string>) => {
+        const paths = [
+          path.join(__saDir, "email-templates", `${name}.html`),
+          path.join(process.cwd(), "server", "email-templates", `${name}.html`),
+          path.join(process.cwd(), "dist", "email-templates", `${name}.html`),
+        ];
+        const found = paths.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+        if (!found) return "";
+        try { return mustache.render(fs.readFileSync(found, "utf8"), vars); } catch { return ""; }
+      };
+
+      let sent = 0; let failed = 0;
+      for (const row of candidates) {
+        const html = loadTemplate("application-approved", { userName: row.userFirstName || row.userEmail || "there", orgName: row.orgName, loginUrl: `${hostUrl}/w/${row.orgSlug}` });
+        if (!html) { failed++; continue; }
+        try {
+          await resend.emails.send({ from: process.env.EMAIL_FROM || "no-reply@fikrahub.com", to: row.userEmail, subject: `🎉 You've been accepted to ${row.orgName}!`, html });
+          await db.update(memberApplications).set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
+          sent++;
+        } catch { failed++; }
+      }
+      res.json({ sent, failed, total: candidates.length });
+    } catch (error) {
+      console.error("Error sending bulk acceptance emails:", error);
+      res.status(500).json({ message: "Failed to send bulk acceptance emails" });
+    }
+  });
+
+  // POST /api/super-admin/workspaces/:orgId/applications/bulk-reject-email
+  app.post("/api/super-admin/workspaces/:orgId/applications/bulk-reject-email", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const resend = resendApiKey ? new Resend(resendApiKey) : null;
+      if (!resend) return res.status(503).json({ message: "Email service not configured" });
+
+      const candidates = await db
+        .select({
+          id: memberApplications.id,
+          ideaName: memberApplications.ideaName,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          orgName: organizations.name,
+        })
+        .from(memberApplications)
+        .innerJoin(users, eq(users.id, memberApplications.userId))
+        .innerJoin(organizations, eq(organizations.id, memberApplications.orgId))
+        .where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, "REJECTED"), isNull(memberApplications.rejectionEmailSentAt)));
+
+      const loadTemplate = (name: string, vars: Record<string, string>) => {
+        const paths = [
+          path.join(__saDir, "email-templates", `${name}.html`),
+          path.join(process.cwd(), "server", "email-templates", `${name}.html`),
+          path.join(process.cwd(), "dist", "email-templates", `${name}.html`),
+        ];
+        const found = paths.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+        if (!found) return "";
+        try { return mustache.render(fs.readFileSync(found, "utf8"), vars); } catch { return ""; }
+      };
+
+      let sent = 0; let failed = 0;
+      for (const row of candidates) {
+        const html = loadTemplate("application-rejected", { userName: row.userFirstName || row.userEmail || "there", orgName: row.orgName, ideaName: row.ideaName || "your idea" });
+        if (!html) { failed++; continue; }
+        try {
+          await resend.emails.send({ from: process.env.EMAIL_FROM || "no-reply@fikrahub.com", to: row.userEmail, subject: `Your application to ${row.orgName} was not accepted`, html });
+          await db.update(memberApplications).set({ rejectionEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
+          sent++;
+        } catch { failed++; }
+      }
+      res.json({ sent, failed, total: candidates.length });
+    } catch (error) {
+      console.error("Error sending bulk rejection emails:", error);
+      res.status(500).json({ message: "Failed to send bulk rejection emails" });
     }
   });
 

@@ -150,6 +150,7 @@ export const organizations = pgTable("organizations", {
   expertsNameAr: varchar("experts_name_ar"),
   expertsDescEn: varchar("experts_desc_en"),
   expertsDescAr: varchar("experts_desc_ar"),
+  acceptanceCapacity: integer("acceptance_capacity").default(280).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
