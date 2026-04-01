@@ -1017,6 +1017,59 @@ export function registerRoutes(app: Express): Server {
 
       const updated = await storage.updateProject(project.id, { submitted: true });
       res.json(updated);
+
+      // Fire-and-forget: send idea submission confirmation email
+      (async () => {
+        try {
+          const resendApiKey = process.env.RESEND_API_KEY;
+          const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
+          if (!resendClient) return;
+
+          const hostUrl = process.env.HOST_URL || 'https://os.fikrahub.com';
+
+          const [submitter] = await db.select({ email: users.email, firstName: users.firstName })
+            .from(users).where(eq(users.id, userId)).limit(1);
+          const org = await storage.getOrganization(project.orgId);
+          if (!submitter?.email || !org) return;
+
+          let challengeTitle: string | null = null;
+          if (project.challengeId) {
+            const [ch] = await db.select({ title: challenges.title })
+              .from(challenges).where(eq(challenges.id, project.challengeId)).limit(1);
+            challengeTitle = ch?.title ?? null;
+          }
+
+          const templatePaths = [
+            path.join(__dirname, 'email-templates', 'idea-submission-confirmation.html'),
+            path.join(process.cwd(), 'server', 'email-templates', 'idea-submission-confirmation.html'),
+            path.join(process.cwd(), 'dist', 'email-templates', 'idea-submission-confirmation.html'),
+          ];
+          const templateFile = templatePaths.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+          if (!templateFile) return;
+
+          const vars: Record<string, string> = {
+            userName: submitter.firstName || submitter.email,
+            orgName: org.name,
+            ideaTitle: (project as any).title || 'Your Idea',
+            submittedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            dashboardUrl: `${hostUrl}/w/${org.slug}`,
+          };
+          if (challengeTitle) vars.challengeTitle = challengeTitle;
+          if ((project as any).sector) vars.sector = (project as any).sector;
+
+          const html = mustache.render(fs.readFileSync(templateFile, 'utf8'), vars);
+          if (!html) return;
+
+          await resendClient.emails.send({
+            from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+            to: submitter.email,
+            subject: `✅ Your idea "${vars.ideaTitle}" has been submitted to ${org.name}`,
+            html,
+          });
+        } catch (emailErr) {
+          console.error('Error sending idea submission email:', emailErr);
+        }
+      })();
     } catch (error) {
       console.error('Error submitting project:', error);
       res.status(500).json({ error: 'Failed to submit project' });
