@@ -1117,20 +1117,6 @@ export function UnifiedSidebar() {
                   </TooltipContent>
                 </Tooltip>
                 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div 
-                      className="flex items-center justify-center p-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md cursor-pointer transition-all duration-200"
-                      onClick={() => setTheme(actualTheme === 'dark' ? 'light' : 'dark')}
-                      data-testid="button-theme-toggle"
-                    >
-                      {actualTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>{actualTheme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')}</p>
-                  </TooltipContent>
-                </Tooltip>
               </>
             ) : (
               // Expanded Bottom Navigation
@@ -1180,15 +1166,6 @@ export function UnifiedSidebar() {
                   </div>
                 )}
                 
-                <div 
-                  className="flex items-center px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md cursor-pointer transition-all duration-200"
-                  onClick={() => setTheme(actualTheme === 'dark' ? 'light' : 'dark')}
-                  data-testid="button-theme-toggle"
-                >
-                  {actualTheme === 'dark' ? <Sun className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" /> : <Moon className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />}
-                  <span className="text-sm font-medium">{actualTheme === 'dark' ? t('theme.light') : t('theme.dark')}</span>
-                </div>
-
                 {/* Language Switcher */}
                 <div className="px-3 py-2">
                   <LanguageSwitcher />
@@ -1197,31 +1174,7 @@ export function UnifiedSidebar() {
             )
           ) : (
             // Logged Out Bottom Section
-            isCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div 
-                    className="flex items-center justify-center p-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md cursor-pointer transition-all duration-200"
-                    onClick={() => setTheme(actualTheme === 'dark' ? 'light' : 'dark')}
-                    data-testid="button-theme-toggle"
-                  >
-                    {actualTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>{actualTheme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')}</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <div 
-                className="flex items-center px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md cursor-pointer transition-all duration-200"
-                onClick={() => setTheme(actualTheme === 'dark' ? 'light' : 'dark')}
-                data-testid="button-theme-toggle"
-              >
-                {actualTheme === 'dark' ? <Sun className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" /> : <Moon className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />}
-                <span className="text-sm font-medium">{actualTheme === 'dark' ? t('theme.light') : t('theme.dark')}</span>
-              </div>
-            )
+            null
           )}
         </div>
       </div>

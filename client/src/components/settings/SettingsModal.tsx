@@ -326,13 +326,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
                           {t('theme.light')}
                         </div>
                       </SelectItem>
-                      <SelectItem value="dark">
-                        <div className="flex items-center gap-2">
-                          <Moon className="w-4 h-4" />
-                          {t('theme.dark')}
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="system">
+<SelectItem value="system">
                         <div className="flex items-center gap-2">
                           <Monitor className="w-4 h-4" />
                           {t('theme.system')}

@@ -50,7 +50,6 @@ export function LeftNavbar({ isExpanded, onToggle }: LeftNavbarProps) {
   const bottomActions = [
     { icon: HelpCircle, label: "About", action: () => {} },
     { icon: MessageCircle, label: "Feedback", action: () => {} },
-    { icon: Moon, label: "Dark Mode", action: () => {} },
   ];
 
   return (

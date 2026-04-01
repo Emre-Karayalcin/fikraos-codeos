@@ -65,28 +65,6 @@ export function SettingsDropdown({ onOpenFullSettings }: SettingsDropdownProps) 
           </div>
           
           <div className="space-y-3">
-            {/* Theme Toggle */}
-            <div className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-              <div className="flex items-center gap-3">
-                {theme === 'light' ? (
-                  <Sun className="w-4 h-4 text-yellow-500" />
-                ) : (
-                  <Moon className="w-4 h-4 text-blue-500" />
-                )}
-                <span className="text-sm text-gray-900 dark:text-gray-100">
-                  {t('settings.theme')}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="h-6 px-2 text-xs"
-                data-testid="button-theme-toggle"
-              >
-                {theme === 'light' ? t('settings.dark') : t('settings.light')}
-              </Button>
-            </div>
 
             {/* Language Selection */}
             <div className="space-y-1">
