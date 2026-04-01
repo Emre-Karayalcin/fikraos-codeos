@@ -353,7 +353,7 @@ export function ApplicationDetailModal({ row, onClose, onUpdate, onRescreen, onR
                 disabled={isPending}
                 onClick={() => onUpdate({ status: "APPROVED", manualOverride: true })}
               >
-                Accept
+                Mark as Accepted
               </Button>
               <Button
                 variant="destructive"
@@ -361,7 +361,7 @@ export function ApplicationDetailModal({ row, onClose, onUpdate, onRescreen, onR
                 disabled={isPending}
                 onClick={() => onUpdate({ status: "REJECTED", manualOverride: true })}
               >
-                Reject
+                Mark as Rejected
               </Button>
             </>
           )}

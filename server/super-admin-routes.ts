@@ -4,7 +4,7 @@ import { isAuthenticated, comparePasswords, hashPassword } from "./auth";
 import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, eq, and, desc, inArray } from "drizzle-orm";
+import { sql, eq, and, desc, inArray, count, isNull } from "drizzle-orm";
 import { organizations, organizationMembers, projects, challenges, assets, assetVersions, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, type ScoringConfig } from "../shared/schema";
 import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
 import { Resend } from "resend";
@@ -849,6 +849,17 @@ export function registerSuperAdminRoutes(app: Express) {
       const [app] = await db.select().from(memberApplications).where(eq(memberApplications.id, id));
       if (!app) return res.status(404).json({ message: "Application not found" });
 
+      // Enforce 280-seat capacity cap for approvals
+      if (status === "APPROVED" && app.status !== "APPROVED") {
+        const [{ value: approvedCount }] = await db
+          .select({ value: count() })
+          .from(memberApplications)
+          .where(eq(memberApplications.status, "APPROVED"));
+        if (approvedCount >= 280) {
+          return res.status(409).json({ message: "Capacity full — 280 applicants have already been accepted." });
+        }
+      }
+
       const update: Record<string, any> = { updatedAt: new Date() };
       if (status !== undefined) { update.status = status; update.reviewedAt = new Date(); }
       if (aiScore !== undefined) update.aiScore = aiScore;
@@ -957,6 +968,170 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error refining application:", error);
       res.status(500).json({ message: "Failed to refine application" });
+    }
+  });
+
+  // POST /api/super-admin/applications/bulk-accept-email — send acceptance emails to top 280 APPROVED not yet emailed
+  app.post("/api/super-admin/applications/bulk-accept-email", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const resend = resendApiKey ? new Resend(resendApiKey) : null;
+      if (!resend) return res.status(503).json({ message: "Email service not configured" });
+
+      const hostUrl = process.env.HOST_URL || "https://os.fikrahub.com";
+
+      // Top 280 APPROVED by AI score who haven't received acceptance email yet
+      const candidates = await db
+        .select({
+          id: memberApplications.id,
+          userId: memberApplications.userId,
+          orgId: memberApplications.orgId,
+          ideaName: memberApplications.ideaName,
+          aiScore: memberApplications.aiScore,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          orgName: organizations.name,
+          orgSlug: organizations.slug,
+        })
+        .from(memberApplications)
+        .innerJoin(users, eq(users.id, memberApplications.userId))
+        .innerJoin(organizations, eq(organizations.id, memberApplications.orgId))
+        .where(and(
+          eq(memberApplications.status, "APPROVED"),
+          isNull(memberApplications.acceptanceEmailSentAt)
+        ))
+        .orderBy(desc(memberApplications.aiScore))
+        .limit(280);
+
+      const loadTemplate = (name: string, vars: Record<string, string>) => {
+        const candidates = [
+          path.join(__saDir, "email-templates", `${name}.html`),
+          path.join(process.cwd(), "server", "email-templates", `${name}.html`),
+          path.join(process.cwd(), "dist", "email-templates", `${name}.html`),
+        ];
+        const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+        if (!found) return "";
+        try { return mustache.render(fs.readFileSync(found, "utf8"), vars); } catch { return ""; }
+      };
+
+      let sent = 0;
+      let failed = 0;
+      for (const row of candidates) {
+        const userName = row.userFirstName || row.userEmail || "there";
+        const loginUrl = `${hostUrl}/w/${row.orgSlug}`;
+        const html = loadTemplate("application-approved", { userName, orgName: row.orgName, loginUrl });
+        if (!html) { failed++; continue; }
+        try {
+          await resend.emails.send({
+            from: process.env.EMAIL_FROM || "no-reply@fikrahub.com",
+            to: row.userEmail,
+            subject: `🎉 You've been accepted to ${row.orgName}!`,
+            html,
+          });
+          await db.update(memberApplications)
+            .set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() })
+            .where(eq(memberApplications.id, row.id));
+          sent++;
+        } catch {
+          failed++;
+        }
+      }
+
+      res.json({ sent, failed, total: candidates.length });
+    } catch (error) {
+      console.error("Error sending bulk acceptance emails:", error);
+      res.status(500).json({ message: "Failed to send bulk acceptance emails" });
+    }
+  });
+
+  // POST /api/super-admin/applications/bulk-reject-email — send rejection emails to all REJECTED not yet emailed
+  app.post("/api/super-admin/applications/bulk-reject-email", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const resend = resendApiKey ? new Resend(resendApiKey) : null;
+      if (!resend) return res.status(503).json({ message: "Email service not configured" });
+
+      const candidates = await db
+        .select({
+          id: memberApplications.id,
+          userId: memberApplications.userId,
+          orgId: memberApplications.orgId,
+          ideaName: memberApplications.ideaName,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          orgName: organizations.name,
+        })
+        .from(memberApplications)
+        .innerJoin(users, eq(users.id, memberApplications.userId))
+        .innerJoin(organizations, eq(organizations.id, memberApplications.orgId))
+        .where(and(
+          eq(memberApplications.status, "REJECTED"),
+          isNull(memberApplications.rejectionEmailSentAt)
+        ));
+
+      const loadTemplate = (name: string, vars: Record<string, string>) => {
+        const candidates = [
+          path.join(__saDir, "email-templates", `${name}.html`),
+          path.join(process.cwd(), "server", "email-templates", `${name}.html`),
+          path.join(process.cwd(), "dist", "email-templates", `${name}.html`),
+        ];
+        const found = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+        if (!found) return "";
+        try { return mustache.render(fs.readFileSync(found, "utf8"), vars); } catch { return ""; }
+      };
+
+      let sent = 0;
+      let failed = 0;
+      for (const row of candidates) {
+        const userName = row.userFirstName || row.userEmail || "there";
+        const html = loadTemplate("application-rejected", { userName, orgName: row.orgName, ideaName: row.ideaName || "your idea" });
+        if (!html) { failed++; continue; }
+        try {
+          await resend.emails.send({
+            from: process.env.EMAIL_FROM || "no-reply@fikrahub.com",
+            to: row.userEmail,
+            subject: `Your application to ${row.orgName} was not accepted`,
+            html,
+          });
+          await db.update(memberApplications)
+            .set({ rejectionEmailSentAt: new Date(), updatedAt: new Date() })
+            .where(eq(memberApplications.id, row.id));
+          sent++;
+        } catch {
+          failed++;
+        }
+      }
+
+      res.json({ sent, failed, total: candidates.length });
+    } catch (error) {
+      console.error("Error sending bulk rejection emails:", error);
+      res.status(500).json({ message: "Failed to send bulk rejection emails" });
+    }
+  });
+
+  // GET /api/super-admin/applications/stats — accepted count & capacity
+  app.get("/api/super-admin/applications/stats", isAuthenticated, isSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const [{ approved }] = await db
+        .select({ approved: count() })
+        .from(memberApplications)
+        .where(eq(memberApplications.status, "APPROVED"));
+      const [{ rejected }] = await db
+        .select({ rejected: count() })
+        .from(memberApplications)
+        .where(eq(memberApplications.status, "REJECTED"));
+      const [{ pendingEmail }] = await db
+        .select({ pendingEmail: count() })
+        .from(memberApplications)
+        .where(and(eq(memberApplications.status, "APPROVED"), isNull(memberApplications.acceptanceEmailSentAt)));
+      const [{ pendingRejEmail }] = await db
+        .select({ pendingRejEmail: count() })
+        .from(memberApplications)
+        .where(and(eq(memberApplications.status, "REJECTED"), isNull(memberApplications.rejectionEmailSentAt)));
+      res.json({ approved, rejected, capacity: 280, pendingAcceptanceEmail: pendingEmail, pendingRejectionEmail: pendingRejEmail });
+    } catch (error) {
+      console.error("Error fetching application stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
 

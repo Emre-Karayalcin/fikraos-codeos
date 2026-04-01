@@ -844,6 +844,8 @@ export const memberApplications = pgTable("member_applications", {
   aiInsights: text("ai_insights"),
   submittedAt: timestamp("submitted_at").defaultNow().notNull(),
   reviewedAt: timestamp("reviewed_at"),
+  acceptanceEmailSentAt: timestamp("acceptance_email_sent_at"),
+  rejectionEmailSentAt: timestamp("rejection_email_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
