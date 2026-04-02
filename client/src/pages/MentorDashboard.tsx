@@ -792,6 +792,22 @@ export default function MentorDashboard() {
                             <ExternalLink size={11} /> Open Meeting Link
                           </a>
                         )}
+                        {b.status === "CONFIRMED" && (
+                          <div className="flex items-center gap-3 pt-1 border-t border-border">
+                            <button
+                              onClick={() => { setRescheduleTarget(b); setRescheduleDate(b.bookedDate); setRescheduleTime(b.bookedTime); }}
+                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              <RefreshCw size={11} /> Reschedule
+                            </button>
+                            <button
+                              onClick={() => setCancelTarget(b)}
+                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600"
+                            >
+                              <XCircle size={11} /> Cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
