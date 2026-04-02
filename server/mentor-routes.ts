@@ -950,9 +950,239 @@ router.patch("/mentor-bookings/:id/complete", async (req: any, res) => {
       .returning();
 
     res.json(updated);
+
+    // Fire-and-forget: post-session thank-you email to member + notify mentor
+    if (resendClient && updated) {
+      (async () => {
+        try {
+          const [memberUser] = await db
+            .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+            .from(users).where(eq(users.id, updated.userId));
+          const [mentorData] = await db
+            .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+            .from(mentorProfiles)
+            .innerJoin(users, eq(mentorProfiles.userId, users.id))
+            .where(eq(mentorProfiles.id, updated.mentorProfileId));
+
+          if (!memberUser?.email) return;
+          const memberName = `${memberUser.firstName || ""} ${memberUser.lastName || ""}`.trim() || memberUser.email;
+          const mentorName = `${mentorData?.firstName || ""} ${mentorData?.lastName || ""}`.trim() || "your mentor";
+
+          await resendClient.emails.send({
+            from: EMAIL_FROM,
+            to: memberUser.email,
+            subject: `🎉 Session completed — thanks for the feedback!`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+              <div style="background:linear-gradient(135deg,#059669,#0d9488);padding:28px 32px;border-radius:12px 12px 0 0">
+                <h2 style="color:white;margin:0;font-size:22px">🎉 Session Completed!</h2>
+                <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px">Thank you for your feedback</p>
+              </div>
+              <div style="background:#f9fafb;padding:28px 32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none">
+                <p style="color:#374151">Hi ${memberName},</p>
+                <p style="color:#374151">Your mentoring session with <strong>${mentorName}</strong> on <strong>${updated.bookedDate} at ${updated.bookedTime}</strong> has been marked as complete.</p>
+                ${rating ? `<p style="color:#374151">You rated this session <strong>${rating}/5 stars</strong>. Thank you for helping improve our mentorship program!</p>` : ""}
+                <p style="color:#6b7280;font-size:13px;margin-top:24px">You can book another session anytime from your dashboard.</p>
+              </div>
+            </div>`,
+          });
+
+          // Notify mentor of completed session + rating
+          if (mentorData?.email) {
+            await resendClient.emails.send({
+              from: EMAIL_FROM,
+              to: mentorData.email,
+              subject: `Session with ${memberName} completed`,
+              html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:28px 32px;background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb">
+                <p>Hi ${mentorName},</p>
+                <p><strong>${memberName}</strong> has marked your session on <strong>${updated.bookedDate} at ${updated.bookedTime}</strong> as completed.</p>
+                ${rating ? `<p>They rated the session <strong>${rating}/5 stars</strong>${feedback ? ` with feedback: "<em>${feedback}</em>"` : ""}.</p>` : ""}
+                <p style="color:#6b7280;font-size:12px">This is an automated notification from CodeOS.</p>
+              </div>`,
+            });
+          }
+        } catch (emailErr) {
+          console.error("Failed to send post-session emails:", emailErr);
+        }
+      })();
+    }
   } catch (error) {
     console.error("Error completing booking:", error);
     res.status(500).json({ message: "Failed to complete booking" });
+  }
+});
+
+// PATCH /api/mentor-bookings/:id/cancel - Member cancels their own booking
+router.patch("/mentor-bookings/:id/cancel", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const [booking] = await db
+      .select()
+      .from(mentorBookings)
+      .where(and(eq(mentorBookings.id, req.params.id), eq(mentorBookings.userId, req.user.id)));
+
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.status === "COMPLETED") return res.status(400).json({ message: "Cannot cancel a completed session" });
+    if (booking.status === "CANCELLED") return res.status(400).json({ message: "Booking is already cancelled" });
+
+    const [updated] = await db
+      .update(mentorBookings)
+      .set({ status: "CANCELLED", updatedAt: new Date() })
+      .where(eq(mentorBookings.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+
+    // Fire-and-forget: notify mentor of cancellation
+    if (resendClient && updated) {
+      (async () => {
+        try {
+          const [mentorUser] = await db
+            .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+            .from(mentorProfiles)
+            .innerJoin(users, eq(mentorProfiles.userId, users.id))
+            .where(eq(mentorProfiles.id, updated.mentorProfileId));
+
+          if (!mentorUser?.email) return;
+          const mentorName = `${mentorUser.firstName || ""} ${mentorUser.lastName || ""}`.trim() || mentorUser.email;
+          const memberName = `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || req.user.email;
+          const hostUrl = process.env.HOST_URL || "https://os.fikrahub.com";
+
+          await resendClient.emails.send({
+            from: EMAIL_FROM,
+            to: mentorUser.email,
+            subject: `Session cancelled by ${memberName}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:28px 32px;background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb">
+              <p>Hi ${mentorName},</p>
+              <p><strong>${memberName}</strong> has cancelled their session scheduled for <strong>${updated.bookedDate} at ${updated.bookedTime}</strong>.</p>
+              <p>The slot is now available for other bookings.</p>
+              <p style="color:#6b7280;font-size:12px">This is an automated notification from CodeOS — <a href="${hostUrl}" style="color:#4f46e5">View Dashboard</a></p>
+            </div>`,
+          });
+        } catch (emailErr) {
+          console.error("Failed to send cancellation email to mentor:", emailErr);
+        }
+      })();
+    }
+  } catch (error) {
+    console.error("Error cancelling booking:", error);
+    res.status(500).json({ message: "Failed to cancel booking" });
+  }
+});
+
+// PATCH /api/mentor-bookings/:id/reschedule - Member or mentor proposes new date/time
+router.patch("/mentor-bookings/:id/reschedule", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { bookedDate, bookedTime } = req.body;
+    if (!bookedDate || !bookedTime) {
+      return res.status(400).json({ message: "bookedDate and bookedTime are required" });
+    }
+
+    // Find booking and determine if requester is member or mentor
+    const [booking] = await db.select().from(mentorBookings).where(eq(mentorBookings.id, req.params.id));
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.status === "COMPLETED") return res.status(400).json({ message: "Cannot reschedule a completed session" });
+    if (booking.status === "CANCELLED") return res.status(400).json({ message: "Cannot reschedule a cancelled session" });
+
+    const [mentorProfile] = await db.select({ id: mentorProfiles.id, userId: mentorProfiles.userId })
+      .from(mentorProfiles).where(eq(mentorProfiles.id, booking.mentorProfileId)).limit(1);
+
+    const isMember = booking.userId === req.user.id;
+    const isMentor = mentorProfile?.userId === req.user.id;
+    if (!isMember && !isMentor) return res.status(403).json({ message: "Not authorized to reschedule this booking" });
+
+    // Validate availability
+    const availSlots = await db.select().from(mentorAvailability).where(eq(mentorAvailability.mentorProfileId, booking.mentorProfileId));
+    const bookingDow = new Date(`${bookedDate}T12:00:00Z`).getUTCDay();
+    const matchingSlot = availSlots.find((a) => a.dayOfWeek === bookingDow);
+    if (!matchingSlot) return res.status(400).json({ message: "Mentor is not available on this day" });
+
+    const newStart = timeToMinutes(bookedTime);
+    const newEnd = newStart + (booking.durationMinutes ?? 60);
+    const slotStart = timeToMinutes(matchingSlot.startTime);
+    const slotEnd = timeToMinutes(matchingSlot.endTime);
+    if (newStart < slotStart || newEnd > slotEnd) {
+      return res.status(400).json({ message: `Selected time is outside mentor's available hours (${matchingSlot.startTime}–${matchingSlot.endTime})` });
+    }
+
+    // Overlap check — exclude this booking itself
+    const existing = await db
+      .select({ bookedTime: mentorBookings.bookedTime, durationMinutes: mentorBookings.durationMinutes })
+      .from(mentorBookings)
+      .where(and(
+        eq(mentorBookings.mentorProfileId, booking.mentorProfileId),
+        eq(mentorBookings.bookedDate, bookedDate),
+        inArray(mentorBookings.status, ["PENDING", "CONFIRMED", "COMPLETED"])
+      ));
+
+    for (const ex of existing.filter((e) => e.bookedTime !== booking.bookedTime || bookedDate !== booking.bookedDate)) {
+      const exStart = timeToMinutes(ex.bookedTime);
+      const exEnd = exStart + (ex.durationMinutes ?? 60);
+      if (exStart < newEnd && exEnd > newStart) {
+        return res.status(409).json({ message: "The new time slot overlaps with an existing booking" });
+      }
+    }
+
+    const [updated] = await db
+      .update(mentorBookings)
+      .set({ bookedDate, bookedTime, status: "PENDING", updatedAt: new Date() })
+      .where(eq(mentorBookings.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+
+    // Fire-and-forget: notify the other party
+    if (resendClient && updated) {
+      (async () => {
+        try {
+          const [memberUser] = await db
+            .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+            .from(users).where(eq(users.id, booking.userId));
+          const [mentorUser] = await db
+            .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+            .from(mentorProfiles)
+            .innerJoin(users, eq(mentorProfiles.userId, users.id))
+            .where(eq(mentorProfiles.id, booking.mentorProfileId));
+
+          const memberName = `${memberUser?.firstName || ""} ${memberUser?.lastName || ""}`.trim() || memberUser?.email || "Member";
+          const mentorName = `${mentorUser?.firstName || ""} ${mentorUser?.lastName || ""}`.trim() || mentorUser?.email || "Mentor";
+          const requesterName = isMember ? memberName : mentorName;
+          const hostUrl = process.env.HOST_URL || "https://os.fikrahub.com";
+
+          const body = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:28px 32px;background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb">
+            <p>Hi {NAME},</p>
+            <p><strong>${requesterName}</strong> has proposed rescheduling your session to <strong>${bookedDate} at ${bookedTime}</strong>.</p>
+            <p>The booking is now <strong>pending confirmation</strong>. Please log in to confirm the new time.</p>
+            <p><a href="${hostUrl}/dashboard" style="display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">View Booking</a></p>
+            <p style="color:#6b7280;font-size:12px;margin-top:20px">This is an automated notification from CodeOS.</p>
+          </div>`;
+
+          // Notify the other party (not the requester)
+          if (isMember && mentorUser?.email) {
+            await resendClient.emails.send({
+              from: EMAIL_FROM,
+              to: mentorUser.email,
+              subject: `${memberName} proposed a reschedule — please confirm`,
+              html: body.replace("{NAME}", mentorName),
+            });
+          } else if (isMentor && memberUser?.email) {
+            await resendClient.emails.send({
+              from: EMAIL_FROM,
+              to: memberUser.email,
+              subject: `${mentorName} proposed rescheduling your session`,
+              html: body.replace("{NAME}", memberName),
+            });
+          }
+        } catch (emailErr) {
+          console.error("Failed to send reschedule notification email:", emailErr);
+        }
+      })();
+    }
+  } catch (error) {
+    console.error("Error rescheduling booking:", error);
+    res.status(500).json({ message: "Failed to reschedule booking" });
   }
 });
 

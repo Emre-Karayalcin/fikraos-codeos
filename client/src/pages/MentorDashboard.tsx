@@ -32,6 +32,7 @@ import {
   ExternalLink,
   Layers,
   Rocket,
+  RefreshCw,
 } from "lucide-react";
 
 interface Booking {
@@ -200,6 +201,10 @@ export default function MentorDashboard() {
   const [viewingIdeaBooking, setViewingIdeaBooking] = useState<Booking | null>(null);
   const [viewingParticipantIdea, setViewingParticipantIdea] = useState<any | null>(null);
   const [mentorFeedbackDrafts, setMentorFeedbackDrafts] = useState<Record<string, string>>({});
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState<Booking | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -254,6 +259,28 @@ export default function MentorDashboard() {
       toast({ title: "Participant feedback saved" });
     },
     onError: () => toast({ title: "Failed to save feedback", variant: "destructive" }),
+  });
+
+  const cancelConfirmedMutation = useMutation({
+    mutationFn: async (id: string) =>
+      apiRequest("PATCH", `/api/mentor-bookings/${id}/status`, { status: "CANCELLED" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mentor-profile/my-bookings"] });
+      toast({ title: "Session cancelled" });
+      setCancelTarget(null);
+    },
+    onError: () => toast({ title: "Failed to cancel booking", variant: "destructive" }),
+  });
+
+  const rescheduleMutation = useMutation({
+    mutationFn: async ({ id, bookedDate, bookedTime }: { id: string; bookedDate: string; bookedTime: string }) =>
+      apiRequest("PATCH", `/api/mentor-bookings/${id}/reschedule`, { bookedDate, bookedTime }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mentor-profile/my-bookings"] });
+      toast({ title: "Reschedule proposed", description: "The member will be notified." });
+      setRescheduleTarget(null);
+    },
+    onError: (err: any) => toast({ title: err?.message || "Failed to reschedule", variant: "destructive" }),
   });
 
   const totalSessions = bookings.length;
@@ -313,7 +340,7 @@ export default function MentorDashboard() {
         </div>
         <p className="text-text-secondary text-xs mt-0.5">{booking.ideaTitle || "General session"}</p>
         {booking.notes && <p className="text-muted-foreground text-xs mt-1 line-clamp-1">{booking.notes}</p>}
-        {/* Idea / Pitch Deck actions */}
+        {/* Idea / Pitch Deck / Meeting actions */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           {booking.ideaId && (
             <button
@@ -344,6 +371,23 @@ export default function MentorDashboard() {
             </a>
           )}
         </div>
+        {/* Cancel / Reschedule for confirmed bookings */}
+        {booking.status === "CONFIRMED" && (
+          <div className="flex items-center gap-3 mt-2">
+            <button
+              onClick={() => { setRescheduleTarget(booking); setRescheduleDate(booking.bookedDate); setRescheduleTime(booking.bookedTime); }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw size={11} /> Reschedule
+            </button>
+            <button
+              onClick={() => setCancelTarget(booking)}
+              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600"
+            >
+              <XCircle size={11} /> Cancel
+            </button>
+          </div>
+        )}
       </div>
       <div className="text-right shrink-0 text-xs text-text-secondary">
         <p className="font-medium text-text-primary">{formatTime(booking.bookedTime)}</p>
@@ -904,6 +948,83 @@ export default function MentorDashboard() {
           onClose={() => setViewingParticipantIdea(null)}
         />
       )}
+
+      {/* Cancel booking confirmation dialog */}
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cancel session?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-2 text-sm text-muted-foreground">
+            <p>
+              You are about to cancel the session with{" "}
+              <strong className="text-foreground">
+                {cancelTarget?.bookerFirstName} {cancelTarget?.bookerLastName}
+              </strong>{" "}
+              on <strong className="text-foreground">{cancelTarget?.bookedDate} at {cancelTarget?.bookedTime && formatTime(cancelTarget.bookedTime)}</strong>.
+            </p>
+            <p>The member will be notified. This cannot be undone.</p>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => setCancelTarget(null)}>Keep Session</Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={cancelConfirmedMutation.isPending}
+              onClick={() => cancelTarget && cancelConfirmedMutation.mutate(cancelTarget.id)}
+            >
+              {cancelConfirmedMutation.isPending ? "Cancelling…" : "Yes, Cancel"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule dialog */}
+      <Dialog open={!!rescheduleTarget} onOpenChange={(open) => !open && setRescheduleTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Propose new time</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Proposing a reschedule for{" "}
+              <strong className="text-foreground">
+                {rescheduleTarget?.bookerFirstName} {rescheduleTarget?.bookerLastName}
+              </strong>. The booking will revert to pending until the member accepts.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Date</label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Time</label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => setRescheduleTarget(null)}>Cancel</Button>
+            <Button
+              size="sm"
+              disabled={rescheduleMutation.isPending || !rescheduleDate || !rescheduleTime}
+              onClick={() => rescheduleTarget && rescheduleMutation.mutate({ id: rescheduleTarget.id, bookedDate: rescheduleDate, bookedTime: rescheduleTime })}
+            >
+              {rescheduleMutation.isPending ? "Sending…" : "Propose Reschedule"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

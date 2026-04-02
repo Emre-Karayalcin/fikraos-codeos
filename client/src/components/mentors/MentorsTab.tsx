@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Search, Calendar, Clock, ChevronDown, ChevronUp, Star, CheckCircle, ExternalLink, MessageSquareText } from "lucide-react";
+import { Search, Calendar, Clock, ChevronDown, ChevronUp, Star, CheckCircle, ExternalLink, MessageSquareText, XCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import MentorCard from "./MentorCard";
@@ -102,6 +102,15 @@ function BookingDetailModal({
   const [showRating, setShowRating] = useState(false);
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [newDate, setNewDate] = useState(booking.bookedDate);
+  const [newTime, setNewTime] = useState(booking.bookedTime);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/mentor-bookings/mine"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
+  };
 
   const completeMutation = useMutation({
     mutationFn: () =>
@@ -110,14 +119,36 @@ function BookingDetailModal({
         feedback: feedback.trim() || undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mentor-bookings/mine"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
+      invalidate();
       toast({ title: "Session marked as complete!", description: "Thank you for your feedback." });
       onClose();
     },
     onError: () => toast({ title: "Failed to submit", variant: "destructive" }),
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/mentor-bookings/${booking.id}/cancel`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Session cancelled" });
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to cancel", variant: "destructive" }),
+  });
+
+  const rescheduleMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("PATCH", `/api/mentor-bookings/${booking.id}/reschedule`, { bookedDate: newDate, bookedTime: newTime }),
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Reschedule requested", description: "The mentor will confirm the new time." });
+      onClose();
+    },
+    onError: (err: any) => toast({ title: err?.message || "Failed to reschedule", variant: "destructive" }),
+  });
+
+  const canCancel = booking.status === "PENDING" || booking.status === "CONFIRMED";
+  const canReschedule = booking.status === "PENDING" || booking.status === "CONFIRMED";
   const canComplete = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
   const alreadyRated = booking.status === "COMPLETED" && booking.rating;
 
@@ -220,8 +251,44 @@ function BookingDetailModal({
             </div>
           )}
 
+          {/* Reschedule form */}
+          {canReschedule && showReschedule && (
+            <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/20">
+              <p className="text-sm font-medium">Propose new date & time</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Date</label>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Time</label>
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">The booking will revert to pending until the mentor confirms.</p>
+            </div>
+          )}
+
+          {/* Cancel confirm */}
+          {canCancel && cancelConfirm && (
+            <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800 p-3 space-y-2">
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">Cancel this session?</p>
+              <p className="text-xs text-red-600 dark:text-red-400/80">This action cannot be undone. The mentor will be notified.</p>
+            </div>
+          )}
+
           {/* Rate session flow */}
-          {canComplete && !showRating && (
+          {canComplete && !showRating && !showReschedule && !cancelConfirm && (
             <Button
               variant="outline"
               className="w-full gap-2"
@@ -257,15 +324,70 @@ function BookingDetailModal({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          {canComplete && showRating && (
-            <Button
-              onClick={() => completeMutation.mutate()}
-              disabled={rating === 0 || completeMutation.isPending}
-            >
-              {completeMutation.isPending ? "Submitting…" : "Submit Review"}
-            </Button>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {/* Cancel row */}
+          {canCancel && !showRating && !showReschedule && !cancelConfirm && (
+            <div className="flex gap-2 w-full sm:w-auto sm:mr-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => setCancelConfirm(true)}
+              >
+                <XCircle className="w-3.5 h-3.5" /> Cancel Session
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowReschedule(true)}
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Reschedule
+              </Button>
+            </div>
+          )}
+
+          {/* Cancel confirm actions */}
+          {cancelConfirm && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setCancelConfirm(false)}>Keep Session</Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => cancelMutation.mutate()}
+                disabled={cancelMutation.isPending}
+              >
+                {cancelMutation.isPending ? "Cancelling…" : "Yes, Cancel"}
+              </Button>
+            </>
+          )}
+
+          {/* Reschedule actions */}
+          {showReschedule && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setShowReschedule(false)}>Back</Button>
+              <Button
+                size="sm"
+                onClick={() => rescheduleMutation.mutate()}
+                disabled={rescheduleMutation.isPending || !newDate || !newTime}
+              >
+                {rescheduleMutation.isPending ? "Sending…" : "Request Reschedule"}
+              </Button>
+            </>
+          )}
+
+          {!cancelConfirm && !showReschedule && (
+            <>
+              <Button variant="outline" onClick={onClose}>Close</Button>
+              {canComplete && showRating && (
+                <Button
+                  onClick={() => completeMutation.mutate()}
+                  disabled={rating === 0 || completeMutation.isPending}
+                >
+                  {completeMutation.isPending ? "Submitting…" : "Submit Review"}
+                </Button>
+              )}
+            </>
           )}
         </DialogFooter>
       </DialogContent>
