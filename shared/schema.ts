@@ -797,6 +797,14 @@ export const mentorBookings = pgTable("mentor_bookings", {
   mentorFeedbackUpdatedAt: timestamp("mentor_feedback_updated_at"),
   rating: integer("rating"),
   feedback: text("feedback"),
+  // Member post-session survey
+  sessionGoalMet: boolean("session_goal_met"),
+  wouldRecommend: boolean("would_recommend"),
+  surveyCompletedAt: timestamp("survey_completed_at"),
+  // Mentor post-session survey
+  participantEngagement: integer("participant_engagement"),
+  areasCoached: jsonb("areas_coached").$type<string[]>(),
+  mentorSurveyCompletedAt: timestamp("mentor_survey_completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

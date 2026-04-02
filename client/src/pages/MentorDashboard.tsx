@@ -1,18 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, KeyboardEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
 import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AllAIOutputsView } from "@/components/idea/AllAIOutputsView";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -24,6 +31,7 @@ import {
   Clock,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   ChevronLeft,
   ChevronRight,
@@ -33,6 +41,11 @@ import {
   Layers,
   Rocket,
   RefreshCw,
+  X,
+  Plus,
+  Trash2,
+  Link2,
+  Unlink,
 } from "lucide-react";
 
 interface Booking {
@@ -58,6 +71,12 @@ interface Booking {
   mentorFeedback?: string | null;
   rating?: number | null;
   feedback?: string | null;
+  sessionGoalMet?: boolean | null;
+  wouldRecommend?: boolean | null;
+  surveyCompletedAt?: string | null;
+  participantEngagement?: number | null;
+  areasCoached?: string[] | null;
+  mentorSurveyCompletedAt?: string | null;
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -172,6 +191,145 @@ function IdeaResourcesDialog({ idea, open, onClose }: { idea: any; open: boolean
   );
 }
 
+const AREAS_OPTIONS = [
+  "Business Model", "Product Strategy", "Technical Architecture", "Pitching",
+  "Market Research", "Go-to-Market", "Team Building", "Fundraising",
+  "UX / Design", "Financial Planning", "Legal & Compliance", "Marketing",
+];
+
+function MentorSurveyCard({
+  booking, feedbackValue, onFeedbackChange, surveyDone, onSubmit, isPending, onSaveFeedbackOnly,
+}: {
+  booking: Booking;
+  feedbackValue: string;
+  onFeedbackChange: (v: string) => void;
+  surveyDone: boolean;
+  onSubmit: (engagement: number | null, areas: string[]) => void;
+  isPending: boolean;
+  onSaveFeedbackOnly: () => void;
+}) {
+  const [engagement, setEngagement] = useState<number | null>(booking.participantEngagement ?? null);
+  const [areas, setAreas] = useState<string[]>(booking.areasCoached ?? []);
+  const [showSurvey, setShowSurvey] = useState(!surveyDone);
+
+  const toggleArea = (a: string) =>
+    setAreas((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]);
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-text-primary">
+            {booking.bookerFirstName} {booking.bookerLastName}
+            {booking.ideaTitle ? ` · ${booking.ideaTitle}` : ""}
+          </p>
+          <p className="text-xs text-muted-foreground">{booking.bookedDate} · {booking.durationMinutes} min</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {surveyDone && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Survey done ✓</span>
+          )}
+          {surveyDone && (
+            <button onClick={() => setShowSurvey(!showSurvey)} className="text-xs text-primary hover:underline">
+              {showSurvey ? "Collapse" : "Edit"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Member survey summary (read-only) */}
+      {booking.surveyCompletedAt && (
+        <div className="rounded-lg bg-muted/30 px-3 py-2 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Member survey</p>
+          <div className="flex items-center gap-3 flex-wrap text-xs">
+            <div className="flex gap-0.5">
+              {[1,2,3,4,5].map((s) => (
+                <Star key={s} size={12} className={s <= (booking.rating ?? 0) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"} />
+              ))}
+            </div>
+            {booking.sessionGoalMet !== null && booking.sessionGoalMet !== undefined && (
+              <span className={`px-2 py-0.5 rounded-full ${booking.sessionGoalMet ? "bg-green-100 text-green-700" : "bg-red-50 text-red-600"}`}>
+                Goal {booking.sessionGoalMet ? "met ✓" : "not met"}
+              </span>
+            )}
+            {booking.wouldRecommend !== null && booking.wouldRecommend !== undefined && (
+              <span className={`px-2 py-0.5 rounded-full ${booking.wouldRecommend ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"}`}>
+                {booking.wouldRecommend ? "Would recommend" : "Would not recommend"}
+              </span>
+            )}
+          </div>
+          {booking.feedback && <p className="text-xs text-muted-foreground italic">"{booking.feedback}"</p>}
+        </div>
+      )}
+
+      {showSurvey && (
+        <>
+          {/* Engagement rating */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Participant engagement (1–5)</p>
+            <div className="flex gap-1.5">
+              {[1,2,3,4,5].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setEngagement(v)}
+                  className={`w-9 h-9 rounded-lg text-sm font-semibold border transition-colors ${
+                    engagement === v ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Areas coached */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Areas coached</p>
+            <div className="flex flex-wrap gap-1.5">
+              {AREAS_OPTIONS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => toggleArea(a)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    areas.includes(a) ? "bg-primary/10 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-primary/30"
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Written feedback */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Written feedback for participant <span className="font-normal">(optional)</span></p>
+            <Textarea
+              value={feedbackValue}
+              onChange={(e) => onFeedbackChange(e.target.value)}
+              placeholder="Share actionable notes the participant will see in their dashboard..."
+              rows={3}
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            {surveyDone && (
+              <Button size="sm" variant="outline" disabled={isPending} onClick={onSaveFeedbackOnly}>
+                Save Notes Only
+              </Button>
+            )}
+            <Button size="sm" disabled={isPending} onClick={() => onSubmit(engagement, areas)}>
+              {isPending ? "Saving…" : surveyDone ? "Update Survey" : "Submit Survey"}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function MentorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -281,6 +439,16 @@ export default function MentorDashboard() {
       setRescheduleTarget(null);
     },
     onError: (err: any) => toast({ title: err?.message || "Failed to reschedule", variant: "destructive" }),
+  });
+
+  const mentorSurveyMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; mentorFeedback: string; participantEngagement: number | null; areasCoached: string[] }) =>
+      apiRequest("PATCH", `/api/mentor-bookings/${id}/mentor-survey`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mentor-profile/my-bookings"] });
+      toast({ title: "Survey submitted!" });
+    },
+    onError: () => toast({ title: "Failed to save survey", variant: "destructive" }),
   });
 
   const totalSessions = bookings.length;
@@ -885,51 +1053,45 @@ export default function MentorDashboard() {
                 </div>
               )}
 
-              <div className="pt-4 border-t border-border">
-                <h3 className="font-semibold text-text-primary">Feedback to Participants</h3>
-                <p className="text-text-secondary text-sm mt-0.5">
-                  Share post-session notes that participants can view in their My Sessions panel.
-                </p>
-
-                <div className="space-y-3 mt-4">
-                  {bookings.filter((b) => b.status === "COMPLETED").length === 0 ? (
-                    <div className="bg-card border border-border rounded-xl p-4 text-sm text-text-secondary">
-                      Completed sessions will appear here.
-                    </div>
-                  ) : (
-                    bookings
-                      .filter((b) => b.status === "COMPLETED")
-                      .map((b) => {
-                        const value = mentorFeedbackDrafts[b.id] ?? b.mentorFeedback ?? "";
-                        return (
-                          <div key={`mentor-feedback-${b.id}`} className="bg-card border border-border rounded-xl p-4 space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-text-primary">
-                                {b.bookerFirstName} {b.bookerLastName}
-                                {b.ideaTitle ? ` · ${b.ideaTitle}` : ""}
-                              </p>
-                              <span className="text-xs text-muted-foreground">{b.bookedDate}</span>
-                            </div>
-                            <Textarea
-                              value={value}
-                              onChange={(e) => setMentorFeedbackDrafts((prev) => ({ ...prev, [b.id]: e.target.value }))}
-                              placeholder="Write actionable feedback for this participant..."
-                              rows={3}
-                            />
-                            <div className="flex justify-end">
-                              <Button
-                                size="sm"
-                                disabled={mentorFeedbackMutation.isPending}
-                                onClick={() => mentorFeedbackMutation.mutate({ id: b.id, mentorFeedback: value })}
-                              >
-                                Save Feedback
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })
-                  )}
+              <div className="pt-4 border-t border-border space-y-4">
+                <div>
+                  <h3 className="font-semibold text-text-primary">Post-Session Survey & Feedback</h3>
+                  <p className="text-text-secondary text-sm mt-0.5">
+                    Rate participant engagement and share written feedback they can view in their dashboard.
+                  </p>
                 </div>
+
+                {bookings.filter((b) => b.status === "COMPLETED").length === 0 ? (
+                  <div className="bg-card border border-border rounded-xl p-4 text-sm text-text-secondary">
+                    Completed sessions will appear here.
+                  </div>
+                ) : (
+                  bookings.filter((b) => b.status === "COMPLETED").map((b) => {
+                    const feedbackValue = mentorFeedbackDrafts[b.id] ?? b.mentorFeedback ?? "";
+                    const surveyDone = !!b.mentorSurveyCompletedAt;
+                    return (
+                      <MentorSurveyCard
+                        key={`mentor-survey-${b.id}`}
+                        booking={b}
+                        feedbackValue={feedbackValue}
+                        onFeedbackChange={(val) => setMentorFeedbackDrafts((prev) => ({ ...prev, [b.id]: val }))}
+                        surveyDone={surveyDone}
+                        onSubmit={(engagement, areas) =>
+                          mentorSurveyMutation.mutate({
+                            id: b.id,
+                            mentorFeedback: feedbackValue,
+                            participantEngagement: engagement,
+                            areasCoached: areas,
+                          })
+                        }
+                        isPending={mentorSurveyMutation.isPending}
+                        onSaveFeedbackOnly={() =>
+                          mentorFeedbackMutation.mutate({ id: b.id, mentorFeedback: feedbackValue })
+                        }
+                      />
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -1047,20 +1209,6 @@ export default function MentorDashboard() {
 
 // ── Inline Profile Tab ──────────────────────────────────────────────────────
 
-import { useEffect, KeyboardEvent } from "react";
-import { apiRequest as _apiRequest } from "@/lib/queryClient";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { X, Plus, Trash2 } from "lucide-react";
-import { useMutation as _useMutation, useQueryClient as _useQueryClient, useQuery as _useQuery } from "@tanstack/react-query";
-import { useToast as _useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Link2, Unlink } from "lucide-react";
-
 const DAYS_OF_WEEK = [
   { label: "Monday", value: 1 },
   { label: "Tuesday", value: 2 },
@@ -1105,10 +1253,10 @@ function TagInput({ label, tags, onChange }: { label: string; tags: string[]; on
 }
 
 function CalendlySection() {
-  const { toast } = _useToast();
-  const queryClient = _useQueryClient();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const { data: status, refetch } = _useQuery<any>({
+  const { data: status, refetch } = useQuery<any>({
     queryKey: ["/api/mentor/calendly/status"],
     queryFn: async () => {
       const res = await fetch("/api/mentor/calendly/status", { credentials: "include" });
@@ -1117,13 +1265,13 @@ function CalendlySection() {
     },
   });
 
-  const disconnectMutation = _useMutation({
-    mutationFn: () => _apiRequest("DELETE", "/api/mentor/calendly/disconnect"),
+  const disconnectMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/mentor/calendly/disconnect"),
     onSuccess: () => { refetch(); toast({ title: "Calendly disconnected" }); },
   });
 
-  const selectEventTypeMutation = _useMutation({
-    mutationFn: (eventTypeUri: string) => _apiRequest("PUT", "/api/mentor/calendly/event-type", { eventTypeUri }),
+  const selectEventTypeMutation = useMutation({
+    mutationFn: (eventTypeUri: string) => apiRequest("PUT", "/api/mentor/calendly/event-type", { eventTypeUri }),
     onSuccess: () => { refetch(); queryClient.invalidateQueries({ queryKey: ["/api/mentor/calendly/status"] }); toast({ title: "Event type saved" }); },
   });
 
@@ -1190,7 +1338,7 @@ function CalendlySection() {
 }
 
 function ProfileTab({ profile, onSaved }: { profile: any; onSaved: () => void }) {
-  const { toast } = _useToast();
+  const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
@@ -1213,8 +1361,8 @@ function ProfileTab({ profile, onSaved }: { profile: any; onSaved: () => void })
     }
   }, [profile]);
 
-  const mutation = _useMutation({
-    mutationFn: (data: any) => _apiRequest("PUT", "/api/mentor-profile/me", data),
+  const mutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", "/api/mentor-profile/me", data),
     onSuccess: () => { toast({ title: "Profile saved" }); onSaved(); },
     onError: () => toast({ title: "Failed to save profile", variant: "destructive" }),
   });

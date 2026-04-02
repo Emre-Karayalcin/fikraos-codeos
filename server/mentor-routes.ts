@@ -507,10 +507,42 @@ router.post("/mentor-bookings", async (req: any, res) => {
   }
 });
 
+// Helper: auto-complete CONFIRMED bookings whose session time has passed
+async function autoCompleteExpiredBookings(userId?: string, mentorProfileId?: string) {
+  const now = new Date();
+  const conditions = [inArray(mentorBookings.status, ["CONFIRMED", "PENDING"])];
+  if (userId) conditions.push(eq(mentorBookings.userId, userId));
+  if (mentorProfileId) conditions.push(eq(mentorBookings.mentorProfileId, mentorProfileId));
+
+  const active = await db.select({
+    id: mentorBookings.id,
+    bookedDate: mentorBookings.bookedDate,
+    bookedTime: mentorBookings.bookedTime,
+    durationMinutes: mentorBookings.durationMinutes,
+  }).from(mentorBookings).where(and(...conditions));
+
+  const toComplete: string[] = [];
+  for (const b of active) {
+    const [h, m] = b.bookedTime.split(":").map(Number);
+    const sessionEnd = new Date(`${b.bookedDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`);
+    sessionEnd.setMinutes(sessionEnd.getMinutes() + (b.durationMinutes ?? 60));
+    if (sessionEnd < now) toComplete.push(b.id);
+  }
+
+  if (toComplete.length > 0) {
+    await db.update(mentorBookings)
+      .set({ status: "COMPLETED", updatedAt: new Date() })
+      .where(inArray(mentorBookings.id, toComplete));
+  }
+}
+
 // GET /api/mentor-bookings/mine - Get user's bookings with mentor details
 router.get("/mentor-bookings/mine", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Auto-complete sessions whose time has passed
+    await autoCompleteExpiredBookings(req.user.id);
 
     const mentorUsers = users;
     const bookings = await db
@@ -534,6 +566,9 @@ router.get("/mentor-bookings/mine", async (req: any, res) => {
         status: mentorBookings.status,
         rating: mentorBookings.rating,
         feedback: mentorBookings.feedback,
+        sessionGoalMet: mentorBookings.sessionGoalMet,
+        wouldRecommend: mentorBookings.wouldRecommend,
+        surveyCompletedAt: mentorBookings.surveyCompletedAt,
         createdAt: mentorBookings.createdAt,
       })
       .from(mentorBookings)
@@ -681,6 +716,9 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
 
     if (!profile) return res.json([]);
 
+    // Auto-complete sessions whose time has passed
+    await autoCompleteExpiredBookings(undefined, profile.id);
+
     const bookings = await db
       .select({
         id: mentorBookings.id,
@@ -705,6 +743,12 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
         status: mentorBookings.status,
         rating: mentorBookings.rating,
         feedback: mentorBookings.feedback,
+        sessionGoalMet: mentorBookings.sessionGoalMet,
+        wouldRecommend: mentorBookings.wouldRecommend,
+        surveyCompletedAt: mentorBookings.surveyCompletedAt,
+        participantEngagement: mentorBookings.participantEngagement,
+        areasCoached: mentorBookings.areasCoached,
+        mentorSurveyCompletedAt: mentorBookings.mentorSurveyCompletedAt,
         createdAt: mentorBookings.createdAt,
       })
       .from(mentorBookings)
@@ -929,7 +973,7 @@ router.patch("/mentor-bookings/:id/complete", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const { rating, feedback } = req.body;
+    const { rating, feedback, sessionGoalMet, wouldRecommend } = req.body;
     if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
       return res.status(400).json({ message: "Rating must be a number between 1 and 5" });
     }
@@ -945,7 +989,15 @@ router.patch("/mentor-bookings/:id/complete", async (req: any, res) => {
 
     const [updated] = await db
       .update(mentorBookings)
-      .set({ status: "COMPLETED", rating, feedback: feedback?.trim() || null, updatedAt: new Date() })
+      .set({
+        status: "COMPLETED",
+        rating,
+        feedback: feedback?.trim() || null,
+        sessionGoalMet: typeof sessionGoalMet === "boolean" ? sessionGoalMet : null,
+        wouldRecommend: typeof wouldRecommend === "boolean" ? wouldRecommend : null,
+        surveyCompletedAt: new Date(),
+        updatedAt: new Date(),
+      })
       .where(eq(mentorBookings.id, req.params.id))
       .returning();
 
@@ -1237,6 +1289,57 @@ router.patch("/mentor-bookings/:id/mentor-feedback", async (req: any, res) => {
   }
 });
 
+// PATCH /api/mentor-bookings/:id/mentor-survey - Mentor submits post-session survey
+router.patch("/mentor-bookings/:id/mentor-survey", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { mentorFeedback, participantEngagement, areasCoached } = req.body;
+
+    if (participantEngagement !== undefined && (typeof participantEngagement !== "number" || participantEngagement < 1 || participantEngagement > 5)) {
+      return res.status(400).json({ message: "participantEngagement must be 1–5" });
+    }
+    if (areasCoached !== undefined && !Array.isArray(areasCoached)) {
+      return res.status(400).json({ message: "areasCoached must be an array" });
+    }
+
+    const [profile] = await db
+      .select({ id: mentorProfiles.id })
+      .from(mentorProfiles)
+      .where(eq(mentorProfiles.userId, req.user.id))
+      .limit(1);
+
+    if (!profile) return res.status(403).json({ message: "No mentor profile found" });
+
+    const [booking] = await db
+      .select({ id: mentorBookings.id, status: mentorBookings.status })
+      .from(mentorBookings)
+      .where(and(eq(mentorBookings.id, req.params.id), eq(mentorBookings.mentorProfileId, profile.id)))
+      .limit(1);
+
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.status !== "COMPLETED") return res.status(400).json({ message: "Session must be completed before submitting a survey" });
+
+    const [updated] = await db
+      .update(mentorBookings)
+      .set({
+        mentorFeedback: typeof mentorFeedback === "string" ? mentorFeedback.trim() || null : undefined,
+        mentorFeedbackUpdatedAt: typeof mentorFeedback === "string" && mentorFeedback.trim() ? new Date() : undefined,
+        participantEngagement: participantEngagement ?? undefined,
+        areasCoached: areasCoached ?? undefined,
+        mentorSurveyCompletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(mentorBookings.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error saving mentor survey:", error);
+    res.status(500).json({ message: "Failed to save mentor survey" });
+  }
+});
+
 // GET /api/mentors/:id/reviews - Public reviews for a mentor profile
 router.get("/mentors/:id/reviews", async (req: any, res) => {
   try {
@@ -1363,7 +1466,13 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
         durationMinutes: mentorBookings.durationMinutes,
         rating: mentorBookings.rating,
         feedback: mentorBookings.feedback,
+        sessionGoalMet: mentorBookings.sessionGoalMet,
+        wouldRecommend: mentorBookings.wouldRecommend,
+        surveyCompletedAt: mentorBookings.surveyCompletedAt,
         mentorFeedback: mentorBookings.mentorFeedback,
+        participantEngagement: mentorBookings.participantEngagement,
+        areasCoached: mentorBookings.areasCoached,
+        mentorSurveyCompletedAt: mentorBookings.mentorSurveyCompletedAt,
         memberFirstName: memberUsers.firstName,
         memberLastName: memberUsers.lastName,
         mentorProfileId: mentorBookings.mentorProfileId,

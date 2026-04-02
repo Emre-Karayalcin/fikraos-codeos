@@ -48,6 +48,16 @@ interface MyBooking {
   mentorFeedback?: string | null;
   rating?: number | null;
   feedback?: string | null;
+  sessionGoalMet?: boolean | null;
+  wouldRecommend?: boolean | null;
+  surveyCompletedAt?: string | null;
+}
+
+function isSessionPastDue(booking: MyBooking): boolean {
+  const [h, m] = booking.bookedTime.split(":").map(Number);
+  const end = new Date(`${booking.bookedDate}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`);
+  end.setMinutes(end.getMinutes() + (booking.durationMinutes ?? 60));
+  return end < new Date();
 }
 
 function formatTime(t: string) {
@@ -99,9 +109,15 @@ function BookingDetailModal({
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [showRating, setShowRating] = useState(false);
+  const pastDue = isSessionPastDue(booking);
+  const surveyPending = booking.status === "COMPLETED" && !booking.surveyCompletedAt;
+  const autoShowSurvey = pastDue && (booking.status === "CONFIRMED" || surveyPending);
+
+  const [showRating, setShowRating] = useState(autoShowSurvey);
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [sessionGoalMet, setSessionGoalMet] = useState<boolean | null>(null);
+  const [wouldRecommend, setWouldRecommend] = useState<boolean | null>(null);
   const [showReschedule, setShowReschedule] = useState(false);
   const [newDate, setNewDate] = useState(booking.bookedDate);
   const [newTime, setNewTime] = useState(booking.bookedTime);
@@ -117,10 +133,12 @@ function BookingDetailModal({
       apiRequest("PATCH", `/api/mentor-bookings/${booking.id}/complete`, {
         rating,
         feedback: feedback.trim() || undefined,
+        sessionGoalMet: sessionGoalMet !== null ? sessionGoalMet : undefined,
+        wouldRecommend: wouldRecommend !== null ? wouldRecommend : undefined,
       }),
     onSuccess: () => {
       invalidate();
-      toast({ title: "Session marked as complete!", description: "Thank you for your feedback." });
+      toast({ title: "Survey submitted!", description: "Thank you for your feedback." });
       onClose();
     },
     onError: () => toast({ title: "Failed to submit", variant: "destructive" }),
@@ -148,9 +166,9 @@ function BookingDetailModal({
   });
 
   const canCancel = booking.status === "PENDING" || booking.status === "CONFIRMED";
-  const canReschedule = booking.status === "PENDING" || booking.status === "CONFIRMED";
-  const canComplete = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
-  const alreadyRated = booking.status === "COMPLETED" && booking.rating;
+  const canReschedule = (booking.status === "PENDING" || booking.status === "CONFIRMED") && !pastDue;
+  const canComplete = (booking.status !== "CANCELLED" && booking.status !== "COMPLETED") || surveyPending;
+  const alreadyRated = booking.status === "COMPLETED" && booking.surveyCompletedAt;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -233,24 +251,6 @@ function BookingDetailModal({
             </div>
           )}
 
-          {/* Already rated */}
-          {alreadyRated && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Your Rating</p>
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Star
-                    key={s}
-                    className={`w-5 h-5 ${s <= (booking.rating ?? 0) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`}
-                  />
-                ))}
-              </div>
-              {booking.feedback && (
-                <p className="text-sm text-muted-foreground italic">"{booking.feedback}"</p>
-              )}
-            </div>
-          )}
-
           {/* Reschedule form */}
           {canReschedule && showReschedule && (
             <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/20">
@@ -287,36 +287,120 @@ function BookingDetailModal({
             </div>
           )}
 
-          {/* Rate session flow */}
-          {canComplete && !showRating && !showReschedule && !cancelConfirm && (
+          {/* Already completed survey */}
+          {alreadyRated && (
+            <div className="space-y-2 rounded-lg bg-muted/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Survey</p>
+              <div className="flex gap-0.5">
+                {[1,2,3,4,5].map((s) => (
+                  <Star key={s} className={`w-4 h-4 ${s <= (booking.rating ?? 0) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {booking.sessionGoalMet !== null && booking.sessionGoalMet !== undefined && (
+                  <span className={`px-2 py-0.5 rounded-full ${booking.sessionGoalMet ? "bg-green-100 text-green-700" : "bg-red-50 text-red-600"}`}>
+                    Goal {booking.sessionGoalMet ? "met ✓" : "not met"}
+                  </span>
+                )}
+                {booking.wouldRecommend !== null && booking.wouldRecommend !== undefined && (
+                  <span className={`px-2 py-0.5 rounded-full ${booking.wouldRecommend ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"}`}>
+                    {booking.wouldRecommend ? "Would recommend ✓" : "Would not recommend"}
+                  </span>
+                )}
+              </div>
+              {booking.feedback && (
+                <p className="text-sm text-muted-foreground italic">"{booking.feedback}"</p>
+              )}
+            </div>
+          )}
+
+          {/* Prompt to fill survey for past-due sessions */}
+          {pastDue && booking.status === "CONFIRMED" && !showRating && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Session time has passed</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Please complete a short post-session survey to close this booking.</p>
+            </div>
+          )}
+
+          {/* Survey trigger button */}
+          {canComplete && !showRating && !showReschedule && !cancelConfirm && !alreadyRated && (
             <Button
-              variant="outline"
+              variant={pastDue ? "default" : "outline"}
               className="w-full gap-2"
               onClick={() => setShowRating(true)}
             >
-              <CheckCircle className="w-4 h-4 text-green-500" />
-              Session Complete
+              <CheckCircle className="w-4 h-4" />
+              {pastDue ? "Complete Post-Session Survey" : "Session Complete"}
             </Button>
           )}
 
           {canComplete && showRating && (
             <div className="space-y-4 border border-border rounded-lg p-4 bg-muted/20">
               <div>
-                <p className="text-sm font-medium mb-1">How was your session?</p>
-                <p className="text-xs text-muted-foreground">Rate your experience with this mentor</p>
+                <p className="text-sm font-semibold">Post-Session Survey</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Your feedback helps improve the mentorship program</p>
               </div>
-              <div className="flex justify-center">
-                <StarRating value={rating} onChange={setRating} />
+
+              {/* Overall rating */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Overall rating</p>
+                <div className="flex justify-center">
+                  <StarRating value={rating} onChange={setRating} />
+                </div>
               </div>
+
+              {/* Goal met */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Was your session goal met?</p>
+                <div className="flex gap-2">
+                  {([true, false] as const).map((val) => (
+                    <button
+                      key={String(val)}
+                      type="button"
+                      onClick={() => setSessionGoalMet(val)}
+                      className={`flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                        sessionGoalMet === val
+                          ? val ? "bg-green-100 border-green-400 text-green-700" : "bg-red-50 border-red-400 text-red-600"
+                          : "border-border text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {val ? "Yes" : "No"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Would recommend */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Would you recommend this mentor?</p>
+                <div className="flex gap-2">
+                  {([true, false] as const).map((val) => (
+                    <button
+                      key={String(val)}
+                      type="button"
+                      onClick={() => setWouldRecommend(val)}
+                      className={`flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                        wouldRecommend === val
+                          ? val ? "bg-blue-100 border-blue-400 text-blue-700" : "bg-muted border-border text-muted-foreground"
+                          : "border-border text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {val ? "Yes" : "No"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Open feedback */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
-                  Feedback <span className="font-normal">(optional)</span>
+                  Additional comments <span className="font-normal">(optional)</span>
                 </label>
                 <Textarea
                   placeholder="Share your experience with this mentor…"
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  rows={3}
+                  rows={2}
                   className="resize-none"
                 />
               </div>
@@ -475,8 +559,14 @@ function MyBookingsSection() {
                 )}
               </div>
 
-              <div className="shrink-0">
+              <div className="shrink-0 flex flex-col items-end gap-1">
                 <BookingStatusBadge status={booking.status} />
+                {booking.status === "COMPLETED" && !booking.surveyCompletedAt && (
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Survey pending</span>
+                )}
+                {isSessionPastDue(booking) && booking.status === "CONFIRMED" && (
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Survey pending</span>
+                )}
               </div>
             </div>
           );

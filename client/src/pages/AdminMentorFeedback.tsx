@@ -147,7 +147,11 @@ export default function AdminMentorFeedback() {
                       <TableHead>Member</TableHead>
                       <TableHead>Mentor</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead>Rating</TableHead>
+                      <TableHead>Member Rating</TableHead>
+                      <TableHead>Goal Met</TableHead>
+                      <TableHead>Recommend</TableHead>
+                      <TableHead>Engagement</TableHead>
+                      <TableHead>Areas Coached</TableHead>
                       <TableHead>Member Feedback</TableHead>
                       <TableHead>Mentor Notes</TableHead>
                     </TableRow>
@@ -155,20 +159,52 @@ export default function AdminMentorFeedback() {
                   <TableBody>
                     {feedback.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                        <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                           No feedback records found
                         </TableCell>
                       </TableRow>
                     ) : (
                       feedback.map((f: any) => (
                         <TableRow key={f.id}>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium whitespace-nowrap">
                             {f.memberFirstName} {f.memberLastName}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{f.mentorName || "—"}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{f.bookedDate}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{f.mentorName || "—"}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{f.bookedDate}</TableCell>
                           <TableCell>
                             {f.rating ? <StarRating rating={f.rating} /> : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {f.sessionGoalMet === true ? (
+                              <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs">Yes</span>
+                            ) : f.sessionGoalMet === false ? (
+                              <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-xs">No</span>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {f.wouldRecommend === true ? (
+                              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs">Yes</span>
+                            ) : f.wouldRecommend === false ? (
+                              <span className="text-xs text-muted-foreground">No</span>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {f.participantEngagement ? (
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map((s) => (
+                                  <Star key={s} className={`w-3 h-3 ${s <= f.participantEngagement ? "fill-primary text-primary" : "text-muted-foreground/20"}`} />
+                                ))}
+                              </div>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm max-w-[160px]">
+                            {f.areasCoached?.length ? (
+                              <div className="flex flex-wrap gap-1">
+                                {f.areasCoached.map((a: string) => (
+                                  <span key={a} className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{a}</span>
+                                ))}
+                              </div>
+                            ) : "—"}
                           </TableCell>
                           <TableCell className="text-sm max-w-xs">
                             <p className="truncate text-muted-foreground" title={f.feedback}>{f.feedback || "—"}</p>
