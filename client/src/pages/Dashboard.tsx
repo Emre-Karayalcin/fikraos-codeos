@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import MentorDashboard from "./MentorDashboard";
 import JudgeDashboard from "./JudgeDashboard";
+import ClientDashboard from "./ClientDashboard";
 
 import { useState } from "react";
 import {
@@ -272,6 +273,11 @@ export default function Dashboard() {
   const isJudge = userRole?.role === 'JUDGE';
   if (isJudge) {
     return <JudgeDashboard />;
+  }
+
+  const isClient = userRole?.role === 'CLIENT';
+  if (isClient) {
+    return <ClientDashboard />;
   }
 
   if (isMentor) {

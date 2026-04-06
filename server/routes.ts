@@ -1693,6 +1693,16 @@ export function registerRoutes(app: Express): Server {
     return membership?.role === 'JUDGE';
   }
 
+  async function requireOrgClient(req: any, orgId: string): Promise<boolean> {
+    const userId = req.user?.id;
+    if (!userId) return false;
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    return membership?.role === 'CLIENT';
+  }
+
   // GET /api/workspaces/:orgId/judge/ideas — IN_INCUBATION ideas for judge dashboard
   app.get('/api/workspaces/:orgId/judge/ideas', isAuthenticated, async (req: any, res) => {
     try {
@@ -2017,6 +2027,139 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching judge leaderboard:', error);
       res.status(500).json({ error: 'Failed to fetch judge leaderboard' });
+    }
+  });
+
+  // ─── Client (read-only) routes ────────────────────────────────────────────────
+
+  // GET /api/workspaces/:orgId/client/dashboard-stats
+  app.get('/api/workspaces/:orgId/client/dashboard-stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const isClientRole = await requireOrgClient(req, orgId);
+      const isAdminRole = await requireOrgAdmin(req, orgId);
+      if (!isClientRole && !isAdminRole) return res.status(403).json({ error: 'Client access required' });
+
+      const [
+        ideasRows,
+        memberCount,
+        challengeCount,
+      ] = await Promise.all([
+        db.select({ status: projects.status }).from(projects).where(eq(projects.orgId, orgId)),
+        db.select({ count: drizzleSql<number>`COUNT(*)::int` }).from(organizationMembers).where(eq(organizationMembers.orgId, orgId)),
+        db.select({ count: drizzleSql<number>`COUNT(*)::int` }).from(challenges).where(eq(challenges.orgId, orgId)),
+      ]);
+
+      const pipeline: Record<string, number> = {
+        BACKLOG: 0, UNDER_REVIEW: 0, SHORTLISTED: 0, IN_INCUBATION: 0, ARCHIVED: 0,
+      };
+      for (const row of ideasRows) {
+        if (row.status in pipeline) pipeline[row.status]++;
+      }
+
+      res.json({
+        totalIdeas: ideasRows.length,
+        totalMembers: memberCount[0]?.count ?? 0,
+        totalChallenges: challengeCount[0]?.count ?? 0,
+        pipeline,
+      });
+    } catch (error) {
+      console.error('Error fetching client dashboard stats:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/client/ideas
+  app.get('/api/workspaces/:orgId/client/ideas', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgClient(req, orgId))) return res.status(403).json({ error: 'Client access required' });
+
+      const rows = await db
+        .select({
+          id: projects.id,
+          title: projects.title,
+          description: projects.description,
+          tags: projects.tags,
+          status: projects.status,
+          createdAt: projects.createdAt,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerUsername: users.username,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .where(eq(projects.orgId, orgId))
+        .orderBy(desc(projects.createdAt));
+
+      res.json(rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        tags: r.tags,
+        status: r.status,
+        createdAt: r.createdAt,
+        ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
+      })));
+    } catch (error) {
+      console.error('Error fetching client ideas:', error);
+      res.status(500).json({ error: 'Failed to fetch ideas' });
+    }
+  });
+
+  // GET /api/workspaces/:orgId/client/leaderboard
+  app.get('/api/workspaces/:orgId/client/leaderboard', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgClient(req, orgId))) return res.status(403).json({ error: 'Client access required' });
+
+      const rows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          tags: projects.tags,
+          status: projects.status,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerUsername: users.username,
+          pmoScore: ideaEvaluations.totalScore,
+          pmoB1: ideaEvaluations.b1, pmoB2: ideaEvaluations.b2, pmoB3: ideaEvaluations.b3,
+          pmoB4: ideaEvaluations.b4, pmoB5: ideaEvaluations.b5,
+          pmoT1: ideaEvaluations.t1, pmoT2: ideaEvaluations.t2,
+          pmoT3: ideaEvaluations.t3, pmoT4: ideaEvaluations.t4,
+          pmoS1: ideaEvaluations.s1, pmoS2: ideaEvaluations.s2, pmoS3: ideaEvaluations.s3,
+          aiScore: memberApplications.aiScore,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(ideaEvaluations, eq(ideaEvaluations.projectId, projects.id))
+        .leftJoin(memberApplications, eq(memberApplications.userId, projects.createdById))
+        .where(and(eq(projects.orgId, orgId), inArray(projects.status, ['SHORTLISTED', 'IN_INCUBATION'])))
+        .orderBy(desc(memberApplications.aiScore));
+
+      const toNum = (v: number | null | undefined) => v ?? 0;
+      res.json(rows.map((r) => ({
+        projectId: r.projectId,
+        title: r.title,
+        tags: r.tags,
+        status: r.status,
+        ownerName: [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername,
+        aiScore: r.aiScore,
+        pmoScore: r.pmoScore,
+        pmoBusinessScore: r.pmoScore != null ? Math.round(
+          (toNum(r.pmoB1)/5)*10 + (toNum(r.pmoB2)/5)*8 + (toNum(r.pmoB3)/5)*8 +
+          (toNum(r.pmoB4)/5)*8 + (toNum(r.pmoB5)/5)*6
+        ) : null,
+        pmoTechnicalScore: r.pmoScore != null ? Math.round(
+          (toNum(r.pmoT1)/5)*10 + (toNum(r.pmoT2)/5)*8 + (toNum(r.pmoT3)/5)*6 + (toNum(r.pmoT4)/5)*6
+        ) : null,
+        pmoStrategicScore: r.pmoScore != null ? Math.round(
+          (toNum(r.pmoS1)/5)*12 + (toNum(r.pmoS2)/5)*10 + (toNum(r.pmoS3)/5)*8
+        ) : null,
+      })));
+    } catch (error) {
+      console.error('Error fetching client leaderboard:', error);
+      res.status(500).json({ error: 'Failed to fetch leaderboard' });
     }
   });
 

@@ -32,7 +32,7 @@ import {
 
 const inviteUserSchema = z.object({
   email: z.string().email("Must be a valid email address"),
-  role: z.enum(["MEMBER", "MENTOR", "ADMIN", "JUDGE"])
+  role: z.enum(["MEMBER", "MENTOR", "ADMIN", "JUDGE", "CLIENT"])
 });
 
 type InviteUserForm = z.infer<typeof inviteUserSchema>;
@@ -260,6 +260,7 @@ export default function UserManagement({ orgId }: UserManagementProps) {
                                 {t('admin.userManagement.roles.admin')}
                               </SelectItem>
                               <SelectItem value="JUDGE">Judge</SelectItem>
+                              <SelectItem value="CLIENT">Client</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -384,6 +385,18 @@ export default function UserManagement({ orgId }: UserManagementProps) {
                                   disabled={member.role === 'ADMIN'}
                                 >
                                   {t('admin.userManagement.actions.makeAdmin')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => updateRoleMutation.mutate({ userId: member.user.id, role: 'JUDGE' })}
+                                  disabled={member.role === 'JUDGE'}
+                                >
+                                  Make Judge
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => updateRoleMutation.mutate({ userId: member.user.id, role: 'CLIENT' })}
+                                  disabled={member.role === 'CLIENT'}
+                                >
+                                  Make Client
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => setMemberToRemove(member)}

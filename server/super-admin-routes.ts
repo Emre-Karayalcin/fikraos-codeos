@@ -511,7 +511,7 @@ export function registerSuperAdminRoutes(app: Express) {
       const { userId, role } = req.body;
       if (!userId || !role) return res.status(400).json({ message: "userId and role are required" });
 
-      const validRoles = ["OWNER", "ADMIN", "MENTOR", "MEMBER"];
+      const validRoles = ["OWNER", "ADMIN", "MENTOR", "MEMBER", "CLIENT", "JUDGE"];
       if (!validRoles.includes(role)) return res.status(400).json({ message: "Invalid role" });
 
       const alreadyMember = await storage.hasOrganizationMember(id, userId);
@@ -535,7 +535,7 @@ export function registerSuperAdminRoutes(app: Express) {
       const { id, userId } = req.params;
       const { role } = req.body;
 
-      const validRoles = ["OWNER", "ADMIN", "MENTOR", "MEMBER"];
+      const validRoles = ["OWNER", "ADMIN", "MENTOR", "MEMBER", "CLIENT", "JUDGE"];
       if (!role || !validRoles.includes(role)) return res.status(400).json({ message: "Invalid role" });
 
       await storage.updateMemberRole(id, userId, role);

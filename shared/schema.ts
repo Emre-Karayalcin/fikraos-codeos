@@ -155,7 +155,7 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const roleEnum = pgEnum("role", ["OWNER", "MEMBER", "MENTOR", "ADMIN", "JUDGE"]);
+export const roleEnum = pgEnum("role", ["OWNER", "MEMBER", "MENTOR", "ADMIN", "JUDGE", "CLIENT"]);
 
 // Idea Management Enums
 export const ideaStatusEnum = pgEnum('idea_status', [

@@ -520,6 +520,8 @@ function InviteUserModal({ workspaces, onClose, onSubmit, isPending }: InviteUse
                 <SelectItem value="MEMBER">Member</SelectItem>
                 <SelectItem value="MENTOR">Mentor</SelectItem>
                 <SelectItem value="ADMIN">Admin</SelectItem>
+                <SelectItem value="JUDGE">Judge</SelectItem>
+                <SelectItem value="CLIENT">Client</SelectItem>
               </SelectContent>
             </Select>
           </div>

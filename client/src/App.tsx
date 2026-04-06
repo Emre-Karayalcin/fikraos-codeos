@@ -27,6 +27,8 @@ import Challenges from "@/pages/Challenges";
 import ChallengeDetail from "@/pages/ChallengeDetail";
 import Events from "@/pages/Events";
 import Academy from "@/pages/Academy";
+import ClientIdeas from "@/pages/ClientIdeas";
+import ClientLeaderboard from "@/pages/ClientLeaderboard";
 import Admin from "@/pages/Admin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminUsers from "@/pages/AdminUsers";
@@ -148,6 +150,19 @@ function Router() {
       <Route path="/w/:slug/my-ideas" component={() => (
         <PageTransition>
           <WorkspaceGuard><MyIdeas /></WorkspaceGuard>
+        </PageTransition>
+      )} />
+
+      {/* Client role read-only routes */}
+      <Route path="/w/:slug/client/ideas" component={() => (
+        <PageTransition>
+          <WorkspaceGuard><ClientIdeas /></WorkspaceGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/client/leaderboard" component={() => (
+        <PageTransition>
+          <WorkspaceGuard><ClientLeaderboard /></WorkspaceGuard>
         </PageTransition>
       )} />
       
