@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 import { HandCoins, Trophy, Settings2, Trash2, Medal } from "lucide-react";
 import { format } from "date-fns";
 
