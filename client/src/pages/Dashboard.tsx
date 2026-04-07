@@ -16,7 +16,9 @@ import {
   FiSearch,
   FiCalendar,
   FiStar,
+  FiPhone,
 } from "react-icons/fi";
+import { useBranding } from "@/contexts/BrandingContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { buildIdeaInitialMessage } from "@/lib/buildIdeaMessage";
@@ -45,6 +47,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const { slug } = useParams<{ slug?: string }>();
+  const { consultationEnabled } = useBranding();
 
   const { data: organizations, isLoading: orgLoading } = useQuery<any[]>({
     queryKey: ['/api/organizations'],
@@ -256,6 +259,14 @@ export default function Dashboard() {
       color: 'text-orange-600',
       path: `/w/${slug}/academy`,
     },
+    ...(consultationEnabled ? [{
+      id: 'consultation',
+      title: 'Consultation',
+      description: 'One-on-one expert sessions',
+      icon: FiPhone,
+      color: 'text-teal-600',
+      path: `/w/${slug}/consultation`,
+    }] : []),
   ];
 
   if (!user) {

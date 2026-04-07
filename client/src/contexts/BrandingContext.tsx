@@ -14,6 +14,7 @@ interface BrandingContextType {
   formSubmissionEnabled: boolean;
   manualBuildEnabled: boolean;
   academyEnabled: boolean;
+  consultationEnabled: boolean;
   isLoading: boolean;
   // new organization-level route fields
   defaultRoute?: string | null;
@@ -51,6 +52,7 @@ const BrandingContext = createContext<BrandingContextType>({
   formSubmissionEnabled: false,
   manualBuildEnabled: false,
   academyEnabled: true,
+  consultationEnabled: false,
   isLoading: true
   // defaults for new fields
   , defaultRoute: null,
@@ -106,6 +108,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         formSubmissionEnabled: data.formSubmissionEnabled ?? false,
         manualBuildEnabled: data.manualBuildEnabled ?? true,
         academyEnabled: data.academyEnabled ?? true,
+        consultationEnabled: data.consultationEnabled ?? false,
         defaultRoute: data.defaultRoute ?? null,
         dashboardNameEn: data.dashboardNameEn ?? null,
         dashboardNameAr: data.dashboardNameAr ?? null,
@@ -171,6 +174,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         formSubmissionEnabled: branding?.formSubmissionEnabled ?? false,
         manualBuildEnabled: branding?.manualBuildEnabled ?? true,
         academyEnabled: branding?.academyEnabled ?? true,
+        consultationEnabled: branding?.consultationEnabled ?? false,
         isLoading,
         // expose new fields to consumers
         defaultRoute: branding?.defaultRoute ?? null,

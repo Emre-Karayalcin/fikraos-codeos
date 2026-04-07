@@ -73,6 +73,7 @@ import AdminMentorFeedback from "@/pages/AdminMentorFeedback";
 import AdminAcademy from "@/pages/AdminAcademy";
 import AdminPitchDecks from "@/pages/AdminPitchDecks";
 import AdminConsultation from "@/pages/AdminConsultation";
+import ConsultationPage from "@/pages/ConsultationPage";
 import AdminProgramRoadmap from "@/pages/AdminProgramRoadmap";
 import Pitch from "@/pages/Pitch";
 import PitchViewer from "@/pages/PitchViewer";
@@ -218,6 +219,12 @@ function Router() {
       <Route path="/w/:slug/academy/:courseSlug/:videoSlug" component={() => (
         <PageTransition>
           <WorkspaceGuard><Academy /></WorkspaceGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/consultation" component={() => (
+        <PageTransition>
+          <WorkspaceGuard><ConsultationPage /></WorkspaceGuard>
         </PageTransition>
       )} />
 

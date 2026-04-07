@@ -3,6 +3,7 @@ import { db } from "./db";
 import {
   consultationCredits,
   consultationSessions,
+  consultationBookings,
   organizations,
   organizationMembers,
   users,
@@ -221,5 +222,81 @@ export function registerConsultationRoutes(app: Express) {
       .orderBy(users.firstName);
 
     res.json(rows);
+  });
+
+  // ── Participant: check own eligibility ────────────────────────────────────
+  app.get("/api/workspaces/:orgId/consultation/eligibility", isAuthenticated, async (req, res) => {
+    const { orgId } = req.params;
+    const userId = (req.user as any)?.id;
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    // Must be a member of the org
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    if (!membership) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const [org] = await db
+      .select({
+        consultationEnabled:    organizations.consultationEnabled,
+        consultationMinCredits: organizations.consultationMinCredits,
+        consultationMaxEligible: organizations.consultationMaxEligible,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+
+    const consultationEnabled = org?.consultationEnabled ?? false;
+    const minCredits  = org?.consultationMinCredits  ?? 10;
+    const maxEligible = org?.consultationMaxEligible ?? 3;
+
+    // Get all ranked participants
+    const ranked = await db
+      .select({
+        userId:       consultationCredits.userId,
+        totalCredits: sql<number>`cast(sum(${consultationCredits.credits}) as int)`,
+      })
+      .from(consultationCredits)
+      .where(eq(consultationCredits.orgId, orgId))
+      .groupBy(consultationCredits.userId)
+      .orderBy(desc(sql`sum(${consultationCredits.credits})`));
+
+    const myEntry = ranked.find(r => r.userId === userId);
+    const myRank  = myEntry ? ranked.indexOf(myEntry) : -1;
+    const totalCredits = myEntry?.totalCredits ?? 0;
+    const isEligible = consultationEnabled
+      && totalCredits >= minCredits
+      && myRank >= 0
+      && myRank < maxEligible;
+
+    // Check for existing booking
+    const [booking] = await db
+      .select()
+      .from(consultationBookings)
+      .where(and(eq(consultationBookings.orgId, orgId), eq(consultationBookings.userId, userId)))
+      .orderBy(desc(consultationBookings.bookedAt))
+      .limit(1);
+
+    const activeBooking = booking && booking.status !== "CANCELLED" ? booking : null;
+
+    let status: "NOT_ELIGIBLE" | "ELIGIBLE" | "BOOKED";
+    if (activeBooking) {
+      status = "BOOKED";
+    } else if (isEligible) {
+      status = "ELIGIBLE";
+    } else {
+      status = "NOT_ELIGIBLE";
+    }
+
+    res.json({
+      consultationEnabled,
+      status,
+      totalCredits,
+      minCredits,
+      maxEligible,
+      rank: myRank >= 0 ? myRank + 1 : null,
+      booking: activeBooking ?? null,
+      config: { minCredits, maxEligible },
+    });
   });
 }

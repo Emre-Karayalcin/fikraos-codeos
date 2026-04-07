@@ -23,6 +23,7 @@ import {
   Trophy,
   Shield,
   GraduationCap,
+  CalendarCheck,
   Presentation,
   CalendarDays,
   MessageSquare
@@ -260,6 +261,7 @@ export function UnifiedSidebar() {
     expertsEnabled,
     dashboardEnabled,
     academyEnabled,
+    consultationEnabled,
     isLoading: brandingLoading,
     dashboardNameEn,
     dashboardNameAr,
@@ -804,6 +806,26 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
+                  {/* Consultation - Only show if enabled */}
+                  {consultationEnabled && !isJudge && !isClient && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={`flex items-center justify-center p-3 rounded-md cursor-pointer transition-all duration-200 ${
+                            location.includes("/consultation") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                          }`}
+                          onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/consultation`)}
+                          data-testid="nav-consultation"
+                        >
+                          <CalendarCheck className="w-5 h-5" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>Consultation</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
                   {/* Events - always visible except for clients */}
                   {!isClient && (
                   <Tooltip>
@@ -974,6 +996,20 @@ export function UnifiedSidebar() {
                     >
                       <GraduationCap className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
                       <span className="text-sm font-medium">Training Modules</span>
+                    </div>
+                  )}
+
+                  {/* Consultation - Only show if enabled */}
+                  {consultationEnabled && !isJudge && !isClient && (
+                    <div
+                      className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
+                        location.includes("/consultation") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      }`}
+                      onClick={() => currentWorkspaceSlug && setLocation(`/w/${currentWorkspaceSlug}/consultation`)}
+                      data-testid="nav-consultation"
+                    >
+                      <CalendarCheck className="w-4 h-4 ltr:mr-2.5 rtl:ml-2.5" />
+                      <span className="text-sm font-medium">Consultation</span>
                     </div>
                   )}
 
