@@ -151,11 +151,15 @@ export const organizations = pgTable("organizations", {
   expertsDescEn: varchar("experts_desc_en"),
   expertsDescAr: varchar("experts_desc_ar"),
   acceptanceCapacity: integer("acceptance_capacity").default(280).notNull(),
+  // Consultation feature config
+  consultationEnabled: boolean("consultation_enabled").default(false),
+  consultationMinCredits: integer("consultation_min_credits").default(10),
+  consultationMaxEligible: integer("consultation_max_eligible").default(3),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const roleEnum = pgEnum("role", ["OWNER", "MEMBER", "MENTOR", "ADMIN", "JUDGE", "CLIENT"]);
+export const roleEnum = pgEnum("role", ["OWNER", "MEMBER", "MENTOR", "ADMIN", "JUDGE", "CLIENT", "CONSULTANT"]);
 
 // Idea Management Enums
 export const ideaStatusEnum = pgEnum('idea_status', [
@@ -1210,6 +1214,70 @@ export const moduleConsultations = pgTable("module_consultations", {
 
 export type ModuleConsultation = typeof moduleConsultations.$inferSelect;
 
+// ─── Consultation Feature ──────────────────────────────────────────────────
+
+export const consultationSessionStatusEnum = pgEnum("consultation_session_status", [
+  "ACTIVE", "CANCELLED", "COMPLETED",
+]);
+
+export const consultationBookingStatusEnum = pgEnum("consultation_booking_status", [
+  "PENDING", "CONFIRMED", "CANCELLED",
+]);
+
+// Consultant profile (distinct from mentor) — one per user per org
+export const consultantProfiles = pgTable("consultant_profiles", {
+  id:           varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId:       varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId:        varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  bio:          text("bio"),
+  expertise:    varchar("expertise"),
+  linkedinUrl:  varchar("linkedin_url"),
+  active:       boolean("active").default(true),
+  createdAt:    timestamp("created_at").defaultNow(),
+  updatedAt:    timestamp("updated_at").defaultNow(),
+});
+
+// Credit audit log — PMO awards credits manually to participants
+export const consultationCredits = pgTable("consultation_credits", {
+  id:          varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId:       varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  challengeId: varchar("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
+  userId:      varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),   // participant
+  credits:     integer("credits").notNull(),
+  awardedById: varchar("awarded_by_id").notNull().references(() => users.id),
+  reason:      text("reason"),
+  createdAt:   timestamp("created_at").defaultNow(),
+});
+
+// Consultation sessions created by PMO — one session can serve up to `capacity` participants
+export const consultationSessions = pgTable("consultation_sessions", {
+  id:                  varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId:               varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  challengeId:         varchar("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
+  consultantUserId:    varchar("consultant_user_id").references(() => users.id, { onDelete: "set null" }),
+  title:               varchar("title").notNull(),
+  externalMeetingLink: varchar("external_meeting_link"),
+  scheduledAt:         timestamp("scheduled_at"),
+  capacity:            integer("capacity").notNull().default(3),
+  filledSlots:         integer("filled_slots").notNull().default(0),
+  status:              consultationSessionStatusEnum("status").default("ACTIVE"),
+  notes:               text("notes"),
+  createdAt:           timestamp("created_at").defaultNow(),
+  updatedAt:           timestamp("updated_at").defaultNow(),
+});
+
+// Booking — one participant books one session
+export const consultationBookings = pgTable("consultation_bookings", {
+  id:                  varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId:           varchar("session_id").notNull().references(() => consultationSessions.id, { onDelete: "cascade" }),
+  userId:              varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId:               varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  status:              consultationBookingStatusEnum("status").default("PENDING"),
+  calendarInviteSent:  boolean("calendar_invite_sent").default(false),
+  bookedAt:            timestamp("booked_at").defaultNow(),
+  cancelledAt:         timestamp("cancelled_at"),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1228,6 +1296,10 @@ export type IdeaScore = typeof ideaScores.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type CourseProgress = typeof courseProgress.$inferSelect;
+export type ConsultantProfile = typeof consultantProfiles.$inferSelect;
+export type ConsultationCredit = typeof consultationCredits.$inferSelect;
+export type ConsultationSession = typeof consultationSessions.$inferSelect;
+export type ConsultationBooking = typeof consultationBookings.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;

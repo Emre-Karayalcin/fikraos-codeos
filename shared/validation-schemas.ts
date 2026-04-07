@@ -309,7 +309,7 @@ export const updateOrgSettingsSchema = z.object({
  */
 export const addOrgMemberSchema = z.object({
   email: z.string().email("Invalid email format").max(255),
-  role: z.enum(['MEMBER', 'ADMIN', 'OWNER', 'MENTOR', 'JUDGE', 'CLIENT']).optional(),
+  role: z.enum(['MEMBER', 'ADMIN', 'OWNER', 'MENTOR', 'JUDGE', 'CLIENT', 'CONSULTANT']).optional(),
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
 });
@@ -318,8 +318,8 @@ export const addOrgMemberSchema = z.object({
  * PATCH /api/organizations/:orgId/admin/members/:userId - Update member role
  */
 export const updateMemberRoleSchema = z.object({
-  role: z.enum(['MEMBER', 'ADMIN', 'OWNER', 'MENTOR', 'JUDGE', 'CLIENT'], {
-    errorMap: () => ({ message: "Role must be MEMBER, ADMIN, OWNER, MENTOR, JUDGE, or CLIENT" })
+  role: z.enum(['MEMBER', 'ADMIN', 'OWNER', 'MENTOR', 'JUDGE', 'CLIENT', 'CONSULTANT'], {
+    errorMap: () => ({ message: "Role must be MEMBER, ADMIN, OWNER, MENTOR, JUDGE, CLIENT, or CONSULTANT" })
   }),
 });
 
