@@ -1370,6 +1370,48 @@ router.get("/mentors/:id/reviews", async (req: any, res) => {
   }
 });
 
+// PATCH /api/workspaces/:orgId/admin/mentor-bookings/:bookingId/member-survey — PMO edits participant survey
+router.patch("/workspaces/:orgId/admin/mentor-bookings/:bookingId/member-survey", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { orgId, bookingId } = req.params;
+    const { rating, feedback, sessionGoalMet, wouldRecommend } = req.body;
+
+    // Verify booking belongs to this org via mentor profile
+    const [booking] = await db
+      .select({ id: mentorBookings.id, mentorProfileId: mentorBookings.mentorProfileId })
+      .from(mentorBookings)
+      .innerJoin(mentorProfiles, eq(mentorBookings.mentorProfileId, mentorProfiles.id))
+      .where(and(eq(mentorBookings.id, bookingId), eq(mentorProfiles.orgId, orgId)))
+      .limit(1);
+
+    if (!booking) return res.status(404).json({ message: "Booking not found in this workspace" });
+
+    if (rating !== undefined && (typeof rating !== "number" || rating < 1 || rating > 5)) {
+      return res.status(400).json({ message: "Rating must be 1–5" });
+    }
+
+    const [updated] = await db
+      .update(mentorBookings)
+      .set({
+        ...(rating !== undefined && { rating }),
+        ...(feedback !== undefined && { feedback: feedback?.trim() || null }),
+        ...(sessionGoalMet !== undefined && { sessionGoalMet }),
+        ...(wouldRecommend !== undefined && { wouldRecommend }),
+        surveyCompletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(mentorBookings.id, bookingId))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating member survey:", error);
+    res.status(500).json({ message: "Failed to update survey" });
+  }
+});
+
 // GET /api/workspaces/:orgId/admin/mentor-insights
 router.get("/workspaces/:orgId/admin/mentor-insights", async (req: any, res) => {
   try {

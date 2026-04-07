@@ -1,17 +1,23 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { MessageSquare, Star } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { MessageSquare, Star, Pencil } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -23,11 +29,145 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+function EditSurveyDialog({
+  record,
+  orgId,
+  open,
+  onClose,
+}: {
+  record: any;
+  orgId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [rating, setRating] = useState<number>(record.rating ?? 0);
+  const [hovered, setHovered] = useState(0);
+  const [feedback, setFeedback] = useState<string>(record.feedback ?? "");
+  const [sessionGoalMet, setSessionGoalMet] = useState<boolean | null>(record.sessionGoalMet ?? null);
+  const [wouldRecommend, setWouldRecommend] = useState<boolean | null>(record.wouldRecommend ?? null);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiRequest("PATCH", `/api/workspaces/${orgId}/admin/mentor-bookings/${record.id}/member-survey`, {
+        rating: rating || undefined,
+        feedback: feedback.trim() || undefined,
+        sessionGoalMet: sessionGoalMet !== null ? sessionGoalMet : undefined,
+        wouldRecommend: wouldRecommend !== null ? wouldRecommend : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`] });
+      toast({ title: "Survey updated" });
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to update survey", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Participant Survey</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1 text-sm">
+          <p className="text-muted-foreground text-xs">
+            {record.memberFirstName} {record.memberLastName} · {record.mentorName} · {record.bookedDate}
+          </p>
+
+          {/* Star rating */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Overall rating</label>
+            <div className="flex gap-1">
+              {[1,2,3,4,5].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onMouseEnter={() => setHovered(s)}
+                  onMouseLeave={() => setHovered(0)}
+                  onClick={() => setRating(s)}
+                  className="transition-transform hover:scale-110"
+                >
+                  <Star className={`w-7 h-7 ${s <= (hovered || rating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
+                </button>
+              ))}
+              {rating > 0 && (
+                <button type="button" onClick={() => setRating(0)} className="text-xs text-muted-foreground hover:text-foreground ml-2 self-center">Clear</button>
+              )}
+            </div>
+          </div>
+
+          {/* Goal met */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Session goal met?</label>
+            <div className="flex gap-2">
+              {([true, false] as const).map((val) => (
+                <button
+                  key={String(val)}
+                  type="button"
+                  onClick={() => setSessionGoalMet(sessionGoalMet === val ? null : val)}
+                  className={`flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                    sessionGoalMet === val
+                      ? val ? "bg-green-100 border-green-400 text-green-700" : "bg-red-50 border-red-400 text-red-600"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {val ? "Yes" : "No"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Would recommend */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Would recommend mentor?</label>
+            <div className="flex gap-2">
+              {([true, false] as const).map((val) => (
+                <button
+                  key={String(val)}
+                  type="button"
+                  onClick={() => setWouldRecommend(wouldRecommend === val ? null : val)}
+                  className={`flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                    wouldRecommend === val
+                      ? val ? "bg-blue-100 border-blue-400 text-blue-700" : "bg-muted border-border text-muted-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {val ? "Yes" : "No"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Open feedback */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Member feedback</label>
+            <Textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Participant's written feedback…"
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+            {mutation.isPending ? "Saving…" : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminMentorFeedback() {
   const { slug } = useParams<{ slug: string }>();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [filterMentorId, setFilterMentorId] = useState("all");
   const [filterMinRating, setFilterMinRating] = useState("all");
+  const [editingRecord, setEditingRecord] = useState<any | null>(null);
 
   const { data: workspace } = useQuery<{ id: string }>({
     queryKey: [`/api/workspaces/${slug}`],
@@ -154,6 +294,7 @@ export default function AdminMentorFeedback() {
                       <TableHead>Areas Coached</TableHead>
                       <TableHead>Member Feedback</TableHead>
                       <TableHead>Mentor Notes</TableHead>
+                      <TableHead className="w-16"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -212,6 +353,15 @@ export default function AdminMentorFeedback() {
                           <TableCell className="text-sm max-w-xs">
                             <p className="truncate text-muted-foreground" title={f.mentorFeedback}>{f.mentorFeedback || "—"}</p>
                           </TableCell>
+                          <TableCell>
+                            <button
+                              onClick={() => setEditingRecord(f)}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                              title="Edit participant survey"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -222,6 +372,15 @@ export default function AdminMentorFeedback() {
           </Card>
         </div>
       </div>
+
+      {editingRecord && orgId && (
+        <EditSurveyDialog
+          record={editingRecord}
+          orgId={orgId}
+          open={!!editingRecord}
+          onClose={() => setEditingRecord(null)}
+        />
+      )}
     </div>
   );
 }
