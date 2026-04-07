@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
   GraduationCap, ClipboardList, Mail, BarChart2, BookOpen, CalendarDays,
-  ClipboardCheck, MessageSquare, Video, Presentation, Map,
+  ClipboardCheck, MessageSquare, Video, Presentation, Map, HandCoins,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -72,6 +72,11 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           titleKey: 'Pitch Decks',
           href: `/w/${workspaceSlug}/admin/pitch-decks`,
           icon: Presentation,
+        },
+        {
+          titleKey: 'Consultation',
+          href: `/w/${workspaceSlug}/admin/consultation`,
+          icon: HandCoins,
         },
       ],
     },

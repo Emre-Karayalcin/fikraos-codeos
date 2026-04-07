@@ -302,6 +302,9 @@ export const updateOrgSettingsSchema = z.object({
   aiBuilderEnabled: z.boolean().optional(),
   formSubmissionEnabled: z.boolean().optional(),
   academyEnabled: z.boolean().optional(),
+  consultationEnabled: z.boolean().optional(),
+  consultationMinCredits: z.number().int().min(0).optional(),
+  consultationMaxEligible: z.number().int().min(1).optional(),
 });
 
 /**

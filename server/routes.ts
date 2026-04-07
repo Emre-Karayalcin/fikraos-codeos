@@ -16,6 +16,7 @@ import { registerSuperAdminRoutes, getScoringConfig } from "./super-admin-routes
 import { registerEventRoutes } from "./events-routes";
 import { registerProgramRoutes } from "./program-routes";
 import { registerPitchLifecycleRoutes } from "./pitch-lifecycle-routes";
+import { registerConsultationRoutes } from "./consultation-routes";
 import multer from 'multer'; // ✅ Add multer import
 import path from 'path'; // ✅ Add path import
 import fs from 'fs'; // ✅ Add fs import
@@ -546,7 +547,7 @@ export function registerRoutes(app: Express): Server {
   app.patch('/api/organizations/:orgId/admin/settings', isAuthenticated, isOrgAdmin, validateRequest(updateOrgSettingsSchema), async (req: any, res) => {
     try {
       const { orgId } = req.params;
-      const { logoUrl, primaryColor, slug, challengesEnabled, expertsEnabled, radarEnabled, dashboardEnabled, aiBuilderEnabled, formSubmissionEnabled, academyEnabled } = req.body;
+      const { logoUrl, primaryColor, slug, challengesEnabled, expertsEnabled, radarEnabled, dashboardEnabled, aiBuilderEnabled, formSubmissionEnabled, academyEnabled, consultationEnabled, consultationMinCredits, consultationMaxEligible } = req.body;
 
       const updatedOrg = await storage.updateOrganization(orgId, {
         logoUrl,
@@ -558,7 +559,10 @@ export function registerRoutes(app: Express): Server {
         dashboardEnabled,
         aiBuilderEnabled,
         formSubmissionEnabled,
-        academyEnabled
+        academyEnabled,
+        consultationEnabled,
+        consultationMinCredits,
+        consultationMaxEligible,
       });
 
       res.json(updatedOrg);
@@ -5372,6 +5376,7 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
   app.use('/api', mentorRoutes);
   registerProgramRoutes(app);
   registerPitchLifecycleRoutes(app);
+  registerConsultationRoutes(app);
 
     // Add this interface near the top of the file, after imports
   interface AssetUpdateIntent {
