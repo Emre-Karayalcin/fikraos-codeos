@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "./db";
-import { mentorProfiles, mentorAvailability, mentorBookings, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords } from "../shared/schema";
+import { mentorProfiles, mentorAvailability, mentorBookings, mentorSurveyQuestions, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords } from "../shared/schema";
 import { eq, and, isNotNull, inArray, sql, desc, avg, count } from "drizzle-orm";
 import { Resend } from "resend";
 
@@ -566,8 +566,7 @@ router.get("/mentor-bookings/mine", async (req: any, res) => {
         status: mentorBookings.status,
         rating: mentorBookings.rating,
         feedback: mentorBookings.feedback,
-        sessionGoalMet: mentorBookings.sessionGoalMet,
-        wouldRecommend: mentorBookings.wouldRecommend,
+        surveyResponses: mentorBookings.surveyResponses,
         surveyCompletedAt: mentorBookings.surveyCompletedAt,
         createdAt: mentorBookings.createdAt,
       })
@@ -973,9 +972,9 @@ router.patch("/mentor-bookings/:id/complete", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const { rating, feedback, sessionGoalMet, wouldRecommend } = req.body;
-    if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating must be a number between 1 and 5" });
+    const { surveyResponses } = req.body;
+    if (!surveyResponses || typeof surveyResponses !== "object") {
+      return res.status(400).json({ message: "surveyResponses object is required" });
     }
 
     // Verify the user owns this booking
@@ -987,14 +986,15 @@ router.patch("/mentor-bookings/:id/complete", async (req: any, res) => {
     if (!booking) return res.status(404).json({ message: "Booking not found" });
     if (booking.status === "CANCELLED") return res.status(400).json({ message: "Cannot complete a cancelled booking" });
 
+    // Extract overall rating from responses if any question is type=rating
+    const ratingValue = Object.values(surveyResponses).find((v) => typeof v === "number" && v >= 1 && v <= 5) as number | undefined;
+
     const [updated] = await db
       .update(mentorBookings)
       .set({
         status: "COMPLETED",
-        rating,
-        feedback: feedback?.trim() || null,
-        sessionGoalMet: typeof sessionGoalMet === "boolean" ? sessionGoalMet : null,
-        wouldRecommend: typeof wouldRecommend === "boolean" ? wouldRecommend : null,
+        surveyResponses,
+        rating: ratingValue ?? null,
         surveyCompletedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -1370,45 +1370,154 @@ router.get("/mentors/:id/reviews", async (req: any, res) => {
   }
 });
 
-// PATCH /api/workspaces/:orgId/admin/mentor-bookings/:bookingId/member-survey — PMO edits participant survey
-router.patch("/workspaces/:orgId/admin/mentor-bookings/:bookingId/member-survey", async (req: any, res) => {
+// ─── Survey Question Management (PMO) ────────────────────────────────────────
+
+const DEFAULT_SURVEY_QUESTIONS = [
+  { questionText: "How would you rate this session overall?", questionType: "rating", isRequired: true, orderIndex: 0 },
+  { questionText: "Was your session goal met?", questionType: "boolean", isRequired: false, orderIndex: 1 },
+  { questionText: "Would you recommend this mentor to others?", questionType: "boolean", isRequired: false, orderIndex: 2 },
+  { questionText: "Any additional feedback or comments?", questionType: "text", isRequired: false, orderIndex: 3 },
+];
+
+// GET /api/workspaces/:orgId/admin/mentor-survey-questions
+router.get("/workspaces/:orgId/admin/mentor-survey-questions", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const { orgId } = req.params;
+
+    let questions = await db
+      .select()
+      .from(mentorSurveyQuestions)
+      .where(eq(mentorSurveyQuestions.orgId, orgId))
+      .orderBy(mentorSurveyQuestions.orderIndex);
+
+    // Seed defaults if none exist yet
+    if (questions.length === 0) {
+      const inserted = await db.insert(mentorSurveyQuestions)
+        .values(DEFAULT_SURVEY_QUESTIONS.map((q) => ({ ...q, orgId })))
+        .returning();
+      questions = inserted.sort((a, b) => a.orderIndex - b.orderIndex);
+    }
+
+    res.json(questions);
+  } catch (error) {
+    console.error("Error fetching survey questions:", error);
+    res.status(500).json({ message: "Failed to fetch survey questions" });
+  }
+});
+
+// GET /api/mentor-bookings/:id/survey-questions — member fetches their org's active questions
+router.get("/mentor-bookings/:id/survey-questions", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const { orgId, bookingId } = req.params;
-    const { rating, feedback, sessionGoalMet, wouldRecommend } = req.body;
-
-    // Verify booking belongs to this org via mentor profile
     const [booking] = await db
-      .select({ id: mentorBookings.id, mentorProfileId: mentorBookings.mentorProfileId })
+      .select({ mentorProfileId: mentorBookings.mentorProfileId })
       .from(mentorBookings)
-      .innerJoin(mentorProfiles, eq(mentorBookings.mentorProfileId, mentorProfiles.id))
-      .where(and(eq(mentorBookings.id, bookingId), eq(mentorProfiles.orgId, orgId)))
+      .where(and(eq(mentorBookings.id, req.params.id), eq(mentorBookings.userId, req.user.id)))
       .limit(1);
 
-    if (!booking) return res.status(404).json({ message: "Booking not found in this workspace" });
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-    if (rating !== undefined && (typeof rating !== "number" || rating < 1 || rating > 5)) {
-      return res.status(400).json({ message: "Rating must be 1–5" });
+    const [profile] = await db
+      .select({ orgId: mentorProfiles.orgId })
+      .from(mentorProfiles)
+      .where(eq(mentorProfiles.id, booking.mentorProfileId))
+      .limit(1);
+
+    if (!profile?.orgId) return res.json([]);
+
+    let questions = await db
+      .select()
+      .from(mentorSurveyQuestions)
+      .where(and(eq(mentorSurveyQuestions.orgId, profile.orgId), eq(mentorSurveyQuestions.isActive, true)))
+      .orderBy(mentorSurveyQuestions.orderIndex);
+
+    // Seed defaults if none exist
+    if (questions.length === 0) {
+      const inserted = await db.insert(mentorSurveyQuestions)
+        .values(DEFAULT_SURVEY_QUESTIONS.map((q) => ({ ...q, orgId: profile.orgId })))
+        .returning();
+      questions = inserted.filter((q) => q.isActive).sort((a, b) => a.orderIndex - b.orderIndex);
     }
 
-    const [updated] = await db
-      .update(mentorBookings)
+    res.json(questions);
+  } catch (error) {
+    console.error("Error fetching booking survey questions:", error);
+    res.status(500).json({ message: "Failed to fetch survey questions" });
+  }
+});
+
+// POST /api/workspaces/:orgId/admin/mentor-survey-questions
+router.post("/workspaces/:orgId/admin/mentor-survey-questions", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const { orgId } = req.params;
+    const { questionText, questionType, isRequired, orderIndex } = req.body;
+
+    if (!questionText?.trim()) return res.status(400).json({ message: "questionText is required" });
+    if (!["rating", "boolean", "text", "scale"].includes(questionType)) {
+      return res.status(400).json({ message: "questionType must be rating | boolean | text | scale" });
+    }
+
+    const [created] = await db.insert(mentorSurveyQuestions)
+      .values({ orgId, questionText: questionText.trim(), questionType, isRequired: !!isRequired, orderIndex: orderIndex ?? 99 })
+      .returning();
+
+    res.status(201).json(created);
+  } catch (error) {
+    console.error("Error creating survey question:", error);
+    res.status(500).json({ message: "Failed to create question" });
+  }
+});
+
+// PATCH /api/workspaces/:orgId/admin/mentor-survey-questions/:questionId
+router.patch("/workspaces/:orgId/admin/mentor-survey-questions/:questionId", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const { orgId, questionId } = req.params;
+    const { questionText, questionType, isRequired, orderIndex, isActive } = req.body;
+
+    const [existing] = await db
+      .select({ id: mentorSurveyQuestions.id })
+      .from(mentorSurveyQuestions)
+      .where(and(eq(mentorSurveyQuestions.id, questionId), eq(mentorSurveyQuestions.orgId, orgId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ message: "Question not found" });
+
+    const [updated] = await db.update(mentorSurveyQuestions)
       .set({
-        ...(rating !== undefined && { rating }),
-        ...(feedback !== undefined && { feedback: feedback?.trim() || null }),
-        ...(sessionGoalMet !== undefined && { sessionGoalMet }),
-        ...(wouldRecommend !== undefined && { wouldRecommend }),
-        surveyCompletedAt: new Date(),
+        ...(questionText !== undefined && { questionText: questionText.trim() }),
+        ...(questionType !== undefined && { questionType }),
+        ...(isRequired !== undefined && { isRequired }),
+        ...(orderIndex !== undefined && { orderIndex }),
+        ...(isActive !== undefined && { isActive }),
         updatedAt: new Date(),
       })
-      .where(eq(mentorBookings.id, bookingId))
+      .where(eq(mentorSurveyQuestions.id, questionId))
       .returning();
 
     res.json(updated);
   } catch (error) {
-    console.error("Error updating member survey:", error);
-    res.status(500).json({ message: "Failed to update survey" });
+    console.error("Error updating survey question:", error);
+    res.status(500).json({ message: "Failed to update question" });
+  }
+});
+
+// DELETE /api/workspaces/:orgId/admin/mentor-survey-questions/:questionId
+router.delete("/workspaces/:orgId/admin/mentor-survey-questions/:questionId", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const { orgId, questionId } = req.params;
+
+    await db.delete(mentorSurveyQuestions)
+      .where(and(eq(mentorSurveyQuestions.id, questionId), eq(mentorSurveyQuestions.orgId, orgId)));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting survey question:", error);
+    res.status(500).json({ message: "Failed to delete question" });
   }
 });
 

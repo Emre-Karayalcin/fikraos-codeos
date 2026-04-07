@@ -70,6 +70,7 @@ import AdminScoringCriteria from "@/pages/AdminScoringCriteria";
 import AdminEvents from "@/pages/AdminEvents";
 import AdminAttendance from "@/pages/AdminAttendance";
 import AdminMentorFeedback from "@/pages/AdminMentorFeedback";
+import AdminMentorSurvey from "@/pages/AdminMentorSurvey";
 import AdminAcademy from "@/pages/AdminAcademy";
 import AdminPitchDecks from "@/pages/AdminPitchDecks";
 import AdminConsultation from "@/pages/AdminConsultation";
@@ -358,6 +359,12 @@ function Router() {
       <Route path="/w/:slug/admin/mentor-feedback" component={() => (
         <PageTransition>
           <AdminGuard><AdminMentorFeedback /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/mentor-survey" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminMentorSurvey /></AdminGuard>
         </PageTransition>
       )} />
 

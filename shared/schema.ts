@@ -801,14 +801,30 @@ export const mentorBookings = pgTable("mentor_bookings", {
   mentorFeedbackUpdatedAt: timestamp("mentor_feedback_updated_at"),
   rating: integer("rating"),
   feedback: text("feedback"),
-  // Member post-session survey
+  // Member post-session survey (dynamic responses keyed by question id)
+  surveyResponses: jsonb("survey_responses").$type<Record<string, string | number | boolean>>(),
+  surveyCompletedAt: timestamp("survey_completed_at"),
+  // Legacy hardcoded survey fields (kept for backwards compat with existing data)
   sessionGoalMet: boolean("session_goal_met"),
   wouldRecommend: boolean("would_recommend"),
-  surveyCompletedAt: timestamp("survey_completed_at"),
   // Mentor post-session survey
   participantEngagement: integer("participant_engagement"),
   areasCoached: jsonb("areas_coached").$type<string[]>(),
   mentorSurveyCompletedAt: timestamp("mentor_survey_completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Post-session survey questions configured per workspace by PMO
+export const mentorSurveyQuestions = pgTable("mentor_survey_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  questionText: text("question_text").notNull(),
+  // rating = 1-5 stars, boolean = Yes/No, text = open text, scale = 1-5 number
+  questionType: varchar("question_type", { length: 20 }).notNull().default("text"),
+  isRequired: boolean("is_required").default(false).notNull(),
+  orderIndex: integer("order_index").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

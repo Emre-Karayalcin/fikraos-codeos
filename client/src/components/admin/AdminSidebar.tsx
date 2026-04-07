@@ -103,6 +103,11 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           href: `/w/${workspaceSlug}/admin/mentor-feedback`,
           icon: MessageSquare,
         },
+        {
+          titleKey: 'Survey Questions',
+          href: `/w/${workspaceSlug}/admin/mentor-survey`,
+          icon: ClipboardList,
+        },
       ],
     },
     {
