@@ -71,6 +71,8 @@ import AdminEvents from "@/pages/AdminEvents";
 import AdminAttendance from "@/pages/AdminAttendance";
 import AdminMentorFeedback from "@/pages/AdminMentorFeedback";
 import AdminMentorSurvey from "@/pages/AdminMentorSurvey";
+import AdminSupport from "@/pages/AdminSupport";
+import SupportPage from "@/pages/SupportPage";
 import AdminAcademy from "@/pages/AdminAcademy";
 import AdminPitchDecks from "@/pages/AdminPitchDecks";
 import AdminConsultation from "@/pages/AdminConsultation";
@@ -229,6 +231,12 @@ function Router() {
         </PageTransition>
       )} />
 
+      <Route path="/w/:slug/support" component={() => (
+        <PageTransition>
+          <WorkspaceGuard><SupportPage /></WorkspaceGuard>
+        </PageTransition>
+      )} />
+
       <Route path="/w/:slug/research" component={() => (
         <PageTransition>
           <WorkspaceGuard><Research /></WorkspaceGuard>
@@ -365,6 +373,12 @@ function Router() {
       <Route path="/w/:slug/admin/mentor-survey" component={() => (
         <PageTransition>
           <AdminGuard><AdminMentorSurvey /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/support" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminSupport /></AdminGuard>
         </PageTransition>
       )} />
 

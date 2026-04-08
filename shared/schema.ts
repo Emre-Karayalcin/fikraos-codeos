@@ -1294,6 +1294,28 @@ export const consultationBookings = pgTable("consultation_bookings", {
   cancelledAt:         timestamp("cancelled_at"),
 });
 
+// ── Support Ticket System ─────────────────────────────────────────────────────
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id", { length: 12 }).primaryKey(),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  category: varchar("category", { length: 50 }).notNull(),
+  priority: varchar("priority", { length: 20 }).notNull().default("LOW"),
+  subject: varchar("subject", { length: 300 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("OPEN"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const supportMessages = pgTable("support_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  senderRole: varchar("sender_role", { length: 20 }).notNull().default("MEMBER"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1316,6 +1338,8 @@ export type ConsultantProfile = typeof consultantProfiles.$inferSelect;
 export type ConsultationCredit = typeof consultationCredits.$inferSelect;
 export type ConsultationSession = typeof consultationSessions.$inferSelect;
 export type ConsultationBooking = typeof consultationBookings.$inferSelect;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type SupportMessage = typeof supportMessages.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;

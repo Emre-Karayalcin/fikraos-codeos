@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
   GraduationCap, ClipboardList, Mail, BarChart2, BookOpen, CalendarDays,
-  ClipboardCheck, MessageSquare, Video, Presentation, Map, HandCoins,
+  ClipboardCheck, MessageSquare, Video, Presentation, Map, HandCoins, Headphones,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -137,6 +137,11 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           titleKey: 'Training Modules',
           href: `/w/${workspaceSlug}/admin/academy`,
           icon: Video,
+        },
+        {
+          titleKey: 'Support Requests',
+          href: `/w/${workspaceSlug}/admin/support`,
+          icon: Headphones,
         },
       ],
     },
