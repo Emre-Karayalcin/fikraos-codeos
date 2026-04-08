@@ -827,6 +827,7 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
+                  {/* Support — temporarily hidden
                   {!isMentor && !isJudge && !isClient && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -845,6 +846,7 @@ export function UnifiedSidebar() {
                       </TooltipContent>
                     </Tooltip>
                   )}
+                  */}
 
                   {/* Events - always visible except for clients */}
                   {!isClient && (
@@ -1033,7 +1035,7 @@ export function UnifiedSidebar() {
                     </div>
                   )}
 
-                  {/* Support */}
+                  {/* Support — temporarily hidden
                   {!isMentor && !isJudge && !isClient && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
@@ -1046,6 +1048,7 @@ export function UnifiedSidebar() {
                       <span className="text-sm font-medium">Support</span>
                     </div>
                   )}
+                  */}
 
                   {/* Events - always visible except for clients */}
                   {!isClient && (
