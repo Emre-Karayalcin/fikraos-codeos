@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import toast from "react-hot-toast";
-import { HandCoins, Trophy, Settings2, Trash2, Medal } from "lucide-react";
+import { HandCoins, Trophy, Settings2, Trash2, Medal, CalendarCheck, Plus, Users, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 
 export default function AdminConsultation() {
@@ -89,6 +89,30 @@ export default function AdminConsultation() {
   const [awardChallenge, setAwardChallenge] = useState("__none__");
   const [awardReason,    setAwardReason]    = useState("");
 
+  // ── Sessions state ────────────────────────────────────────────────────────
+  const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  const [newSession, setNewSession] = useState({
+    title: "", scheduledAt: "", capacity: 3, externalMeetingLink: "", notes: "",
+  });
+
+  // ── Sessions query ────────────────────────────────────────────────────────
+  const { data: sessions = [], refetch: refetchSessions } = useQuery<any[]>({
+    queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions`],
+    enabled: !!orgId,
+  });
+
+  // ── Bookings per session ──────────────────────────────────────────────────
+  const { data: sessionBookings = [] } = useQuery<any[]>({
+    queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions/${expandedSession}/bookings`],
+    queryFn: async () => {
+      if (!expandedSession || !orgId) return [];
+      const res = await fetch(`/api/workspaces/${orgId}/admin/consultation/sessions/${expandedSession}/bookings`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!orgId && !!expandedSession,
+  });
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   const saveConfigMutation = useMutation({
     mutationFn: async () => {
@@ -148,6 +172,60 @@ export default function AdminConsultation() {
     onError: () => toast.error("Failed to delete credit"),
   });
 
+  const createSessionMutation = useMutation({
+    mutationFn: async () => {
+      const body: any = { title: newSession.title, capacity: newSession.capacity };
+      if (newSession.scheduledAt) body.scheduledAt = new Date(newSession.scheduledAt).toISOString();
+      if (newSession.externalMeetingLink) body.externalMeetingLink = newSession.externalMeetingLink;
+      if (newSession.notes) body.notes = newSession.notes;
+      const res = await fetch(`/api/workspaces/${orgId}/admin/consultation/sessions`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Session created");
+      setNewSession({ title: "", scheduledAt: "", capacity: 3, externalMeetingLink: "", notes: "" });
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions`] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateSessionStatusMutation = useMutation({
+    mutationFn: async ({ sessionId, status }: { sessionId: string; status: string }) => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/consultation/sessions/${sessionId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Session updated");
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions`] });
+    },
+    onError: () => toast.error("Failed to update session"),
+  });
+
+  const updateBookingMutation = useMutation({
+    mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/consultation/bookings/${bookingId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Booking updated");
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions/${expandedSession}/bookings`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions`] });
+    },
+    onError: () => toast.error("Failed to update booking"),
+  });
+
   return (
     <div className="flex h-screen bg-background">
       <AdminSidebar
@@ -176,6 +254,7 @@ export default function AdminConsultation() {
             <TabsList>
               <TabsTrigger value="credits"><HandCoins className="w-4 h-4 mr-1.5" />Award Credits</TabsTrigger>
               <TabsTrigger value="rankings"><Trophy className="w-4 h-4 mr-1.5" />Rankings</TabsTrigger>
+              <TabsTrigger value="sessions"><CalendarCheck className="w-4 h-4 mr-1.5" />Sessions</TabsTrigger>
               <TabsTrigger value="settings"><Settings2 className="w-4 h-4 mr-1.5" />Settings</TabsTrigger>
             </TabsList>
 
@@ -365,6 +444,197 @@ export default function AdminConsultation() {
                         ))}
                       </TableBody>
                     </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* ── Sessions tab ──────────────────────────────────────────── */}
+            <TabsContent value="sessions" className="space-y-6 mt-4">
+
+              {/* Create session form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Create Session</CardTitle>
+                  <CardDescription>Create a consultation session that eligible participants can book.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Session Title</Label>
+                      <Input
+                        placeholder="e.g. 1-on-1 Business Model Review"
+                        value={newSession.title}
+                        onChange={e => setNewSession(s => ({ ...s, title: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Scheduled Date & Time</Label>
+                      <Input
+                        type="datetime-local"
+                        value={newSession.scheduledAt}
+                        onChange={e => setNewSession(s => ({ ...s, scheduledAt: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Capacity (# of participants)</Label>
+                      <Input
+                        type="number" min={1} max={100}
+                        value={newSession.capacity}
+                        onChange={e => setNewSession(s => ({ ...s, capacity: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Meeting Link (optional)</Label>
+                      <Input
+                        placeholder="https://meet.google.com/…"
+                        value={newSession.externalMeetingLink}
+                        onChange={e => setNewSession(s => ({ ...s, externalMeetingLink: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Notes (optional)</Label>
+                      <Textarea
+                        placeholder="Internal notes about this session…"
+                        className="resize-none h-20"
+                        value={newSession.notes}
+                        onChange={e => setNewSession(s => ({ ...s, notes: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => createSessionMutation.mutate()}
+                    disabled={!newSession.title || createSessionMutation.isPending}
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    {createSessionMutation.isPending ? "Creating…" : "Create Session"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Sessions list */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Sessions</CardTitle>
+                  <CardDescription>All consultation sessions for this workspace.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {sessions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No sessions created yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {sessions.map((s: any) => (
+                        <div key={s.id} className="border rounded-lg overflow-hidden">
+                          <div className="flex items-center gap-3 p-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm">{s.title}</p>
+                                <Badge variant={s.status === "ACTIVE" ? "default" : s.status === "COMPLETED" ? "outline" : "destructive"} className="text-xs">
+                                  {s.status}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {s.scheduledAt ? format(new Date(s.scheduledAt), "MMM d, yyyy · h:mm a") : "Time TBD"}
+                                {" · "}
+                                <Users className="w-3 h-3 inline" /> {s.filledSlots ?? s.activeBookings ?? 0}/{s.capacity} booked
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {s.status === "ACTIVE" && (
+                                <>
+                                  <Button
+                                    variant="outline" size="sm"
+                                    onClick={() => updateSessionStatusMutation.mutate({ sessionId: s.id, status: "COMPLETED" })}
+                                    disabled={updateSessionStatusMutation.isPending}
+                                  >
+                                    Complete
+                                  </Button>
+                                  <Button
+                                    variant="ghost" size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => updateSessionStatusMutation.mutate({ sessionId: s.id, status: "CANCELLED" })}
+                                    disabled={updateSessionStatusMutation.isPending}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}
+                              >
+                                {expandedSession === s.id
+                                  ? <ChevronUp className="w-4 h-4" />
+                                  : <ChevronDown className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Expanded bookings */}
+                          {expandedSession === s.id && (
+                            <div className="border-t bg-muted/30 p-4">
+                              {sessionBookings.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No bookings yet.</p>
+                              ) : (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Participant</TableHead>
+                                      <TableHead>Status</TableHead>
+                                      <TableHead>Booked At</TableHead>
+                                      <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {sessionBookings.map((b: any) => (
+                                      <TableRow key={b.id}>
+                                        <TableCell>
+                                          <p className="text-sm font-medium">{b.participantName}</p>
+                                          {b.participantEmail && <p className="text-xs text-muted-foreground">{b.participantEmail}</p>}
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge variant={b.status === "CONFIRMED" ? "default" : b.status === "CANCELLED" ? "destructive" : "secondary"}>
+                                            {b.status}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-sm text-muted-foreground">
+                                          {b.bookedAt ? format(new Date(b.bookedAt), "MMM d, yyyy") : "—"}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                          <div className="flex items-center justify-end gap-1">
+                                            {b.status === "PENDING" && (
+                                              <Button
+                                                variant="ghost" size="icon" className="h-7 w-7 text-green-600"
+                                                title="Confirm booking"
+                                                onClick={() => updateBookingMutation.mutate({ bookingId: b.id, status: "CONFIRMED" })}
+                                                disabled={updateBookingMutation.isPending}
+                                              >
+                                                <CheckCircle className="w-4 h-4" />
+                                              </Button>
+                                            )}
+                                            {b.status !== "CANCELLED" && (
+                                              <Button
+                                                variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                                                title="Cancel booking"
+                                                onClick={() => updateBookingMutation.mutate({ bookingId: b.id, status: "CANCELLED" })}
+                                                disabled={updateBookingMutation.isPending}
+                                              >
+                                                <XCircle className="w-4 h-4" />
+                                              </Button>
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>

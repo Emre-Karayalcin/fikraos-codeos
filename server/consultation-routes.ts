@@ -8,10 +8,12 @@ import {
   organizationMembers,
   users,
   challenges,
+  platformEvents,
 } from "../shared/schema";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, ne } from "drizzle-orm";
 import { isAuthenticated } from "./auth";
 import { z } from "zod";
+import { emailService } from "./services/emailService";
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 
@@ -279,6 +281,14 @@ export function registerConsultationRoutes(app: Express) {
 
     const activeBooking = booking && booking.status !== "CANCELLED" ? booking : null;
 
+    // Enrich booking with session details if booked
+    let sessionDetails: { title: string; scheduledAt: Date | null; externalMeetingLink: string | null } | null = null;
+    if (activeBooking) {
+      const [sess] = await db.select({ title: consultationSessions.title, scheduledAt: consultationSessions.scheduledAt, externalMeetingLink: consultationSessions.externalMeetingLink })
+        .from(consultationSessions).where(eq(consultationSessions.id, activeBooking.sessionId));
+      if (sess) sessionDetails = sess;
+    }
+
     let status: "NOT_ELIGIBLE" | "ELIGIBLE" | "BOOKED";
     if (activeBooking) {
       status = "BOOKED";
@@ -296,7 +306,330 @@ export function registerConsultationRoutes(app: Express) {
       maxEligible,
       rank: myRank >= 0 ? myRank + 1 : null,
       booking: activeBooking ?? null,
+      sessionDetails: sessionDetails ?? null,
       config: { minCredits, maxEligible },
     });
+  });
+
+  // ── SESSION CRUD (admin) ───────────────────────────────────────────────────
+
+  const createSessionSchema = z.object({
+    title:               z.string().min(1).max(200),
+    scheduledAt:         z.string().datetime().optional().nullable(),
+    capacity:            z.number().int().min(1).max(100).optional(),
+    externalMeetingLink: z.string().url().optional().nullable(),
+    consultantUserId:    z.string().optional().nullable(),
+    challengeId:         z.string().optional().nullable(),
+    notes:               z.string().max(1000).optional().nullable(),
+  });
+
+  // Create session
+  app.post("/api/workspaces/:orgId/admin/consultation/sessions", isAuthenticated, async (req, res) => {
+    const { orgId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+
+    const parsed = createSessionSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() }); return; }
+    const data = parsed.data;
+
+    const [session] = await db.insert(consultationSessions).values({
+      orgId,
+      title:               data.title,
+      scheduledAt:         data.scheduledAt ? new Date(data.scheduledAt) : null,
+      capacity:            data.capacity ?? 3,
+      externalMeetingLink: data.externalMeetingLink ?? null,
+      consultantUserId:    data.consultantUserId ?? null,
+      challengeId:         data.challengeId ?? null,
+      notes:               data.notes ?? null,
+    }).returning();
+
+    res.status(201).json(session);
+  });
+
+  // List sessions
+  app.get("/api/workspaces/:orgId/admin/consultation/sessions", isAuthenticated, async (req, res) => {
+    const { orgId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+
+    const sessions = await db
+      .select()
+      .from(consultationSessions)
+      .where(eq(consultationSessions.orgId, orgId))
+      .orderBy(desc(consultationSessions.createdAt));
+
+    if (sessions.length === 0) { res.json([]); return; }
+
+    // Enrich with booking counts
+    const sessionIds = sessions.map(s => s.id);
+    const bookingCounts = await db
+      .select({
+        sessionId: consultationBookings.sessionId,
+        count:     sql<number>`cast(count(*) as int)`,
+      })
+      .from(consultationBookings)
+      .where(and(inArray(consultationBookings.sessionId, sessionIds), ne(consultationBookings.status, 'CANCELLED')))
+      .groupBy(consultationBookings.sessionId);
+
+    const countMap: Record<string, number> = {};
+    bookingCounts.forEach(b => { countMap[b.sessionId] = b.count; });
+
+    res.json(sessions.map(s => ({ ...s, activeBookings: countMap[s.id] ?? 0 })));
+  });
+
+  // Update session
+  app.patch("/api/workspaces/:orgId/admin/consultation/sessions/:sessionId", isAuthenticated, async (req, res) => {
+    const { orgId, sessionId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+
+    const updateSchema = createSessionSchema.partial().extend({ status: z.enum(["ACTIVE", "CANCELLED", "COMPLETED"]).optional() });
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() }); return; }
+
+    const data = parsed.data;
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.scheduledAt !== undefined) updateData.scheduledAt = data.scheduledAt ? new Date(data.scheduledAt) : null;
+    if (data.capacity !== undefined) updateData.capacity = data.capacity;
+    if (data.externalMeetingLink !== undefined) updateData.externalMeetingLink = data.externalMeetingLink;
+    if (data.consultantUserId !== undefined) updateData.consultantUserId = data.consultantUserId;
+    if (data.challengeId !== undefined) updateData.challengeId = data.challengeId;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.status !== undefined) updateData.status = data.status;
+
+    const [updated] = await db
+      .update(consultationSessions)
+      .set(updateData)
+      .where(and(eq(consultationSessions.id, sessionId), eq(consultationSessions.orgId, orgId)))
+      .returning();
+
+    if (!updated) { res.status(404).json({ error: "Session not found" }); return; }
+    res.json(updated);
+  });
+
+  // Delete session
+  app.delete("/api/workspaces/:orgId/admin/consultation/sessions/:sessionId", isAuthenticated, async (req, res) => {
+    const { orgId, sessionId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+
+    const [deleted] = await db
+      .delete(consultationSessions)
+      .where(and(eq(consultationSessions.id, sessionId), eq(consultationSessions.orgId, orgId)))
+      .returning();
+
+    if (!deleted) { res.status(404).json({ error: "Session not found" }); return; }
+    res.json({ ok: true });
+  });
+
+  // ── BOOKING MANAGEMENT (admin) ──────────────────────────────────────────────
+
+  // List bookings for a session
+  app.get("/api/workspaces/:orgId/admin/consultation/sessions/:sessionId/bookings", isAuthenticated, async (req, res) => {
+    const { orgId, sessionId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+
+    const bookings = await db
+      .select()
+      .from(consultationBookings)
+      .where(and(eq(consultationBookings.sessionId, sessionId), eq(consultationBookings.orgId, orgId)))
+      .orderBy(desc(consultationBookings.bookedAt));
+
+    if (bookings.length === 0) { res.json([]); return; }
+
+    const userIds = bookings.map(b => b.userId);
+    const allUsers = await db
+      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, username: users.username, email: users.email })
+      .from(users)
+      .where(inArray(users.id, userIds));
+    const userMap = Object.fromEntries(allUsers.map(u => [u.id, u]));
+
+    res.json(bookings.map(b => {
+      const u = userMap[b.userId];
+      return {
+        ...b,
+        participantName: u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username : b.userId,
+        participantEmail: u?.email ?? null,
+      };
+    }));
+  });
+
+  // Confirm or cancel a booking (admin)
+  app.patch("/api/workspaces/:orgId/admin/consultation/bookings/:bookingId", isAuthenticated, async (req, res) => {
+    const { orgId, bookingId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+
+    const schema = z.object({ status: z.enum(["CONFIRMED", "CANCELLED"]) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
+    const { status } = parsed.data;
+
+    const [booking] = await db
+      .select()
+      .from(consultationBookings)
+      .where(and(eq(consultationBookings.id, bookingId), eq(consultationBookings.orgId, orgId)));
+    if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+
+    const wasCancelled = booking.status === "CANCELLED";
+    const isCancelling = status === "CANCELLED";
+
+    const [updated] = await db
+      .update(consultationBookings)
+      .set({
+        status,
+        cancelledAt: isCancelling ? new Date() : null,
+      } as any)
+      .where(eq(consultationBookings.id, bookingId))
+      .returning();
+
+    // Adjust filledSlots
+    if (!wasCancelled && isCancelling) {
+      await db
+        .update(consultationSessions)
+        .set({ filledSlots: sql`${consultationSessions.filledSlots} - 1` })
+        .where(eq(consultationSessions.id, booking.sessionId));
+    }
+
+    // Send email notification
+    const [session] = await db.select().from(consultationSessions).where(eq(consultationSessions.id, booking.sessionId));
+    const [participant] = await db.select({ firstName: users.firstName, lastName: users.lastName, username: users.username, email: users.email }).from(users).where(eq(users.id, booking.userId));
+    if (participant?.email && session) {
+      const participantName = `${participant.firstName ?? ""} ${participant.lastName ?? ""}`.trim() || participant.username;
+      emailService.sendConsultationBookingNotification({
+        recipientEmail:      participant.email,
+        recipientName:       participantName,
+        sessionTitle:        session.title,
+        scheduledAt:         session.scheduledAt,
+        externalMeetingLink: isCancelling ? null : (session.externalMeetingLink ?? null),
+        status:              isCancelling ? "PENDING" : "CONFIRMED",
+      }).catch(console.error);
+    }
+
+    // Audit log
+    const adminId = (req.user as any)?.id;
+    db.insert(platformEvents).values({
+      orgId,
+      userId:    adminId,
+      eventType: isCancelling ? "CONSULTATION_CANCELLED" : "CONSULTATION_CONFIRMED",
+      metadata:  { bookingId, sessionId: booking.sessionId, participantId: booking.userId },
+    } as any).catch(console.error);
+
+    res.json(updated);
+  });
+
+  // ── PARTICIPANT: Available sessions ────────────────────────────────────────
+
+  app.get("/api/workspaces/:orgId/consultation/sessions", isAuthenticated, async (req, res) => {
+    const { orgId } = req.params;
+    const userId = (req.user as any)?.id;
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    if (!membership) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    // Only ACTIVE sessions with available slots
+    const sessions = await db
+      .select()
+      .from(consultationSessions)
+      .where(
+        and(
+          eq(consultationSessions.orgId, orgId),
+          eq(consultationSessions.status, "ACTIVE"),
+          sql`${consultationSessions.filledSlots} < ${consultationSessions.capacity}`,
+        )
+      )
+      .orderBy(consultationSessions.scheduledAt);
+
+    res.json(sessions);
+  });
+
+  // ── PARTICIPANT: Book a session ────────────────────────────────────────────
+
+  app.post("/api/workspaces/:orgId/consultation/sessions/:sessionId/book", isAuthenticated, async (req, res) => {
+    const { orgId, sessionId } = req.params;
+    const userId = (req.user as any)?.id;
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    // Must be member
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    if (!membership) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    // Check eligibility
+    const [org] = await db
+      .select({ consultationEnabled: organizations.consultationEnabled, consultationMinCredits: organizations.consultationMinCredits, consultationMaxEligible: organizations.consultationMaxEligible })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+    if (!org?.consultationEnabled) { res.status(403).json({ error: "Consultation not enabled" }); return; }
+
+    const ranked = await db
+      .select({ userId: consultationCredits.userId, totalCredits: sql<number>`cast(sum(${consultationCredits.credits}) as int)` })
+      .from(consultationCredits)
+      .where(eq(consultationCredits.orgId, orgId))
+      .groupBy(consultationCredits.userId)
+      .orderBy(desc(sql`sum(${consultationCredits.credits})`));
+    const myEntry = ranked.find(r => r.userId === userId);
+    const myRank = myEntry ? ranked.indexOf(myEntry) : -1;
+    const totalCredits = myEntry?.totalCredits ?? 0;
+    const minCredits = org.consultationMinCredits ?? 10;
+    const maxEligible = org.consultationMaxEligible ?? 3;
+    const isEligible = totalCredits >= minCredits && myRank >= 0 && myRank < maxEligible;
+    if (!isEligible) { res.status(403).json({ error: "Not eligible for consultation" }); return; }
+
+    // Double-booking prevention
+    const [existingBooking] = await db
+      .select()
+      .from(consultationBookings)
+      .where(and(eq(consultationBookings.orgId, orgId), eq(consultationBookings.userId, userId), ne(consultationBookings.status, "CANCELLED")));
+    if (existingBooking) { res.status(409).json({ error: "You already have an active booking" }); return; }
+
+    // Check session availability
+    const [session] = await db
+      .select()
+      .from(consultationSessions)
+      .where(and(eq(consultationSessions.id, sessionId), eq(consultationSessions.orgId, orgId)));
+    if (!session || session.status !== "ACTIVE") { res.status(404).json({ error: "Session not available" }); return; }
+    if (session.filledSlots >= session.capacity) { res.status(409).json({ error: "Session is full" }); return; }
+
+    // Create booking + increment filledSlots atomically-ish
+    const [booking] = await db
+      .insert(consultationBookings)
+      .values({ sessionId, userId, orgId, status: "PENDING" })
+      .returning();
+
+    await db
+      .update(consultationSessions)
+      .set({ filledSlots: sql`${consultationSessions.filledSlots} + 1` })
+      .where(eq(consultationSessions.id, sessionId));
+
+    // Email notification
+    const [participant] = await db
+      .select({ firstName: users.firstName, lastName: users.lastName, username: users.username, email: users.email })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (participant?.email) {
+      const participantName = `${participant.firstName ?? ""} ${participant.lastName ?? ""}`.trim() || participant.username;
+      emailService.sendConsultationBookingNotification({
+        recipientEmail:      participant.email,
+        recipientName:       participantName,
+        sessionTitle:        session.title,
+        scheduledAt:         session.scheduledAt,
+        externalMeetingLink: null,
+        status:              "PENDING",
+      }).catch(console.error);
+    }
+
+    // Audit log
+    db.insert(platformEvents).values({
+      orgId,
+      userId,
+      eventType: "CONSULTATION_BOOKED",
+      metadata:  { bookingId: booking.id, sessionId },
+    } as any).catch(console.error);
+
+    res.status(201).json(booking);
   });
 }

@@ -924,6 +924,9 @@ export const platformEventTypeEnum = pgEnum('platform_event_type', [
   'IDEA_STATUS_CHANGED',
   'CHALLENGE_STATUS_CHANGED',
   'APPLICATION_STATUS_CHANGED',
+  'CONSULTATION_BOOKED',
+  'CONSULTATION_CONFIRMED',
+  'CONSULTATION_CANCELLED',
 ]);
 
 export const platformEvents = pgTable("platform_events", {

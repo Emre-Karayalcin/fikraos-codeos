@@ -324,6 +324,49 @@ This is an automated notification from FikraOS Idea Management System.
       text
     });
   }
+
+  async sendConsultationBookingNotification(opts: {
+    recipientEmail: string;
+    recipientName: string;
+    sessionTitle: string;
+    scheduledAt: Date | null;
+    externalMeetingLink: string | null;
+    status: 'PENDING' | 'CONFIRMED';
+  }): Promise<boolean> {
+    const isConfirmed = opts.status === 'CONFIRMED';
+    const subject = isConfirmed
+      ? `✅ Consultation Confirmed: ${opts.sessionTitle}`
+      : `📅 Consultation Booking Received: ${opts.sessionTitle}`;
+
+    const dateStr = opts.scheduledAt
+      ? opts.scheduledAt.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+      : 'To be announced';
+
+    const meetingSection = opts.externalMeetingLink
+      ? `<p style="margin-top:16px"><a href="${opts.externalMeetingLink}" style="display:inline-block;background:#10b981;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Join Meeting</a></p>`
+      : `<p style="color:#6b7280;font-size:14px">Meeting link will be shared once confirmed.</p>`;
+
+    const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;color:#333;line-height:1.6">
+      <div style="max-width:580px;margin:0 auto;padding:20px">
+        <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:28px;border-radius:8px 8px 0 0">
+          <h1 style="margin:0;font-size:22px">${isConfirmed ? '✅ Consultation Confirmed' : '📅 Consultation Booked'}</h1>
+        </div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-top:none;padding:28px;border-radius:0 0 8px 8px">
+          <p>Hi ${opts.recipientName},</p>
+          <p>${isConfirmed ? 'Your consultation session has been <strong>confirmed</strong>.' : 'Your consultation booking request has been received and is <strong>pending confirmation</strong>.'}</p>
+          <div style="background:#f9fafb;padding:16px;border-radius:8px;margin:20px 0">
+            <p style="margin:0 0 8px 0"><strong>Session:</strong> ${opts.sessionTitle}</p>
+            <p style="margin:0 0 8px 0"><strong>Date/Time:</strong> ${dateStr}</p>
+            <p style="margin:0"><strong>Status:</strong> ${isConfirmed ? '✅ Confirmed' : '⏳ Pending'}</p>
+          </div>
+          ${meetingSection}
+          <p style="color:#6b7280;font-size:13px;margin-top:24px">If you have any questions, please contact the PMO team.</p>
+        </div>
+      </div>
+    </body></html>`;
+
+    return this.sendEmail({ to: opts.recipientEmail, subject, html });
+  }
 }
 
 export const emailService = new EmailService();
