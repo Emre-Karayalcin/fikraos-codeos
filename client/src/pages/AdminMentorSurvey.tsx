@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -14,6 +14,23 @@ import {
   ClipboardList, Plus, Trash2, GripVertical, Star, ToggleLeft, AlignLeft, Hash,
   Eye, EyeOff, Pencil, Check, X,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type QuestionType = "rating" | "boolean" | "text" | "scale";
 
@@ -59,6 +76,17 @@ function QuestionRow({
   const [type, setType] = useState<QuestionType>(question.questionType as QuestionType);
   const [required, setRequired] = useState(question.isRequired);
 
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: question.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/mentor-survey-questions`] });
 
@@ -76,16 +104,23 @@ function QuestionRow({
     onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
   });
 
-  const toggleActive = () =>
-    updateMutation.mutate({ isActive: !question.isActive });
-
-  const saveEdit = () =>
-    updateMutation.mutate({ questionText: text, questionType: type, isRequired: required });
+  const toggleActive = () => updateMutation.mutate({ isActive: !question.isActive });
+  const saveEdit = () => updateMutation.mutate({ questionText: text, questionType: type, isRequired: required });
 
   return (
-    <div className={`rounded-xl border transition-colors ${question.isActive ? "border-border bg-card" : "border-dashed border-border/50 bg-muted/20"}`}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-xl border transition-colors ${question.isActive ? "border-border bg-card" : "border-dashed border-border/50 bg-muted/20"}`}
+    >
       <div className="flex items-start gap-3 p-4">
-        <div className="text-muted-foreground/40 mt-0.5 cursor-grab shrink-0">
+        {/* Drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="text-muted-foreground/40 mt-0.5 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+          title="Drag to reorder"
+        >
           <GripVertical size={16} />
         </div>
 
@@ -111,11 +146,7 @@ function QuestionRow({
                   </SelectContent>
                 </Select>
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                  <Switch
-                    checked={required}
-                    onCheckedChange={setRequired}
-                    className="scale-75"
-                  />
+                  <Switch checked={required} onCheckedChange={setRequired} className="scale-75" />
                   Required
                 </label>
               </div>
@@ -199,6 +230,12 @@ export default function AdminMentorSurvey() {
   const [newType, setNewType] = useState<QuestionType>("text");
   const [newRequired, setNewRequired] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [localQuestions, setLocalQuestions] = useState<SurveyQuestion[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const { data: workspace } = useQuery<{ id: string }>({
     queryKey: [`/api/workspaces/${slug}`],
@@ -220,13 +257,49 @@ export default function AdminMentorSurvey() {
     enabled: !!orgId,
   });
 
+  // Keep local state in sync with server data
+  useEffect(() => {
+    setLocalQuestions(questions);
+  }, [questions]);
+
+  const reorderMutation = useMutation({
+    mutationFn: (updates: { id: string; orderIndex: number }[]) =>
+      Promise.all(
+        updates.map(({ id, orderIndex }) =>
+          apiRequest("PATCH", `/api/workspaces/${orgId}/admin/mentor-survey-questions/${id}`, { orderIndex })
+        )
+      ),
+    onError: () => {
+      // Revert on failure
+      setLocalQuestions(questions);
+      toast({ title: "Failed to save order", variant: "destructive" });
+    },
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localQuestions.findIndex((q) => q.id === active.id);
+    const newIndex = localQuestions.findIndex((q) => q.id === over.id);
+    const reordered = arrayMove(localQuestions, oldIndex, newIndex);
+
+    // Optimistic update
+    setLocalQuestions(reordered);
+
+    // Persist new orderIndexes
+    reorderMutation.mutate(
+      reordered.map((q, i) => ({ id: q.id, orderIndex: i }))
+    );
+  };
+
   const createMutation = useMutation({
     mutationFn: () =>
       apiRequest("POST", `/api/workspaces/${orgId}/admin/mentor-survey-questions`, {
         questionText: newText.trim(),
         questionType: newType,
         isRequired: newRequired,
-        orderIndex: questions.length,
+        orderIndex: localQuestions.length,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/mentor-survey-questions`] });
@@ -239,7 +312,7 @@ export default function AdminMentorSurvey() {
     onError: () => toast({ title: "Failed to add question", variant: "destructive" }),
   });
 
-  const activeCount = questions.filter((q) => q.isActive).length;
+  const activeCount = localQuestions.filter((q) => q.isActive).length;
 
   return (
     <div className="flex h-screen bg-background">
@@ -279,23 +352,34 @@ export default function AdminMentorSurvey() {
               ))}
             </div>
           ) : (
-            <div className="space-y-2">
-              {questions.map((q) => (
-                <QuestionRow
-                  key={q.id}
-                  question={q}
-                  orgId={orgId!}
-                  onDeleted={() => {}}
-                />
-              ))}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={localQuestions.map((q) => q.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  {localQuestions.map((q) => (
+                    <QuestionRow
+                      key={q.id}
+                      question={q}
+                      orgId={orgId!}
+                      onDeleted={() => {}}
+                    />
+                  ))}
 
-              {questions.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
-                  <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">No questions yet. Add your first question below.</p>
+                  {localQuestions.length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
+                      <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No questions yet. Add your first question below.</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </SortableContext>
+            </DndContext>
           )}
 
           {/* Add question */}
@@ -322,11 +406,7 @@ export default function AdminMentorSurvey() {
                   </SelectContent>
                 </Select>
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                  <Switch
-                    checked={newRequired}
-                    onCheckedChange={setNewRequired}
-                    className="scale-75"
-                  />
+                  <Switch checked={newRequired} onCheckedChange={setNewRequired} className="scale-75" />
                   Required
                 </label>
               </div>
