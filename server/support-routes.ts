@@ -30,7 +30,7 @@ export function registerSupportRoutes(app: Express) {
     }
 
     const [membership] = await db
-      .select({ orgId: organizationMembers.organizationId })
+      .select({ orgId: organizationMembers.orgId })
       .from(organizationMembers)
       .where(eq(organizationMembers.userId, user.id))
       .limit(1);
@@ -70,7 +70,7 @@ export function registerSupportRoutes(app: Express) {
             .from(organizationMembers)
             .where(
               and(
-                eq(organizationMembers.organizationId, membership.orgId),
+                eq(organizationMembers.orgId, membership.orgId),
                 inArray(organizationMembers.role, ["ADMIN", "OWNER"])
               )
             );
@@ -144,7 +144,7 @@ export function registerSupportRoutes(app: Express) {
       .where(
         and(
           eq(organizationMembers.userId, user.id),
-          eq(organizationMembers.organizationId, ticket.orgId)
+          eq(organizationMembers.orgId, ticket.orgId)
         )
       );
 
@@ -189,7 +189,7 @@ export function registerSupportRoutes(app: Express) {
       .where(
         and(
           eq(organizationMembers.userId, user.id),
-          eq(organizationMembers.organizationId, ticket.orgId)
+          eq(organizationMembers.orgId, ticket.orgId)
         )
       );
 
@@ -249,7 +249,7 @@ export function registerSupportRoutes(app: Express) {
               .from(organizationMembers)
               .where(
                 and(
-                  eq(organizationMembers.organizationId, ticket.orgId),
+                  eq(organizationMembers.orgId, ticket.orgId),
                   inArray(organizationMembers.role, ["ADMIN", "OWNER"])
                 )
               );
@@ -296,7 +296,7 @@ export function registerSupportRoutes(app: Express) {
       .where(
         and(
           eq(organizationMembers.userId, user.id),
-          eq(organizationMembers.organizationId, orgId)
+          eq(organizationMembers.orgId, orgId)
         )
       );
 
@@ -339,7 +339,7 @@ export function registerSupportRoutes(app: Express) {
       .where(
         and(
           eq(organizationMembers.userId, user.id),
-          eq(organizationMembers.organizationId, orgId)
+          eq(organizationMembers.orgId, orgId)
         )
       );
 
