@@ -138,11 +138,12 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           href: `/w/${workspaceSlug}/admin/academy`,
           icon: Video,
         },
-        {
-          titleKey: 'Support Requests',
-          href: `/w/${workspaceSlug}/admin/support`,
-          icon: Headphones,
-        },
+        // Support Requests — temporarily hidden
+        // {
+        //   titleKey: 'Support Requests',
+        //   href: `/w/${workspaceSlug}/admin/support`,
+        //   icon: Headphones,
+        // },
       ],
     },
     {
