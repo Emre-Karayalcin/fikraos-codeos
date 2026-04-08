@@ -12,6 +12,8 @@ import { Send, Plus, ArrowLeft, Headphones } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
+import { BottomNavigation } from "@/components/layout/BottomNavigation";
 
 interface Ticket {
   id: string;
@@ -275,94 +277,91 @@ export default function SupportPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-8 h-screen flex flex-col">
-        {/* Header */}
-        {view !== "chat" && (
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Headphones className="w-7 h-7 text-primary" />
-              <div>
-                <h1 className="text-xl font-bold">Support</h1>
-                <p className="text-xs text-muted-foreground">Submit a request or view your tickets</p>
-              </div>
-            </div>
-            {view === "list" && (
-              <Button className="gap-1.5 rounded-full" size="sm" onClick={() => setView("new")}>
-                <Plus className="w-3.5 h-3.5" /> New Ticket
-              </Button>
-            )}
-            {view === "new" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-muted-foreground"
-                onClick={() => setView("list")}
-              >
-                <ArrowLeft className="w-4 h-4" /> Back to tickets
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* New ticket form */}
-        {view === "new" && (
-          <div className="flex-1 overflow-y-auto">
-            <NewTicketForm onSuccess={() => setView("list")} />
-          </div>
-        )}
-
-        {/* Chat view */}
-        {view === "chat" && selectedTicket && (
-          <div className="flex-1 overflow-hidden flex flex-col">
+    <div className="flex h-screen bg-background overflow-hidden">
+      <UnifiedSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {view === "chat" && selectedTicket ? (
+          <div className="flex-1 overflow-hidden flex flex-col px-6 py-5">
             <ChatView
               ticket={selectedTicket}
               onBack={() => { setView("list"); setSelectedTicket(null); }}
             />
           </div>
-        )}
-
-        {/* Tickets list */}
-        {view === "list" && (
-          <div className="flex-1 overflow-y-auto space-y-2">
-            {isLoading && (
-              <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
-            )}
-            {!isLoading && tickets.length === 0 && (
-              <div className="text-center py-12 space-y-3">
-                <Headphones className="w-10 h-10 text-muted-foreground/40 mx-auto" />
-                <p className="text-sm text-muted-foreground">No support tickets yet.</p>
-                <Button size="sm" className="rounded-full gap-1.5" onClick={() => setView("new")}>
-                  <Plus className="w-3.5 h-3.5" /> Submit your first request
-                </Button>
-              </div>
-            )}
-            {tickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                onClick={() => openTicket(ticket)}
-                className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:border-primary/30 hover:bg-muted/20 transition-colors cursor-pointer"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-semibold text-muted-foreground">
-                      #{ticket.id}
-                    </span>
-                    <span className="text-sm font-medium truncate">{ticket.subject}</span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                    <span>{ticket.category}</span>
-                    <span>·</span>
-                    <span>{ticket.priority.charAt(0) + ticket.priority.slice(1).toLowerCase()}</span>
-                    <span>·</span>
-                    <span>{formatDateTime(ticket.updatedAt)}</span>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto px-4 py-6 pb-24 md:pb-6 space-y-5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Headphones className="w-7 h-7 text-primary" />
+                  <div>
+                    <h1 className="text-xl font-bold">Support</h1>
+                    <p className="text-xs text-muted-foreground">Submit a request or view your tickets</p>
                   </div>
                 </div>
-                <div className="shrink-0">{statusBadge(ticket.status)}</div>
+                {view === "list" && (
+                  <Button className="gap-1.5 rounded-full" size="sm" onClick={() => setView("new")}>
+                    <Plus className="w-3.5 h-3.5" /> New Ticket
+                  </Button>
+                )}
+                {view === "new" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground"
+                    onClick={() => setView("list")}
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Back to tickets
+                  </Button>
+                )}
               </div>
-            ))}
+
+              {/* New ticket form */}
+              {view === "new" && <NewTicketForm onSuccess={() => setView("list")} />}
+
+              {/* Tickets list */}
+              {view === "list" && (
+                <div className="space-y-2">
+                  {isLoading && (
+                    <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
+                  )}
+                  {!isLoading && tickets.length === 0 && (
+                    <div className="text-center py-12 space-y-3">
+                      <Headphones className="w-10 h-10 text-muted-foreground/40 mx-auto" />
+                      <p className="text-sm text-muted-foreground">No support tickets yet.</p>
+                      <Button size="sm" className="rounded-full gap-1.5" onClick={() => setView("new")}>
+                        <Plus className="w-3.5 h-3.5" /> Submit your first request
+                      </Button>
+                    </div>
+                  )}
+                  {tickets.map((ticket) => (
+                    <div
+                      key={ticket.id}
+                      onClick={() => openTicket(ticket)}
+                      className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:border-primary/30 hover:bg-muted/20 transition-colors cursor-pointer"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-semibold text-muted-foreground">#{ticket.id}</span>
+                          <span className="text-sm font-medium truncate">{ticket.subject}</span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                          <span>{ticket.category}</span>
+                          <span>·</span>
+                          <span>{ticket.priority.charAt(0) + ticket.priority.slice(1).toLowerCase()}</span>
+                          <span>·</span>
+                          <span>{formatDateTime(ticket.updatedAt)}</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">{statusBadge(ticket.status)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
+        <BottomNavigation />
       </div>
     </div>
   );
