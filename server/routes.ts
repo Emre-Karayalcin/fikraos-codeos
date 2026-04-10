@@ -7446,7 +7446,7 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
 
       const [{ approved }] = await db.select({ approved: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'APPROVED')));
       const [{ rejected }] = await db.select({ rejected: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'REJECTED')));
-      const [{ pendingEmail }] = await db.select({ pendingEmail: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'APPROVED'), isNull(memberApplications.acceptanceEmailSentAt)));
+      const [{ pendingEmail }] = await db.select({ pendingEmail: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'AI_REVIEWED'), isNull(memberApplications.acceptanceEmailSentAt)));
       const [{ pendingRejEmail }] = await db.select({ pendingRejEmail: count() }).from(memberApplications).where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'REJECTED'), isNull(memberApplications.rejectionEmailSentAt)));
 
       res.json({ approved, rejected, capacity, pendingAcceptanceEmail: pendingEmail, pendingRejectionEmail: pendingRejEmail });
@@ -7483,7 +7483,7 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
         .from(memberApplications)
         .innerJoin(users, eq(users.id, memberApplications.userId))
         .innerJoin(organizations, eq(organizations.id, memberApplications.orgId))
-        .where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'APPROVED'), isNull(memberApplications.acceptanceEmailSentAt)))
+        .where(and(eq(memberApplications.orgId, orgId), eq(memberApplications.status, 'AI_REVIEWED'), isNull(memberApplications.acceptanceEmailSentAt)))
         .orderBy(desc(memberApplications.aiScore))
         .limit(280);
 
@@ -7506,9 +7506,9 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
         if (!html) { failed++; continue; }
         try {
           await resendClient.emails.send({ from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com', to: row.userEmail, subject: `🎉 You've been accepted to ${row.orgName}!`, html });
-          // Activate user account and mark email sent
+          // Activate user account, mark APPROVED, and record email sent
           await db.update(users).set({ status: 'ACTIVE' }).where(eq(users.id, row.userId));
-          await db.update(memberApplications).set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
+          await db.update(memberApplications).set({ status: 'APPROVED', acceptanceEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
           sent++;
         } catch { failed++; }
       }
@@ -7677,10 +7677,16 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
             };
 
             // Update existing application, or create one if member hasn't completed onboarding yet
-            const existingApp = await db.select({ id: memberApplications.id })
+            const existingApp = await db.select({ id: memberApplications.id, status: memberApplications.status })
               .from(memberApplications)
               .where(and(eq(memberApplications.userId, existingUser.id), eq(memberApplications.orgId, orgId)))
               .limit(1).then(r => r[0]);
+
+            // Skip re-scoring if already AI reviewed
+            if (existingApp?.status === 'AI_REVIEWED' || existingApp?.status === 'APPROVED') {
+              warnings.push(`Row ${rowNum}: ${email} already scored (${existingApp.status}) — skipped`);
+              continue;
+            }
 
             let appId: string;
             if (existingApp) {
