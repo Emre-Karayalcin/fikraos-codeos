@@ -201,7 +201,7 @@ export default function AdminApplications() {
   });
 
   const acceptedLeaderboard = rows
-    .filter((r) => r.application.status === "APPROVED")
+    .filter((r) => r.application.aiScore != null && r.application.status !== "REJECTED")
     .sort((a, b) => (b.application.aiScore ?? 0) - (a.application.aiScore ?? 0))
     .slice(0, CAPACITY);
 
