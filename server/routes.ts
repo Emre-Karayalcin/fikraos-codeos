@@ -7533,5 +7533,194 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
     }
   });
 
+  // ── CSV Import ────────────────────────────────────────────────────────────────
+  // POST /api/workspaces/:orgId/admin/applications/import-csv
+  const uploadCsv = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) cb(null, true);
+      else cb(new Error('Only CSV files are allowed'));
+    },
+  });
+
+  app.post(
+    '/api/workspaces/:orgId/admin/applications/import-csv',
+    isAuthenticated,
+    uploadCsv.single('file'),
+    async (req: any, res) => {
+      try {
+        const { orgId } = req.params;
+        if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+        if (!req.file) return res.status(400).json({ error: 'No CSV file uploaded' });
+
+        const { parse } = await import('csv-parse/sync');
+
+        const records: Record<string, string>[] = parse(req.file.buffer, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+        });
+
+        if (!records.length) return res.status(400).json({ error: 'CSV file is empty' });
+
+        // Validate required columns exist
+        const requiredCols = ['full_name', 'email_address', 'idea_name', 'sector', 'problem_statement', 'solution_description'];
+        const headerCols = Object.keys(records[0]);
+        const missingCols = requiredCols.filter(c => !headerCols.includes(c));
+        if (missingCols.length) {
+          return res.status(400).json({ error: `CSV missing required columns: ${missingCols.join(', ')}` });
+        }
+
+        const org = await db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug })
+          .from(organizations).where(eq(organizations.id, orgId)).limit(1).then(r => r[0]);
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+        const APP_URL = process.env.APP_URL || 'http://localhost:5000';
+        const resendApiKey = process.env.RESEND_API_KEY;
+        const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
+
+        const loadTpl = (name: string, vars: Record<string, string>) => {
+          const cands = [path.join(__dirname, 'email-templates', `${name}.html`), path.join(process.cwd(), 'server', 'email-templates', `${name}.html`)];
+          const found = cands.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+          if (!found) return '';
+          try { return mustache.render(fs.readFileSync(found, 'utf8'), vars); } catch { return ''; }
+        };
+
+        const seenEmails = new Set<string>();
+        const warnings: string[] = [];
+        const errors: string[] = [];
+        let imported = 0;
+
+        for (let i = 0; i < records.length; i++) {
+          const row = records[i];
+          const rowNum = i + 2; // header is row 1
+          const email = (row['email_address'] || '').toLowerCase().trim();
+          const fullName = (row['full_name'] || '').trim();
+
+          // Basic validation
+          if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            errors.push(`Row ${rowNum}: invalid or missing email`);
+            continue;
+          }
+          if (!fullName) {
+            errors.push(`Row ${rowNum}: missing full_name`);
+            continue;
+          }
+
+          // Dedup within CSV
+          if (seenEmails.has(email)) {
+            warnings.push(`Row ${rowNum}: duplicate email ${email} — skipped`);
+            continue;
+          }
+          seenEmails.add(email);
+
+          // Check if email already exists in DB
+          const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
+          if (existingUser) {
+            warnings.push(`Row ${rowNum}: email ${email} already exists — skipped`);
+            continue;
+          }
+
+          // Split name
+          const nameParts = fullName.split(' ');
+          const firstName = nameParts[0] || fullName;
+          const lastName = nameParts.slice(1).join(' ') || '';
+
+          // Build metadata from demographic fields
+          const metadata: Record<string, string> = {};
+          const demoFields = ['date_of_birth', 'phone_number', 'nationality', 'gender', 'national_id', 'current_education_status', 'university', 'major', 'study_start_date', 'study_end_date', 'based_in_saudi_arabia', 'saudi_region'];
+          for (const f of demoFields) {
+            if (row[f]) metadata[f] = row[f];
+          }
+
+          const newUserId = crypto.randomUUID();
+
+          try {
+            // 1) Create PENDING user
+            await db.insert(users).values({
+              id: newUserId,
+              email,
+              firstName,
+              lastName,
+              password: '',
+              status: 'PENDING',
+              role: 'MEMBER',
+            });
+
+            // 2) Add to org
+            await db.insert(organizationMembers).values({
+              id: crypto.randomUUID(),
+              orgId,
+              userId: newUserId,
+              role: 'MEMBER',
+            });
+
+            // 3) Create application
+            const cleanStr = (v: string | undefined) => (v || '').trim() || null;
+            const isPrevWinner = (row['previous_program_winner'] || '').toLowerCase();
+
+            const [app] = await db.insert(memberApplications).values({
+              id: crypto.randomUUID(),
+              userId: newUserId,
+              orgId,
+              ideaName: cleanStr(row['idea_name']),
+              sector: cleanStr(row['sector']),
+              problemStatement: cleanStr(row['problem_statement']),
+              solutionDescription: cleanStr(row['solution_description']),
+              differentiator: cleanStr(row['why_choose_solution']),
+              targetUser: cleanStr(row['target_user']),
+              relevantSkills: cleanStr(row['relevant_skills_experience']),
+              previousWinner: isPrevWinner === 'yes' ? 'yes' : isPrevWinner === 'no' ? 'no' : null,
+              hasValidation: cleanStr(row['initial_design_testing_validation']) ? 'yes' : null,
+              validationDetails: cleanStr(row['initial_design_testing_validation']),
+              metadata,
+              status: 'PENDING_REVIEW',
+            }).returning();
+
+            // 4) Fire AI screening
+            screenApplicationAsync(app.id, null, orgId).catch(console.error);
+
+            // 5) Send onboarding email
+            const setPasswordUrl = `${APP_URL}/w/${org.slug}/onboard?userId=${newUserId}&email=${encodeURIComponent(email)}`;
+            const html = loadTpl('csv-onboarding', {
+              orgName: org.name,
+              firstName,
+              email,
+              ideaName: row['idea_name'] || 'your idea',
+              setPasswordUrl,
+            });
+
+            if (resendClient && html) {
+              resendClient.emails.send({
+                from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+                to: email,
+                subject: `Welcome to ${org.name} — Set Your Password`,
+                html,
+              }).catch(e => console.error('CSV onboarding email failed for', email, e));
+            } else {
+              console.log(`📧 [CSV import] Set-password link for ${email}: ${setPasswordUrl}`);
+            }
+
+            imported++;
+          } catch (rowErr) {
+            console.error(`CSV import row ${rowNum} error:`, rowErr);
+            errors.push(`Row ${rowNum}: failed to import ${email}`);
+            // Cleanup partial user in case of error
+            await db.delete(users).where(eq(users.id, newUserId)).catch(() => {});
+          }
+        }
+
+        res.json({ imported, warnings, errors, total: records.length });
+      } catch (error: any) {
+        console.error('CSV import error:', error);
+        if (error instanceof multer.MulterError || error.message?.includes('Only CSV')) {
+          return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Failed to import CSV' });
+      }
+    }
+  );
+
   return httpServer;
 }

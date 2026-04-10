@@ -864,6 +864,8 @@ export const memberApplications = pgTable("member_applications", {
   previousWinner: varchar("previous_winner", { length: 10 }),
   hasValidation: varchar("has_validation", { length: 10 }),
   validationDetails: text("validation_details"),
+  // Extra demographic/profile data from CSV import
+  metadata: jsonb("metadata"),
   // Screening result
   status: varchar("status", { length: 30 }).default("PENDING_REVIEW").notNull(),
   aiScore: integer("ai_score"),

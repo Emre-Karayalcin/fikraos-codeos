@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -15,7 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ClipboardList, Search, Trophy, Mail, Users, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ClipboardList, Search, Trophy, Mail, Users, AlertTriangle, Upload, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { ApplicationDetailModal, type AppRow } from "@/components/ApplicationDetailModal";
 
@@ -45,6 +46,8 @@ export default function AdminApplications() {
   const [selected, setSelected] = useState<AppRowFull | null>(null);
   const [confirmBulkAccept, setConfirmBulkAccept] = useState(false);
   const [confirmBulkReject, setConfirmBulkReject] = useState(false);
+  const [csvResult, setCsvResult] = useState<{ imported: number; warnings: string[]; errors: string[]; total: number } | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
   const { data: workspace } = useQuery<{ id: string; name: string; slug: string }>({
@@ -163,6 +166,28 @@ export default function AdminApplications() {
     onError: (e: Error) => { setConfirmBulkReject(false); toast.error(e.message); },
   });
 
+  const csvImportMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      const r = await fetch(`/api/workspaces/${workspace!.id}/admin/applications/import-csv`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Import failed");
+      return data as { imported: number; warnings: string[]; errors: string[]; total: number };
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: [`/api/workspaces/${workspace?.id}/admin/applications`] });
+      refetchStats();
+      setCsvResult(result);
+      toast.success(`Imported ${result.imported} of ${result.total} applicants`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filtered = rows.filter((r) => {
     const q = search.toLowerCase();
     const matchesSearch =
@@ -200,14 +225,87 @@ export default function AdminApplications() {
 
       <div className="flex-1 overflow-y-auto flex flex-col">
         <div className="p-6 border-b border-border">
-          <div className="flex items-center gap-3">
-            <ClipboardList className="w-7 h-7 text-primary" />
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <ClipboardList className="w-7 h-7 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold">Applications</h1>
+                <p className="text-muted-foreground text-sm">Review member applications and AI screening results</p>
+              </div>
+            </div>
             <div>
-              <h1 className="text-2xl font-bold">Applications</h1>
-              <p className="text-muted-foreground text-sm">Review member applications and AI screening results</p>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) csvImportMutation.mutate(file);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => csvInputRef.current?.click()}
+                disabled={csvImportMutation.isPending || !workspace?.id}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {csvImportMutation.isPending ? "Importing…" : "Import CSV"}
+              </Button>
             </div>
           </div>
         </div>
+
+        {/* CSV Import Result Dialog */}
+        <Dialog open={!!csvResult} onOpenChange={() => setCsvResult(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>CSV Import Results</DialogTitle>
+            </DialogHeader>
+            {csvResult && (
+              <div className="space-y-4 text-sm">
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="font-medium">{csvResult.imported} imported</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-yellow-600">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="font-medium">{csvResult.warnings.length} warnings</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-red-600">
+                    <XCircle className="w-4 h-4" />
+                    <span className="font-medium">{csvResult.errors.length} errors</span>
+                  </div>
+                </div>
+
+                {csvResult.warnings.length > 0 && (
+                  <div>
+                    <p className="font-medium text-yellow-700 mb-1">Warnings (skipped):</p>
+                    <ul className="max-h-32 overflow-y-auto space-y-1 bg-yellow-50 rounded p-2">
+                      {csvResult.warnings.map((w, i) => <li key={i} className="text-yellow-700">{w}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {csvResult.errors.length > 0 && (
+                  <div>
+                    <p className="font-medium text-red-700 mb-1">Errors:</p>
+                    <ul className="max-h-32 overflow-y-auto space-y-1 bg-red-50 rounded p-2">
+                      {csvResult.errors.map((e, i) => <li key={i} className="text-red-700">{e}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                <p className="text-muted-foreground text-xs">
+                  AI screening has been triggered for all imported applications. Onboarding emails sent to new participants.
+                </p>
+                <Button className="w-full" onClick={() => setCsvResult(null)}>Close</Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <div className="p-6 space-y-5">
 
