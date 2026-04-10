@@ -749,38 +749,63 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
+      // Look up the org and user's role in this workspace
+      const { slug } = req.params;
+      const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.slug, slug)).limit(1);
+      const isMemberRole = org
+        ? await db.select({ role: organizationMembers.role })
+            .from(organizationMembers)
+            .where(and(eq(organizationMembers.userId, invited.id), eq(organizationMembers.orgId, org.id)))
+            .limit(1)
+            .then(r => r[0]?.role === 'MEMBER')
+        : false;
+
       // hash password and update user
       // SECURITY: Hash password using scrypt
       const hashed = await hashPassword(password);
+      // MEMBER role stays PENDING until PMO approves; other roles become ACTIVE immediately
       const updated = await storage.updateUser(invited.id, {
         email,
         firstName: firstName || invited.firstName || '',
         lastName: lastName || invited.lastName || '',
         password: hashed,
-        status: 'ACTIVE'
+        status: isMemberRole ? 'PENDING' : 'ACTIVE',
       });
+
+      // For MEMBER: auto-create an empty application record so CSV import can update it later
+      if (isMemberRole && org) {
+        const existingApp = await db.select({ id: memberApplications.id })
+          .from(memberApplications)
+          .where(and(eq(memberApplications.userId, invited.id), eq(memberApplications.orgId, org.id)))
+          .limit(1).then(r => r[0]);
+        if (!existingApp) {
+          await db.insert(memberApplications).values({
+            id: crypto.randomUUID(),
+            userId: invited.id,
+            orgId: org.id,
+            status: 'PENDING_REVIEW',
+          }).catch(console.error);
+        }
+      }
 
       // Auto-login if possible (Passport style)
       if (typeof req.logIn === 'function') {
         req.logIn(updated, (err: any) => {
           if (err) {
             console.error('Auto-login failed after signup:', err);
-            // fallback: attach to session manually if available
             if (req.session) (req.session as any).userId = updated.id;
             return res.status(500).json({ error: 'Failed to create session after signup' });
           }
-          // success - return user for frontend redirect to workspace dashboard
-          return res.json({ success: true, user: updated });
+          return res.json({ success: true, user: updated, awaitingReview: isMemberRole });
         });
         return;
       }
 
-      // Fallback session set (if express-session used)
       if (req.session) {
         (req.session as any).userId = updated.id;
       }
 
-      res.json({ success: true, user: updated });
+      res.json({ success: true, user: updated, awaitingReview: isMemberRole });
     } catch (error) {
       console.error('Signup completion error:', error);
       res.status(500).json({ error: 'Signup failed' });
@@ -7583,123 +7608,60 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           return res.status(400).json({ error: `CSV missing required columns: ${missingCols.join(', ')}` });
         }
 
-        const org = await db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug })
+        const orgExists = await db.select({ id: organizations.id })
           .from(organizations).where(eq(organizations.id, orgId)).limit(1).then(r => r[0]);
-        if (!org) return res.status(404).json({ error: 'Organization not found' });
-
-        const APP_URL = process.env.APP_URL || 'http://localhost:5000';
-        const resendApiKey = process.env.RESEND_API_KEY;
-        const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
-
-        const loadTpl = (name: string, vars: Record<string, string>) => {
-          const cands = [path.join(__dirname, 'email-templates', `${name}.html`), path.join(process.cwd(), 'server', 'email-templates', `${name}.html`)];
-          const found = cands.find(p => { try { return fs.existsSync(p); } catch { return false; } });
-          if (!found) return '';
-          try { return mustache.render(fs.readFileSync(found, 'utf8'), vars); } catch { return ''; }
-        };
+        if (!orgExists) return res.status(404).json({ error: 'Organization not found' });
 
         const seenEmails = new Set<string>();
         const warnings: string[] = [];
         const errors: string[] = [];
         let imported = 0;
 
+        const cleanStr = (v: string | undefined) => (v || '').trim() || null;
+        const demoFields = ['date_of_birth', 'phone_number', 'nationality', 'gender', 'national_id',
+          'current_education_status', 'university', 'major', 'study_start_date', 'study_end_date',
+          'based_in_saudi_arabia', 'saudi_region'];
+
         for (let i = 0; i < records.length; i++) {
           const row = records[i];
-          const rowNum = i + 2; // header is row 1
+          const rowNum = i + 2;
           const email = (row['email_address'] || '').toLowerCase().trim();
-          const fullName = (row['full_name'] || '').trim();
 
-          // Basic validation
           if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             errors.push(`Row ${rowNum}: invalid or missing email`);
             continue;
           }
-          if (!fullName) {
-            errors.push(`Row ${rowNum}: missing full_name`);
-            continue;
-          }
 
-          // Dedup within CSV
+          // Dedup within CSV — only process first occurrence, warn on subsequent
           if (seenEmails.has(email)) {
-            warnings.push(`Row ${rowNum}: duplicate email ${email} — skipped`);
+            warnings.push(`Row ${rowNum}: duplicate email ${email} — only first occurrence processed`);
             continue;
           }
           seenEmails.add(email);
 
-          // Check if email already exists in DB
-          const existingUser = await db.select({ id: users.id, firstName: users.firstName })
+          // Must be an existing user in this org (invite them first)
+          const existingUser = await db.select({ id: users.id })
             .from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
-
-          const isNewUser = !existingUser;
-          const targetUserId = existingUser?.id ?? crypto.randomUUID();
-
-          if (existingUser) {
-            // If user exists, check if they already have an application for this org
-            const existingApp = await db.select({ id: memberApplications.id })
-              .from(memberApplications)
-              .where(and(eq(memberApplications.userId, existingUser.id), eq(memberApplications.orgId, orgId)))
-              .limit(1).then(r => r[0]);
-            if (existingApp) {
-              warnings.push(`Row ${rowNum}: ${email} already has an application — skipped`);
-              continue;
-            }
+          if (!existingUser) {
+            warnings.push(`Row ${rowNum}: ${email} not found — invite the member first`);
+            continue;
           }
 
-          // Split name
-          const nameParts = fullName.split(' ');
-          const firstName = (existingUser?.firstName) || nameParts[0] || fullName;
-          const lastName = nameParts.slice(1).join(' ') || '';
-
-          // Build metadata from demographic fields
-          const metadata: Record<string, string> = {};
-          const demoFields = ['date_of_birth', 'phone_number', 'nationality', 'gender', 'national_id', 'current_education_status', 'university', 'major', 'study_start_date', 'study_end_date', 'based_in_saudi_arabia', 'saudi_region'];
-          for (const f of demoFields) {
-            if (row[f]) metadata[f] = row[f];
+          const membership = await db.select({ id: organizationMembers.id })
+            .from(organizationMembers)
+            .where(and(eq(organizationMembers.userId, existingUser.id), eq(organizationMembers.orgId, orgId)))
+            .limit(1).then(r => r[0]);
+          if (!membership) {
+            warnings.push(`Row ${rowNum}: ${email} is not a member of this workspace — skipped`);
+            continue;
           }
 
           try {
-            if (isNewUser) {
-              // 1a) Create PENDING user
-              await db.insert(users).values({
-                id: targetUserId,
-                email,
-                firstName,
-                lastName,
-                password: '',
-                status: 'PENDING',
-                role: 'MEMBER',
-              });
-              // 1b) Add to org
-              await db.insert(organizationMembers).values({
-                id: crypto.randomUUID(),
-                orgId,
-                userId: targetUserId,
-                role: 'MEMBER',
-              });
-            } else {
-              // Ensure existing user is in this org
-              const existingMembership = await db.select({ id: organizationMembers.id })
-                .from(organizationMembers)
-                .where(and(eq(organizationMembers.userId, targetUserId), eq(organizationMembers.orgId, orgId)))
-                .limit(1).then(r => r[0]);
-              if (!existingMembership) {
-                await db.insert(organizationMembers).values({
-                  id: crypto.randomUUID(),
-                  orgId,
-                  userId: targetUserId,
-                  role: 'MEMBER',
-                });
-              }
-            }
-
-            // 2) Create application
-            const cleanStr = (v: string | undefined) => (v || '').trim() || null;
             const isPrevWinner = (row['previous_program_winner'] || '').toLowerCase();
+            const metadata: Record<string, string> = {};
+            for (const f of demoFields) { if (row[f]) metadata[f] = row[f]; }
 
-            const [app] = await db.insert(memberApplications).values({
-              id: crypto.randomUUID(),
-              userId: targetUserId,
-              orgId,
+            const ideaFields = {
               ideaName: cleanStr(row['idea_name']),
               sector: cleanStr(row['sector']),
               problemStatement: cleanStr(row['problem_statement']),
@@ -7707,43 +7669,39 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
               differentiator: cleanStr(row['why_choose_solution']),
               targetUser: cleanStr(row['target_user']),
               relevantSkills: cleanStr(row['relevant_skills_experience']),
-              previousWinner: isPrevWinner === 'yes' ? 'yes' : isPrevWinner === 'no' ? 'no' : null,
-              hasValidation: cleanStr(row['initial_design_testing_validation']) ? 'yes' : null,
+              previousWinner: isPrevWinner === 'yes' ? 'yes' : isPrevWinner === 'no' ? 'no' : (null as any),
+              hasValidation: cleanStr(row['initial_design_testing_validation']) ? 'yes' : (null as any),
               validationDetails: cleanStr(row['initial_design_testing_validation']),
               metadata,
-              status: 'PENDING_REVIEW',
-            }).returning();
+              status: 'PENDING_REVIEW' as const,
+            };
 
-            // 3) Fire AI screening
-            screenApplicationAsync(app.id, null, orgId).catch(console.error);
+            // Update existing application, or create one if member hasn't completed onboarding yet
+            const existingApp = await db.select({ id: memberApplications.id })
+              .from(memberApplications)
+              .where(and(eq(memberApplications.userId, existingUser.id), eq(memberApplications.orgId, orgId)))
+              .limit(1).then(r => r[0]);
 
-            // 4) Send onboarding email ONLY for newly created users
-            if (isNewUser) {
-              const setPasswordUrl = `${APP_URL}/w/${org.slug}/onboard?userId=${targetUserId}&email=${encodeURIComponent(email)}`;
-              const html = loadTpl('csv-onboarding', {
-                orgName: org.name,
-                firstName,
-                email,
-                ideaName: row['idea_name'] || 'your idea',
-                setPasswordUrl,
-              });
-              if (resendClient && html) {
-                resendClient.emails.send({
-                  from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
-                  to: email,
-                  subject: `Welcome to ${org.name} — Set Your Password`,
-                  html,
-                }).catch(e => console.error('CSV onboarding email failed for', email, e));
-              } else {
-                console.log(`📧 [CSV import] Set-password link for ${email}: ${setPasswordUrl}`);
-              }
+            let appId: string;
+            if (existingApp) {
+              await db.update(memberApplications).set(ideaFields).where(eq(memberApplications.id, existingApp.id));
+              appId = existingApp.id;
+            } else {
+              const [created] = await db.insert(memberApplications).values({
+                id: crypto.randomUUID(),
+                userId: existingUser.id,
+                orgId,
+                ...ideaFields,
+              }).returning();
+              appId = created.id;
             }
 
+            // Trigger AI scoring
+            screenApplicationAsync(appId, null, orgId).catch(console.error);
             imported++;
           } catch (rowErr) {
             console.error(`CSV import row ${rowNum} error:`, rowErr);
-            errors.push(`Row ${rowNum}: failed to import ${email}`);
-            if (isNewUser) await db.delete(users).where(eq(users.id, targetUserId)).catch(() => {});
+            errors.push(`Row ${rowNum}: failed to process ${email}`);
           }
         }
 
