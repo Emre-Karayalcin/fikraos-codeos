@@ -7560,6 +7560,7 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           columns: true,
           skip_empty_lines: true,
           trim: true,
+          relax_column_count: true,
         });
 
         if (!records.length) return res.status(400).json({ error: 'CSV file is empty' });
@@ -7616,15 +7617,27 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           seenEmails.add(email);
 
           // Check if email already exists in DB
-          const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
+          const existingUser = await db.select({ id: users.id, firstName: users.firstName })
+            .from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
+
+          const isNewUser = !existingUser;
+          const targetUserId = existingUser?.id ?? crypto.randomUUID();
+
           if (existingUser) {
-            warnings.push(`Row ${rowNum}: email ${email} already exists — skipped`);
-            continue;
+            // If user exists, check if they already have an application for this org
+            const existingApp = await db.select({ id: memberApplications.id })
+              .from(memberApplications)
+              .where(and(eq(memberApplications.userId, existingUser.id), eq(memberApplications.orgId, orgId)))
+              .limit(1).then(r => r[0]);
+            if (existingApp) {
+              warnings.push(`Row ${rowNum}: ${email} already has an application — skipped`);
+              continue;
+            }
           }
 
           // Split name
           const nameParts = fullName.split(' ');
-          const firstName = nameParts[0] || fullName;
+          const firstName = (existingUser?.firstName) || nameParts[0] || fullName;
           const lastName = nameParts.slice(1).join(' ') || '';
 
           // Build metadata from demographic fields
@@ -7634,35 +7647,48 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
             if (row[f]) metadata[f] = row[f];
           }
 
-          const newUserId = crypto.randomUUID();
-
           try {
-            // 1) Create PENDING user
-            await db.insert(users).values({
-              id: newUserId,
-              email,
-              firstName,
-              lastName,
-              password: '',
-              status: 'PENDING',
-              role: 'MEMBER',
-            });
+            if (isNewUser) {
+              // 1a) Create PENDING user
+              await db.insert(users).values({
+                id: targetUserId,
+                email,
+                firstName,
+                lastName,
+                password: '',
+                status: 'PENDING',
+                role: 'MEMBER',
+              });
+              // 1b) Add to org
+              await db.insert(organizationMembers).values({
+                id: crypto.randomUUID(),
+                orgId,
+                userId: targetUserId,
+                role: 'MEMBER',
+              });
+            } else {
+              // Ensure existing user is in this org
+              const existingMembership = await db.select({ id: organizationMembers.id })
+                .from(organizationMembers)
+                .where(and(eq(organizationMembers.userId, targetUserId), eq(organizationMembers.orgId, orgId)))
+                .limit(1).then(r => r[0]);
+              if (!existingMembership) {
+                await db.insert(organizationMembers).values({
+                  id: crypto.randomUUID(),
+                  orgId,
+                  userId: targetUserId,
+                  role: 'MEMBER',
+                });
+              }
+            }
 
-            // 2) Add to org
-            await db.insert(organizationMembers).values({
-              id: crypto.randomUUID(),
-              orgId,
-              userId: newUserId,
-              role: 'MEMBER',
-            });
-
-            // 3) Create application
+            // 2) Create application
             const cleanStr = (v: string | undefined) => (v || '').trim() || null;
             const isPrevWinner = (row['previous_program_winner'] || '').toLowerCase();
 
             const [app] = await db.insert(memberApplications).values({
               id: crypto.randomUUID(),
-              userId: newUserId,
+              userId: targetUserId,
               orgId,
               ideaName: cleanStr(row['idea_name']),
               sector: cleanStr(row['sector']),
@@ -7678,36 +7704,36 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
               status: 'PENDING_REVIEW',
             }).returning();
 
-            // 4) Fire AI screening
+            // 3) Fire AI screening
             screenApplicationAsync(app.id, null, orgId).catch(console.error);
 
-            // 5) Send onboarding email
-            const setPasswordUrl = `${APP_URL}/w/${org.slug}/onboard?userId=${newUserId}&email=${encodeURIComponent(email)}`;
-            const html = loadTpl('csv-onboarding', {
-              orgName: org.name,
-              firstName,
-              email,
-              ideaName: row['idea_name'] || 'your idea',
-              setPasswordUrl,
-            });
-
-            if (resendClient && html) {
-              resendClient.emails.send({
-                from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
-                to: email,
-                subject: `Welcome to ${org.name} — Set Your Password`,
-                html,
-              }).catch(e => console.error('CSV onboarding email failed for', email, e));
-            } else {
-              console.log(`📧 [CSV import] Set-password link for ${email}: ${setPasswordUrl}`);
+            // 4) Send onboarding email ONLY for newly created users
+            if (isNewUser) {
+              const setPasswordUrl = `${APP_URL}/w/${org.slug}/onboard?userId=${targetUserId}&email=${encodeURIComponent(email)}`;
+              const html = loadTpl('csv-onboarding', {
+                orgName: org.name,
+                firstName,
+                email,
+                ideaName: row['idea_name'] || 'your idea',
+                setPasswordUrl,
+              });
+              if (resendClient && html) {
+                resendClient.emails.send({
+                  from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+                  to: email,
+                  subject: `Welcome to ${org.name} — Set Your Password`,
+                  html,
+                }).catch(e => console.error('CSV onboarding email failed for', email, e));
+              } else {
+                console.log(`📧 [CSV import] Set-password link for ${email}: ${setPasswordUrl}`);
+              }
             }
 
             imported++;
           } catch (rowErr) {
             console.error(`CSV import row ${rowNum} error:`, rowErr);
             errors.push(`Row ${rowNum}: failed to import ${email}`);
-            // Cleanup partial user in case of error
-            await db.delete(users).where(eq(users.id, newUserId)).catch(() => {});
+            if (isNewUser) await db.delete(users).where(eq(users.id, targetUserId)).catch(() => {});
           }
         }
 
