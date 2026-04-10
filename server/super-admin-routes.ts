@@ -1031,6 +1031,7 @@ export function registerSuperAdminRoutes(app: Express) {
             subject: `🎉 You've been accepted to ${row.orgName}!`,
             html,
           });
+          await db.update(users).set({ status: "ACTIVE" }).where(eq(users.id, row.userId));
           await db.update(memberApplications)
             .set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() })
             .where(eq(memberApplications.id, row.id));
@@ -1197,6 +1198,7 @@ export function registerSuperAdminRoutes(app: Express) {
       const candidates = await db
         .select({
           id: memberApplications.id,
+          userId: memberApplications.userId,
           ideaName: memberApplications.ideaName,
           aiScore: memberApplications.aiScore,
           userEmail: users.email,
@@ -1228,6 +1230,7 @@ export function registerSuperAdminRoutes(app: Express) {
         if (!html) { failed++; continue; }
         try {
           await resend.emails.send({ from: process.env.EMAIL_FROM || "no-reply@fikrahub.com", to: row.userEmail, subject: `🎉 You've been accepted to ${row.orgName}!`, html });
+          await db.update(users).set({ status: "ACTIVE" }).where(eq(users.id, row.userId));
           await db.update(memberApplications).set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
           sent++;
         } catch { failed++; }

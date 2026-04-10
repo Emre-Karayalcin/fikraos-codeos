@@ -66,7 +66,7 @@ import { insertProjectSchema, insertChatSchema, insertMessageSchema, insertAsset
 import { screenApplicationAsync, refineApplicationAsync } from "./lib/applicationScreening";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, and, inArray, desc, asc, avg, count, sql as drizzleSql, isNull, or, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, not, desc, asc, avg, count, sql as drizzleSql, isNull, or, isNotNull } from "drizzle-orm";
 import { canAccessProject, canModifyProject, canAccessChat, canAccessAssets } from "./middleware/authorization";
 import { requireApiKey } from "./middleware/api-key-auth";
 import { passwordResetLimiter, authRateLimiter, orgCreationLimiter, fileUploadLimiter, aiRateLimiter, dataExportLimiter } from "./middleware/security";
@@ -7511,6 +7511,26 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           await db.update(memberApplications).set({ status: 'APPROVED', acceptanceEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
           sent++;
         } catch { failed++; }
+      }
+
+      // Auto-reject all remaining AI_REVIEWED applications not in the accepted batch
+      const acceptedIds = candidates.map(c => c.id);
+      if (acceptedIds.length > 0) {
+        await db.update(memberApplications)
+          .set({ status: 'REJECTED', updatedAt: new Date() })
+          .where(and(
+            eq(memberApplications.orgId, orgId),
+            eq(memberApplications.status, 'AI_REVIEWED'),
+            not(inArray(memberApplications.id, acceptedIds))
+          ));
+      } else {
+        // No one was accepted — reject all AI_REVIEWED
+        await db.update(memberApplications)
+          .set({ status: 'REJECTED', updatedAt: new Date() })
+          .where(and(
+            eq(memberApplications.orgId, orgId),
+            eq(memberApplications.status, 'AI_REVIEWED')
+          ));
       }
 
       res.json({ sent, failed, total: candidates.length });
