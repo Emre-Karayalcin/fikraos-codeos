@@ -7448,8 +7448,10 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           id: memberApplications.id,
           ideaName: memberApplications.ideaName,
           aiScore: memberApplications.aiScore,
+          userId: memberApplications.userId,
           userEmail: users.email,
           userFirstName: users.firstName,
+          userPassword: users.password,
           orgName: organizations.name,
           orgSlug: organizations.slug,
         })
@@ -7469,10 +7471,18 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
 
       let sent = 0; let failed = 0;
       for (const row of candidates) {
-        const html = loadTpl('application-approved', { userName: row.userFirstName || row.userEmail || 'there', orgName: row.orgName, loginUrl: `${hostUrl}/w/${row.orgSlug}` });
+        // If user has no password yet (CSV-imported), send them to set-password page first
+        const hasPassword = row.userPassword && row.userPassword.length > 0;
+        const loginUrl = hasPassword
+          ? `${hostUrl}/w/${row.orgSlug}`
+          : `${hostUrl}/w/${row.orgSlug}/onboard?userId=${row.userId}&email=${encodeURIComponent(row.userEmail)}`;
+
+        const html = loadTpl('application-approved', { userName: row.userFirstName || row.userEmail || 'there', orgName: row.orgName, loginUrl });
         if (!html) { failed++; continue; }
         try {
           await resendClient.emails.send({ from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com', to: row.userEmail, subject: `🎉 You've been accepted to ${row.orgName}!`, html });
+          // Activate user account and mark email sent
+          await db.update(users).set({ status: 'ACTIVE' }).where(eq(users.id, row.userId));
           await db.update(memberApplications).set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
           sent++;
         } catch { failed++; }
