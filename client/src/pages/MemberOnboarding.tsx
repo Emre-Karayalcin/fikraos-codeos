@@ -31,6 +31,8 @@ export default function MemberOnboarding() {
   const userId = params.get("userId") || "";
   const email = params.get("email") || "";
 
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -52,14 +54,14 @@ export default function MemberOnboarding() {
   };
   const allRulesMet = Object.values(rules).every(Boolean);
   const passwordsMatch = password === confirm && confirm.length > 0;
-  const canSubmit = allRulesMet && passwordsMatch;
+  const canSubmit = !!firstName.trim() && allRulesMet && passwordsMatch;
 
   const submitMutation = useMutation({
     mutationFn: async () => {
       const r = await fetch(`/api/workspaces/${slug}/complete-invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, email, password }),
+        body: JSON.stringify({ userId, email, password, firstName: firstName.trim(), lastName: lastName.trim() }),
       });
       if (!r.ok) {
         const err = await r.json();
@@ -68,7 +70,7 @@ export default function MemberOnboarding() {
       return r.json();
     },
     onSuccess: () => {
-      toast.success("Password set! Welcome aboard.");
+      toast.success("Account created! Your application is under review.");
       setLocation(`/w/${slug}`);
     },
     onError: (err: Error) => toast.error(err.message),
@@ -84,9 +86,9 @@ export default function MemberOnboarding() {
           ) : (
             <div className="text-2xl font-bold text-gray-800 mb-4">{workspace?.name || "Loading…"}</div>
           )}
-          <h1 className="text-xl font-bold text-gray-900">Set Your Password</h1>
+          <h1 className="text-xl font-bold text-gray-900">Create Your Account</h1>
           <p className="text-gray-500 text-sm mt-1">
-            One last step — create a password for your account.
+            Set up your profile to join {workspace?.name || "the workspace"}.
           </p>
           {email && (
             <p className="text-xs text-gray-400 mt-2 bg-gray-100 rounded px-3 py-1 inline-block">{email}</p>
@@ -95,6 +97,28 @@ export default function MemberOnboarding() {
 
         {/* Form card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+        {/* Name fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">
+                First Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Sara"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Last Name</Label>
+              <Input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Alqahtani"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
               Password <span className="text-red-500">*</span>
@@ -155,7 +179,7 @@ export default function MemberOnboarding() {
             disabled={!canSubmit || submitMutation.isPending}
             onClick={() => submitMutation.mutate()}
           >
-            {submitMutation.isPending ? "Setting up your account…" : "Set Password & Enter Workspace"}
+            {submitMutation.isPending ? "Creating your account…" : "Create Account"}
           </Button>
         </div>
 
