@@ -749,44 +749,16 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Look up the org and user's role in this workspace
-      const { slug } = req.params;
-      const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.slug, slug)).limit(1);
-      const isMemberRole = org
-        ? await db.select({ role: organizationMembers.role })
-            .from(organizationMembers)
-            .where(and(eq(organizationMembers.userId, invited.id), eq(organizationMembers.orgId, org.id)))
-            .limit(1)
-            .then(r => r[0]?.role === 'MEMBER')
-        : false;
-
       // hash password and update user
       // SECURITY: Hash password using scrypt
       const hashed = await hashPassword(password);
-      // MEMBER role stays PENDING until PMO approves; other roles become ACTIVE immediately
       const updated = await storage.updateUser(invited.id, {
         email,
         firstName: firstName || invited.firstName || '',
         lastName: lastName || invited.lastName || '',
         password: hashed,
-        status: isMemberRole ? 'PENDING' : 'ACTIVE',
+        status: 'ACTIVE',
       });
-
-      // For MEMBER: auto-create an empty application record so CSV import can update it later
-      if (isMemberRole && org) {
-        const existingApp = await db.select({ id: memberApplications.id })
-          .from(memberApplications)
-          .where(and(eq(memberApplications.userId, invited.id), eq(memberApplications.orgId, org.id)))
-          .limit(1).then(r => r[0]);
-        if (!existingApp) {
-          await db.insert(memberApplications).values({
-            id: crypto.randomUUID(),
-            userId: invited.id,
-            orgId: org.id,
-            status: 'PENDING_REVIEW',
-          }).catch(console.error);
-        }
-      }
 
       // Auto-login if possible (Passport style)
       if (typeof req.logIn === 'function') {
@@ -796,7 +768,7 @@ export function registerRoutes(app: Express): Server {
             if (req.session) (req.session as any).userId = updated.id;
             return res.status(500).json({ error: 'Failed to create session after signup' });
           }
-          return res.json({ success: true, user: updated, awaitingReview: isMemberRole });
+          return res.json({ success: true, user: updated });
         });
         return;
       }
@@ -805,7 +777,7 @@ export function registerRoutes(app: Express): Server {
         (req.session as any).userId = updated.id;
       }
 
-      res.json({ success: true, user: updated, awaitingReview: isMemberRole });
+      res.json({ success: true, user: updated });
     } catch (error) {
       console.error('Signup completion error:', error);
       res.status(500).json({ error: 'Signup failed' });
@@ -7628,9 +7600,20 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           return res.status(400).json({ error: `CSV missing required columns: ${missingCols.join(', ')}` });
         }
 
-        const orgExists = await db.select({ id: organizations.id })
+        const org = await db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug })
           .from(organizations).where(eq(organizations.id, orgId)).limit(1).then(r => r[0]);
-        if (!orgExists) return res.status(404).json({ error: 'Organization not found' });
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+        const APP_URL = process.env.APP_URL || process.env.HOST_URL || 'http://localhost:5000';
+        const resendApiKey = process.env.RESEND_API_KEY;
+        const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
+
+        const loadTpl = (name: string, vars: Record<string, string>) => {
+          const cands = [path.join(__dirname, 'email-templates', `${name}.html`), path.join(process.cwd(), 'server', 'email-templates', `${name}.html`)];
+          const found = cands.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+          if (!found) return '';
+          try { return mustache.render(fs.readFileSync(found, 'utf8'), vars); } catch { return ''; }
+        };
 
         const seenEmails = new Set<string>();
         const warnings: string[] = [];
@@ -7646,35 +7629,24 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           const row = records[i];
           const rowNum = i + 2;
           const email = (row['email_address'] || '').toLowerCase().trim();
+          const fullName = (row['full_name'] || '').trim();
 
+          // Validation
           if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             errors.push(`Row ${rowNum}: invalid or missing email`);
             continue;
           }
+          if (!fullName) {
+            errors.push(`Row ${rowNum}: missing full_name`);
+            continue;
+          }
 
-          // Dedup within CSV — only process first occurrence, warn on subsequent
+          // Dedup within CSV
           if (seenEmails.has(email)) {
             warnings.push(`Row ${rowNum}: duplicate email ${email} — only first occurrence processed`);
             continue;
           }
           seenEmails.add(email);
-
-          // Must be an existing user in this org (invite them first)
-          const existingUser = await db.select({ id: users.id })
-            .from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
-          if (!existingUser) {
-            warnings.push(`Row ${rowNum}: ${email} not found — invite the member first`);
-            continue;
-          }
-
-          const membership = await db.select({ id: organizationMembers.id })
-            .from(organizationMembers)
-            .where(and(eq(organizationMembers.userId, existingUser.id), eq(organizationMembers.orgId, orgId)))
-            .limit(1).then(r => r[0]);
-          if (!membership) {
-            warnings.push(`Row ${rowNum}: ${email} is not a member of this workspace — skipped`);
-            continue;
-          }
 
           try {
             const isPrevWinner = (row['previous_program_winner'] || '').toLowerCase();
@@ -7696,34 +7668,85 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
               status: 'PENDING_REVIEW' as const,
             };
 
-            // Update existing application, or create one if member hasn't completed onboarding yet
+            // Check if user exists
+            const existingUser = await db.select({ id: users.id, firstName: users.firstName, status: users.status })
+              .from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
+
+            let targetUserId: string;
+            let isNewUser = false;
+
+            if (existingUser) {
+              targetUserId = existingUser.id;
+              // Ensure org membership
+              const hasMembership = await db.select({ id: organizationMembers.id })
+                .from(organizationMembers)
+                .where(and(eq(organizationMembers.userId, existingUser.id), eq(organizationMembers.orgId, orgId)))
+                .limit(1).then(r => r[0]);
+              if (!hasMembership) {
+                await db.insert(organizationMembers).values({ id: crypto.randomUUID(), orgId, userId: existingUser.id, role: 'MEMBER' });
+              }
+            } else {
+              // Create new PENDING user
+              isNewUser = true;
+              targetUserId = crypto.randomUUID();
+              const nameParts = fullName.split(' ');
+              await db.insert(users).values({
+                id: targetUserId,
+                email,
+                firstName: nameParts[0] || fullName,
+                lastName: nameParts.slice(1).join(' ') || '',
+                password: '',
+                status: 'PENDING',
+                role: 'MEMBER',
+              });
+              await db.insert(organizationMembers).values({ id: crypto.randomUUID(), orgId, userId: targetUserId, role: 'MEMBER' });
+            }
+
+            // Check for existing application
             const existingApp = await db.select({ id: memberApplications.id, status: memberApplications.status })
               .from(memberApplications)
-              .where(and(eq(memberApplications.userId, existingUser.id), eq(memberApplications.orgId, orgId)))
+              .where(and(eq(memberApplications.userId, targetUserId), eq(memberApplications.orgId, orgId)))
               .limit(1).then(r => r[0]);
 
-            // Skip re-scoring if already AI reviewed
+            // Skip if already scored
             if (existingApp?.status === 'AI_REVIEWED' || existingApp?.status === 'APPROVED') {
               warnings.push(`Row ${rowNum}: ${email} already scored (${existingApp.status}) — skipped`);
+              imported++;
               continue;
             }
 
             let appId: string;
             if (existingApp) {
-              await db.update(memberApplications).set(ideaFields).where(eq(memberApplications.id, existingApp.id));
+              await db.update(memberApplications).set({ ...ideaFields, updatedAt: new Date() }).where(eq(memberApplications.id, existingApp.id));
               appId = existingApp.id;
             } else {
               const [created] = await db.insert(memberApplications).values({
-                id: crypto.randomUUID(),
-                userId: existingUser.id,
-                orgId,
-                ...ideaFields,
+                id: crypto.randomUUID(), userId: targetUserId, orgId, ...ideaFields,
               }).returning();
               appId = created.id;
             }
 
             // Trigger AI scoring
             screenApplicationAsync(appId, null, orgId).catch(console.error);
+
+            // Send onboarding email only for newly created users
+            if (isNewUser) {
+              const nameParts = fullName.split(' ');
+              const firstName = nameParts[0] || fullName;
+              const setPasswordUrl = `${APP_URL}/w/${org.slug}/onboard?userId=${targetUserId}&email=${encodeURIComponent(email)}`;
+              const html = loadTpl('csv-onboarding', { orgName: org.name, firstName, email, ideaName: row['idea_name'] || 'your idea', setPasswordUrl });
+              if (resendClient && html) {
+                resendClient.emails.send({
+                  from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
+                  to: email,
+                  subject: `Welcome to ${org.name} — Set Your Password`,
+                  html,
+                }).catch(e => console.error('CSV onboarding email failed for', email, e));
+              } else {
+                console.log(`📧 [CSV import] Set-password link for ${email}: ${setPasswordUrl}`);
+              }
+            }
+
             imported++;
           } catch (rowErr) {
             console.error(`CSV import row ${rowNum} error:`, rowErr);

@@ -250,9 +250,6 @@ export default function UserManagement({ orgId }: UserManagementProps) {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="MEMBER">
-                                {t('admin.userManagement.roles.member')}
-                              </SelectItem>
                               <SelectItem value="MENTOR">
                                 {t('admin.userManagement.roles.mentor')}
                               </SelectItem>
