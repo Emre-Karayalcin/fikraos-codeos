@@ -71,7 +71,7 @@ export default function MemberOnboarding() {
     },
     onSuccess: () => {
       toast.success("Account created! Your application is under review.");
-      setLocation(`/w/${slug}`);
+      setLocation(`/w/${slug}/onboard/thank-you`);
     },
     onError: (err: Error) => toast.error(err.message),
   });
