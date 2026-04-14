@@ -201,9 +201,8 @@ export default function AdminApplications() {
   });
 
   const acceptedLeaderboard = rows
-    .filter((r) => r.application.aiScore != null && r.application.status !== "REJECTED")
-    .sort((a, b) => (b.application.aiScore ?? 0) - (a.application.aiScore ?? 0))
-    .slice(0, CAPACITY);
+    .filter((r) => r.application.status === "APPROVED")
+    .sort((a, b) => (b.application.aiScore ?? 0) - (a.application.aiScore ?? 0));
 
   const rejectedList = rows.filter((r) => r.application.status === "REJECTED");
 
@@ -515,6 +514,7 @@ export default function AdminApplications() {
                       <TableHead>Submitted</TableHead>
                       <TableHead>AI Score</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -549,6 +549,26 @@ export default function AdminApplications() {
                           )}
                         </TableCell>
                         <TableCell>{statusBadge(row.application.status)}</TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              title="Accept"
+                              disabled={row.application.status === "APPROVED" || updateMutation.isPending}
+                              onClick={() => updateMutation.mutate({ id: row.application.id, data: { status: "APPROVED" } })}
+                              className={`p-1.5 rounded-md transition-colors ${row.application.status === "APPROVED" ? "text-green-500 bg-green-50 cursor-default" : "text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button
+                              title="Reject"
+                              disabled={row.application.status === "REJECTED" || updateMutation.isPending}
+                              onClick={() => updateMutation.mutate({ id: row.application.id, data: { status: "REJECTED" } })}
+                              className={`p-1.5 rounded-md transition-colors ${row.application.status === "REJECTED" ? "text-red-500 bg-red-50 cursor-default" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
