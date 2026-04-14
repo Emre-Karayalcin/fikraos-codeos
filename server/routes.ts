@@ -735,8 +735,9 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: 'Invited user not found' });
       }
 
-      // Only allow completing invite if user is PENDING
-      if (!invited.status || invited.status !== 'PENDING') {
+      // Allow if PENDING, or ACTIVE but password not yet set (CSV-imported users set to ACTIVE prematurely)
+      const passwordNotSet = !invited.password || invited.password === '';
+      if (invited.status !== 'PENDING' && !(invited.status === 'ACTIVE' && passwordNotSet)) {
         console.warn(`Invite completion attempted for non-pending user: ${userId}, status: ${invited.status}`);
         return res.status(400).json({ error: 'Invalid invite or invite already completed' });
       }
