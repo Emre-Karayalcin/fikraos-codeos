@@ -19,7 +19,7 @@ export function useAuth() {
 
       if (res.status === 401) {
         const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-        const workspaceRegex = /^\/w\/[^\/]+(\/(register|reset-password))?\/?$/;
+        const workspaceRegex = /^\/w\/[^\/]+(\/(register|reset-password|onboard(\/thank-you)?))?\/?$/;
         if (!workspaceRegex.test(currentPath) && currentPath !== "/admin/login") {
           setLocation("/");
         }
@@ -28,7 +28,7 @@ export function useAuth() {
 
       if (res.status !== 401) {
         const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-        const workspaceRegex = /^\/w\/[^\/]+(\/(register|reset-password))?\/?$/;
+        const workspaceRegex = /^\/w\/[^\/]+(\/(register|reset-password|onboard(\/thank-you)?))?\/?$/;
         if (workspaceRegex.test(currentPath)) {
           setLocation("/");
         }
