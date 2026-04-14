@@ -7604,7 +7604,7 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
           .from(organizations).where(eq(organizations.id, orgId)).limit(1).then(r => r[0]);
         if (!org) return res.status(404).json({ error: 'Organization not found' });
 
-        const APP_URL = process.env.APP_URL || process.env.HOST_URL || 'http://localhost:5000';
+        const APP_URL = process.env.HOST_URL || `${req.protocol}://${req.get('host')}`;
         const resendApiKey = process.env.RESEND_API_KEY;
         const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
 
