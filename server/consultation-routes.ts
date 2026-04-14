@@ -507,7 +507,7 @@ export function registerConsultationRoutes(app: Express) {
     const adminId = (req.user as any)?.id;
     db.insert(platformEvents).values({
       orgId,
-      userId:    adminId,
+      actorId:   adminId,
       eventType: isCancelling ? "CONSULTATION_CANCELLED" : "CONSULTATION_CONFIRMED",
       metadata:  { bookingId, sessionId: booking.sessionId, participantId: booking.userId },
     } as any).catch(console.error);
@@ -625,7 +625,7 @@ export function registerConsultationRoutes(app: Express) {
     // Audit log
     db.insert(platformEvents).values({
       orgId,
-      userId,
+      actorId: userId,
       eventType: "CONSULTATION_BOOKED",
       metadata:  { bookingId: booking.id, sessionId },
     } as any).catch(console.error);
