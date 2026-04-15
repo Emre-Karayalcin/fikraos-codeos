@@ -6,6 +6,7 @@ import { OrbVisualization } from "@/components/orb/OrbVisualization";
 import MentorDashboard from "./MentorDashboard";
 import JudgeDashboard from "./JudgeDashboard";
 import ClientDashboard from "./ClientDashboard";
+import ConsultantDashboard from "./ConsultantDashboard";
 
 import { useState } from "react";
 import {
@@ -289,6 +290,11 @@ export default function Dashboard() {
   const isClient = userRole?.role === 'CLIENT';
   if (isClient) {
     return <ClientDashboard />;
+  }
+
+  const isConsultant = userRole?.role === 'CONSULTANT';
+  if (isConsultant) {
+    return <ConsultantDashboard />;
   }
 
   if (isMentor) {

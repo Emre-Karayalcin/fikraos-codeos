@@ -1,10 +1,12 @@
 import nodemailer from 'nodemailer';
+import { generateIcs, icsAsNodemailerAttachment } from './calendarService';
 
 interface EmailOptions {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: nodemailer.SendMailOptions['attachments'];
 }
 
 class EmailService {
@@ -63,7 +65,11 @@ class EmailService {
 
       await this.transporter.sendMail({
         from,
-        ...options
+        to:          options.to,
+        subject:     options.subject,
+        html:        options.html,
+        text:        options.text,
+        attachments: options.attachments,
       });
 
       console.log('✅ Email sent successfully to:', options.to);
@@ -332,6 +338,8 @@ This is an automated notification from FikraOS Idea Management System.
     scheduledAt: Date | null;
     externalMeetingLink: string | null;
     status: 'PENDING' | 'CONFIRMED';
+    uid?: string;
+    durationMinutes?: number;
   }): Promise<boolean> {
     const isConfirmed = opts.status === 'CONFIRMED';
     const subject = isConfirmed
@@ -360,12 +368,29 @@ This is an automated notification from FikraOS Idea Management System.
             <p style="margin:0"><strong>Status:</strong> ${isConfirmed ? '✅ Confirmed' : '⏳ Pending'}</p>
           </div>
           ${meetingSection}
-          <p style="color:#6b7280;font-size:13px;margin-top:24px">If you have any questions, please contact the PMO team.</p>
+          <p style="color:#6b7280;font-size:13px;margin-top:24px">A calendar invite (.ics) is attached — add it to your calendar to track this session.</p>
+          <p style="color:#6b7280;font-size:13px">If you have any questions, please contact the PMO team.</p>
         </div>
       </div>
     </body></html>`;
 
-    return this.sendEmail({ to: opts.recipientEmail, subject, html });
+    // Generate .ics attachment if we have a scheduled time
+    let attachments: nodemailer.SendMailOptions['attachments'] | undefined;
+    if (opts.scheduledAt) {
+      const icsContent = generateIcs({
+        uid:             opts.uid ?? `consultation-${Date.now()}@codeos`,
+        summary:         opts.sessionTitle,
+        start:           opts.scheduledAt,
+        durationMinutes: opts.durationMinutes ?? 60,
+        location:        opts.externalMeetingLink,
+        status:          isConfirmed ? 'CONFIRMED' : 'TENTATIVE',
+        attendeeEmail:   opts.recipientEmail,
+        attendeeName:    opts.recipientName,
+      });
+      attachments = [icsAsNodemailerAttachment(icsContent)];
+    }
+
+    return this.sendEmail({ to: opts.recipientEmail, subject, html, attachments });
   }
 }
 

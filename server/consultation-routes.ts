@@ -6,6 +6,7 @@ import {
   consultationBookings,
   organizations,
   organizationMembers,
+  memberApplications,
   users,
   challenges,
   platformEvents,
@@ -500,6 +501,7 @@ export function registerConsultationRoutes(app: Express) {
         scheduledAt:         session.scheduledAt,
         externalMeetingLink: isCancelling ? null : (session.externalMeetingLink ?? null),
         status:              isCancelling ? "PENDING" : "CONFIRMED",
+        uid:                 `consultation-${booking.id}@codeos`,
       }).catch(console.error);
     }
 
@@ -617,8 +619,9 @@ export function registerConsultationRoutes(app: Express) {
         recipientName:       participantName,
         sessionTitle:        session.title,
         scheduledAt:         session.scheduledAt,
-        externalMeetingLink: null,
+        externalMeetingLink: session.externalMeetingLink ?? null,
         status:              "PENDING",
+        uid:                 `consultation-${booking.id}@codeos`,
       }).catch(console.error);
     }
 
@@ -631,5 +634,58 @@ export function registerConsultationRoutes(app: Express) {
     } as any).catch(console.error);
 
     res.status(201).json(booking);
+  });
+
+  // ── CONSULTANT: My sessions + participant idea info ────────────────────────
+  app.get("/api/workspaces/:orgId/consultant/my-sessions", isAuthenticated, async (req, res) => {
+    const { orgId } = req.params;
+    const consultantId = (req.user as any)?.id;
+    if (!consultantId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    // Verify user is a member of this org (any role)
+    const [member] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, consultantId)));
+    if (!member) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const sessions = await db
+      .select()
+      .from(consultationSessions)
+      .where(and(
+        eq(consultationSessions.orgId, orgId),
+        eq(consultationSessions.consultantUserId, consultantId),
+      ))
+      .orderBy(desc(consultationSessions.scheduledAt));
+
+    const result = await Promise.all(sessions.map(async (session) => {
+      const bookings = await db
+        .select({
+          bookingId:           consultationBookings.id,
+          bookingStatus:       consultationBookings.status,
+          bookedAt:            consultationBookings.bookedAt,
+          participantId:       users.id,
+          participantName:     sql<string>`concat(${users.firstName}, ' ', ${users.lastName})`,
+          participantEmail:    users.email,
+          ideaName:            memberApplications.ideaName,
+          sector:              memberApplications.sector,
+          problemStatement:    memberApplications.problemStatement,
+          solutionDescription: memberApplications.solutionDescription,
+          differentiator:      memberApplications.differentiator,
+          targetUser:          memberApplications.targetUser,
+          aiScore:             memberApplications.aiScore,
+        })
+        .from(consultationBookings)
+        .innerJoin(users, eq(users.id, consultationBookings.userId))
+        .leftJoin(memberApplications, and(
+          eq(memberApplications.userId, consultationBookings.userId),
+          eq(memberApplications.orgId, orgId),
+        ))
+        .where(eq(consultationBookings.sessionId, session.id));
+
+      return { ...session, bookings };
+    }));
+
+    res.json(result);
   });
 }

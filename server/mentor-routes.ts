@@ -3,6 +3,7 @@ import { db } from "./db";
 import { mentorProfiles, mentorAvailability, mentorBookings, mentorSurveyQuestions, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords } from "../shared/schema";
 import { eq, and, isNotNull, inArray, sql, desc, avg, count } from "drizzle-orm";
 import { Resend } from "resend";
+import { generateIcs } from "./services/calendarService";
 
 const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const EMAIL_FROM = process.env.EMAIL_FROM || "no-reply@fikrahub.com";
@@ -478,17 +479,35 @@ router.post("/mentor-bookings", async (req: any, res) => {
                   <table>${detailRows}</table>
                   <p>You'll be notified once the mentor confirms your session. You can also view or cancel your bookings from the dashboard.</p>
                   <p style="text-align:center"><a class="cta" href="${process.env.APP_URL || "https://os.fikrahub.com"}/dashboard">View My Bookings</a></p>
+                  <p style="font-size:13px;color:#64748b;margin-top:18px">A tentative calendar invite (.ics) is attached — you can add it to your calendar now and it will update once the mentor confirms.</p>
                   <p style="font-size:13px;color:#64748b;margin-top:24px">This is an automated notification from CodeOS.</p>
                 </div>
                 <div class="footer">© 2025 CodeOS — All rights reserved</div>
               </div></div>
             </body></html>`;
 
+            // Build tentative .ics for the pending booking
+            const pendingSessionStart = new Date(`${bookedDate}T${bookedTime}:00`);
+            const pendingIcsContent = generateIcs({
+              uid:             `mentor-booking-${booking.id}@codeos`,
+              summary:         `Mentoring Session with ${mentorName}`,
+              start:           pendingSessionStart,
+              durationMinutes: durationMinutes || 60,
+              attendeeEmail:   bookerEmail,
+              attendeeName:    bookerName,
+              status:          "TENTATIVE",
+            });
+
             await resendClient.emails.send({
               from: EMAIL_FROM,
               to: bookerEmail,
               subject: `Your session with ${mentorName} is pending confirmation`,
               html: memberHtml,
+              attachments: [{
+                filename:     "invite.ics",
+                content:      Buffer.from(pendingIcsContent).toString("base64"),
+                content_type: "text/calendar; method=REQUEST; charset=UTF-8",
+              }],
             });
             console.log(`✅ Mentor booking confirmation email sent to member: ${bookerEmail}`);
           }
@@ -913,6 +932,25 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
             const meetingLinkRow = `
               ${updated.meetingLink ? `<tr><td style="padding:10px 14px;color:#6b7280;font-size:13px;font-weight:600;white-space:nowrap">🔗 Meeting Link</td><td style="padding:10px 14px;font-size:14px"><a href="${updated.meetingLink}" style="color:#4f46e5;font-weight:600">Join Session</a></td></tr>` : ""}
             `;
+
+            // Build .ics calendar invite
+            const sessionStart = new Date(`${updated.bookedDate}T${updated.bookedTime}:00`);
+            const icsContent = generateIcs({
+              uid:             `mentor-booking-${updated.id}@codeos`,
+              summary:         `Mentoring Session with ${mentorName}`,
+              start:           sessionStart,
+              durationMinutes: updated.durationMinutes ?? 60,
+              location:        updated.meetingLink ?? undefined,
+              attendeeEmail:   memberUser.email,
+              attendeeName:    memberName,
+              status:          "CONFIRMED",
+            });
+            const icsAttachment = [{
+              filename:     "invite.ics",
+              content:      Buffer.from(icsContent).toString("base64"),
+              content_type: "text/calendar; method=REQUEST; charset=UTF-8",
+            }];
+
             await resendClient.emails.send({
               from: EMAIL_FROM,
               to: memberUser.email,
@@ -936,9 +974,11 @@ router.patch("/mentor-bookings/:id/status", async (req: any, res) => {
                       ? `<div style="text-align:center;margin:24px 0"><a href="${updated.meetingLink}" style="background:#4f46e5;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px">Join Session via Calendly</a></div>`
                       : `<p style="color:#6b7280;font-size:13px">The meeting link will be shared by your mentor before the session.</p>`
                     }
+                    <p style="color:#6b7280;font-size:12px;margin-top:24px">A calendar invite (.ics) is attached — add it to your calendar to track this session.</p>
                     <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from CodeOS.</p>
                   </div>
                 </div>`,
+              attachments: icsAttachment,
             });
             console.log(`✅ Booking confirmation email sent to member: ${memberUser.email}`);
           } else if (status === "CANCELLED") {

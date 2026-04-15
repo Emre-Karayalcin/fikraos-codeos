@@ -322,6 +322,7 @@ export function UnifiedSidebar() {
   const isMentor = userRole?.role === 'MENTOR';
   const isJudge = userRole?.role === 'JUDGE';
   const isClient = userRole?.role === 'CLIENT';
+  const isConsultant = userRole?.role === 'CONSULTANT';
 
   const createProjectAndChat = async (payload?: { title?: string; description?: string }) => {
     if (!isAuthenticated) {
@@ -649,8 +650,8 @@ export function UnifiedSidebar() {
           </button>
         </div>
 
-        {/* New Idea Button - Only show when authenticated and expanded, not for mentors, judges, or clients */}
-        {isAuthenticated && !isCollapsed && !isMentor && !isJudge && !isClient && (
+        {/* New Idea Button - Only show when authenticated and expanded, not for mentors, judges, clients, or consultants */}
+        {isAuthenticated && !isCollapsed && !isMentor && !isJudge && !isClient && !isConsultant && (
           <div className="px-3 sm:px-4 pb-3 sm:pb-4">
             <button
               onClick={handleNewConversation}
@@ -689,7 +690,7 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
-                  {!isMentor && !isJudge && !isAdmin && !isClient && (
+                  {!isMentor && !isJudge && !isAdmin && !isClient && !isConsultant && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -708,7 +709,7 @@ export function UnifiedSidebar() {
                   </Tooltip>
                   )}
 
-                  {!isMentor && !isJudge && !isClient && (
+                  {!isMentor && !isJudge && !isClient && !isConsultant && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -728,7 +729,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Challenges - Only show if enabled */}
-                  {challengesEnabled && !isJudge && (
+                  {challengesEnabled && !isJudge && !isConsultant && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -748,7 +749,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Radar - Only show if enabled */}
-                  {radarEnabled && !isMentor && !isJudge && !isClient && (
+                  {radarEnabled && !isMentor && !isJudge && !isClient && !isConsultant && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -768,7 +769,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Experts - Only show if enabled */}
-                  {expertsEnabled && !isJudge && !isClient && (
+                  {expertsEnabled && !isJudge && !isClient && !isConsultant && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -788,7 +789,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Academy - Only show if enabled */}
-                  {academyEnabled && !isJudge && !isClient && (
+                  {academyEnabled && !isJudge && !isClient && !isConsultant && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -808,7 +809,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Consultation - Only show if enabled */}
-                  {consultationEnabled && !isJudge && !isClient && (
+                  {(consultationEnabled || isConsultant) && !isJudge && !isClient && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -828,7 +829,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Support — temporarily hidden
-                  {!isMentor && !isJudge && !isClient && (
+                  {!isMentor && !isJudge && !isClient && !isConsultant && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -906,7 +907,7 @@ export function UnifiedSidebar() {
                     </Tooltip>
                   )}
 
-                  {handleNewConversation && !isMentor && !isJudge && !isClient && (
+                  {handleNewConversation && !isMentor && !isJudge && !isClient && !isConsultant && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -939,7 +940,7 @@ export function UnifiedSidebar() {
                     </div>
                   )}
 
-                  {!isMentor && !isJudge && !isAdmin && !isClient && (
+                  {!isMentor && !isJudge && !isAdmin && !isClient && !isConsultant && (
                   <div
                     className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                       location.includes("/my-ideas") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -952,7 +953,7 @@ export function UnifiedSidebar() {
                   </div>
                   )}
 
-                  {!isMentor && !isJudge && !isClient && (
+                  {!isMentor && !isJudge && !isClient && !isConsultant && (
                   <div
                     className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                       location.includes("/pitch") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -966,7 +967,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Challenges - Only show if enabled */}
-                  {challengesEnabled && !isJudge && (
+                  {challengesEnabled && !isJudge && !isConsultant && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/challenges") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -980,7 +981,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Radar - Only show if enabled */}
-                  {radarEnabled && !isMentor && !isJudge && !isClient && (
+                  {radarEnabled && !isMentor && !isJudge && !isClient && !isConsultant && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/radar") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -994,7 +995,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Experts - Only show if enabled */}
-                  {expertsEnabled && !isJudge && !isClient && (
+                  {expertsEnabled && !isJudge && !isClient && !isConsultant && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/experts") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -1008,7 +1009,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Academy - Only show if enabled */}
-                  {academyEnabled && !isJudge && !isClient && (
+                  {academyEnabled && !isJudge && !isClient && !isConsultant && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/academy") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -1022,7 +1023,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Consultation - Only show if enabled */}
-                  {consultationEnabled && !isJudge && !isClient && (
+                  {(consultationEnabled || isConsultant) && !isJudge && !isClient && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/consultation") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -1036,7 +1037,7 @@ export function UnifiedSidebar() {
                   )}
 
                   {/* Support — temporarily hidden
-                  {!isMentor && !isJudge && !isClient && (
+                  {!isMentor && !isJudge && !isClient && !isConsultant && (
                     <div
                       className={`flex items-center px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
                         location.includes("/support") ? "text-white bg-primary" : "text-gray-400 hover:text-white hover:bg-gray-800"
