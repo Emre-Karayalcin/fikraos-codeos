@@ -18,6 +18,7 @@ import { registerProgramRoutes } from "./program-routes";
 import { registerPitchLifecycleRoutes } from "./pitch-lifecycle-routes";
 import { registerConsultationRoutes } from "./consultation-routes";
 import { registerSupportRoutes } from "./support-routes";
+import { registerDeclarationRoutes } from "./declaration-routes";
 import multer from 'multer'; // ✅ Add multer import
 import path from 'path'; // ✅ Add path import
 import fs from 'fs'; // ✅ Add fs import
@@ -5377,6 +5378,7 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
   registerPitchLifecycleRoutes(app);
   registerConsultationRoutes(app);
   registerSupportRoutes(app);
+  registerDeclarationRoutes(app);
 
     // Add this interface near the top of the file, after imports
   interface AssetUpdateIntent {

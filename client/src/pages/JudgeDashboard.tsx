@@ -5,6 +5,7 @@ import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { RichTextViewer } from "@/components/editor/RichTextViewer";
 import {
   Dialog,
   DialogContent,
@@ -547,6 +548,53 @@ export default function JudgeDashboard() {
 
   const orgId = Array.isArray(orgs) ? orgs[0]?.id : undefined;
 
+  // COI (Conflict-of-Interest) declaration — checked once per idea
+  const [coiPendingIdea, setCoiPendingIdea] = useState<JudgeIdea | null>(null);
+  const [coiAgreed, setCoiAgreed] = useState(false);
+
+  const { data: coiDeclaration } = useQuery<any>({
+    queryKey: ["/api/declarations/active/judge-coi", orgId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${orgId}/declarations/active?type=JUDGE_COI`, { credentials: "include" });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!orgId,
+  });
+
+  const acceptCoiMutation = useMutation({
+    mutationFn: async ({ declarationId, projectId }: { declarationId: string; projectId: string }) => {
+      const res = await fetch(`/api/workspaces/${orgId}/declarations/${declarationId}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId }),
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      const idea = coiPendingIdea;
+      setCoiPendingIdea(null);
+      setCoiAgreed(false);
+      setSelectedIdea(idea);
+    },
+  });
+
+  async function handleScoreClick(idea: JudgeIdea) {
+    if (!coiDeclaration || !orgId) { setSelectedIdea(idea); return; }
+    try {
+      const res = await fetch(
+        `/api/workspaces/${orgId}/declarations/has-accepted?declarationId=${coiDeclaration.id}&projectId=${idea.projectId}`,
+        { credentials: "include" },
+      );
+      const { accepted } = await res.json();
+      if (accepted) { setSelectedIdea(idea); } else { setCoiPendingIdea(idea); }
+    } catch { setSelectedIdea(idea); }
+  }
+
+  const [selectedIdea, setSelectedIdea] = useState<JudgeIdea | null>(null);
+
   const { data: ideas = [], isLoading } = useQuery<JudgeIdea[]>({
     queryKey: ["/api/judge/ideas", orgId],
     queryFn: async () => {
@@ -557,7 +605,6 @@ export default function JudgeDashboard() {
     enabled: !!orgId,
   });
 
-  const [selectedIdea, setSelectedIdea] = useState<JudgeIdea | null>(null);
   const scoredCount = ideas.filter((i) => i.scored).length;
 
   return (
@@ -613,7 +660,7 @@ export default function JudgeDashboard() {
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {ideas.map((idea) => (
-                  <IdeaCard key={idea.projectId} idea={idea} onClick={() => setSelectedIdea(idea)} />
+                  <IdeaCard key={idea.projectId} idea={idea} onClick={() => handleScoreClick(idea)} />
                 ))}
               </div>
             )
@@ -633,6 +680,48 @@ export default function JudgeDashboard() {
           open={!!selectedIdea}
           onClose={() => setSelectedIdea(null)}
         />
+      )}
+
+      {/* COI declaration modal — shown before scoring dialog when not yet accepted for this idea */}
+      {coiPendingIdea && coiDeclaration && (
+        <Dialog open={true} onOpenChange={() => {}}>
+          <DialogContent
+            className="max-w-2xl max-h-[85vh] overflow-y-auto [&>button]:hidden"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>{coiDeclaration.title}</DialogTitle>
+              <DialogDescription>
+                Please confirm before scoring: <strong>{coiPendingIdea.title}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <RichTextViewer content={coiDeclaration.content} className="text-sm" />
+            <div className="space-y-3 pt-4 border-t">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={coiAgreed}
+                  onChange={(e) => setCoiAgreed(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600"
+                />
+                <span className="text-sm">I confirm I have no conflict of interest with this specific idea</span>
+              </label>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setCoiPendingIdea(null); setCoiAgreed(false); }}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={!coiAgreed || acceptCoiMutation.isPending}
+                  onClick={() => acceptCoiMutation.mutate({ declarationId: coiDeclaration.id, projectId: coiPendingIdea.projectId })}
+                >
+                  {acceptCoiMutation.isPending ? "Saving…" : "Proceed to Score"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

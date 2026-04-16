@@ -1321,6 +1321,44 @@ export const supportMessages = pgTable("support_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ── Legal Declarations ────────────────────────────────────────────────────────
+
+export const declarationTypeEnum = pgEnum("declaration_type", [
+  "MENTOR_NDA", "PARTICIPANT_CONSENT", "JUDGE_COI", "PMO_COI"
+]);
+
+export const declarationStatusEnum = pgEnum("declaration_status", [
+  "DRAFT", "ACTIVE", "INACTIVE"
+]);
+
+export const legalDeclarations = pgTable("legal_declarations", {
+  id:            varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId:         varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }), // null = global
+  type:          declarationTypeEnum("type").notNull(),
+  title:         varchar("title", { length: 500 }).notNull(),
+  content:       text("content").notNull(),
+  version:       varchar("version", { length: 50 }).notNull(),
+  status:        declarationStatusEnum("status").default("DRAFT").notNull(),
+  effectiveDate: timestamp("effective_date"),
+  expiryDate:    timestamp("expiry_date"),
+  createdBy:     varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy:     varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt:     timestamp("created_at").defaultNow(),
+  updatedAt:     timestamp("updated_at").defaultNow(),
+});
+
+export const declarationAcceptances = pgTable("declaration_acceptances", {
+  id:            varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  declarationId: varchar("declaration_id").notNull().references(() => legalDeclarations.id, { onDelete: "cascade" }),
+  userId:        varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId:         varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  acceptedAt:    timestamp("accepted_at").defaultNow(),
+  metadata:      jsonb("metadata").$type<{ projectId?: string; ipAddress?: string; userAgent?: string }>(),
+});
+
+export type LegalDeclaration = typeof legalDeclarations.$inferSelect;
+export type DeclarationAcceptance = typeof declarationAcceptances.$inferSelect;
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

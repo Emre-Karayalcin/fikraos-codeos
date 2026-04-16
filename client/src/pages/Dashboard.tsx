@@ -23,6 +23,7 @@ import { useBranding } from "@/contexts/BrandingContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { buildIdeaInitialMessage } from "@/lib/buildIdeaMessage";
+import { RichTextViewer } from "@/components/editor/RichTextViewer";
 import toast from "react-hot-toast";
 
 interface DashboardCard {
@@ -114,6 +115,37 @@ export default function Dashboard() {
   const showPopup =
     !popupDismissed &&
     myApplication != null;
+
+  // Participant consent gate — check for unaccepted PARTICIPANT_CONSENT declaration
+  const [consentAgreed, setConsentAgreed] = useState(false);
+  const { data: pendingConsent = [], refetch: refetchConsent } = useQuery<any[]>({
+    queryKey: ["/api/declarations/my-pending/consent", currentOrg?.id],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/workspaces/${currentOrg!.id}/declarations/my-pending?type=PARTICIPANT_CONSENT`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentOrg?.id && !!user && !isMentor && !userIsAdmin,
+  });
+
+  const acceptConsentMutation = useMutation({
+    mutationFn: async (declarationId: string) => {
+      const res = await fetch(
+        `/api/workspaces/${currentOrg!.id}/declarations/${declarationId}/accept`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        },
+      );
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => { setConsentAgreed(false); refetchConsent(); },
+  });
 
   const dismissPopup = () => {
     sessionStorage.setItem('onboarding_popup_shown', '1');
@@ -303,6 +335,40 @@ export default function Dashboard() {
 
   return (
     <>
+    {/* Participant consent gate — non-dismissable, appears before everything else */}
+    {pendingConsent.length > 0 && (
+      <Dialog open={true} onOpenChange={() => {}}>
+        <DialogContent
+          className="max-w-2xl max-h-[85vh] overflow-y-auto [&>button]:hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>{pendingConsent[0].title}</DialogTitle>
+          </DialogHeader>
+          <RichTextViewer content={pendingConsent[0].content} className="text-sm" />
+          <div className="space-y-3 pt-4 border-t">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={consentAgreed}
+                onChange={(e) => setConsentAgreed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600"
+              />
+              <span className="text-sm">I consent to share my idea data for program evaluation purposes</span>
+            </label>
+            <Button
+              className="w-full"
+              disabled={!consentAgreed || acceptConsentMutation.isPending}
+              onClick={() => acceptConsentMutation.mutate(pendingConsent[0].id)}
+            >
+              {acceptConsentMutation.isPending ? "Saving…" : "Continue"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
+
     {/* First-visit idea generation popup */}
     <Dialog open={showPopup} onOpenChange={(open) => { if (!open) dismissPopup(); }}>
       <DialogContent className="max-w-md">

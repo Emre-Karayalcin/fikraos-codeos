@@ -4,6 +4,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RichTextViewer } from "@/components/editor/RichTextViewer";
 import toast from "react-hot-toast";
 import { Eye, EyeOff, CheckCircle } from "lucide-react";
 
@@ -30,6 +32,8 @@ export default function MemberOnboarding() {
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const userId = params.get("userId") || "";
   const email = params.get("email") || "";
+  const role = params.get("role") || "";
+  const isMentor = role === "MENTOR";
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -37,10 +41,24 @@ export default function MemberOnboarding() {
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [ndaAccepted, setNdaAccepted] = useState(false);
+  const [ndaModalOpen, setNdaModalOpen] = useState(false);
 
   const { data: workspace } = useQuery<Workspace>({
     queryKey: [`/api/workspaces/${slug}`],
     enabled: !!slug,
+  });
+
+  // Fetch active MENTOR_NDA only for MENTOR role
+  const { data: ndaDeclaration } = useQuery<any>({
+    queryKey: ["/api/declarations/active", slug, "MENTOR_NDA"],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${slug}/declarations/active?type=MENTOR_NDA`, { credentials: "include" });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!slug && isMentor,
   });
 
   const primaryColor = workspace?.primaryColor || "#4588f5";
@@ -54,7 +72,8 @@ export default function MemberOnboarding() {
   };
   const allRulesMet = Object.values(rules).every(Boolean);
   const passwordsMatch = password === confirm && confirm.length > 0;
-  const canSubmit = !!firstName.trim() && allRulesMet && passwordsMatch;
+  const ndaOk = !isMentor || !ndaDeclaration || ndaAccepted;
+  const canSubmit = !!firstName.trim() && allRulesMet && passwordsMatch && ndaOk;
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -70,6 +89,15 @@ export default function MemberOnboarding() {
       return r.json();
     },
     onSuccess: () => {
+      // Record NDA acceptance for mentors
+      if (isMentor && ndaDeclaration) {
+        fetch(`/api/workspaces/${slug}/declarations/${ndaDeclaration.id}/accept`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        }).catch(() => {});
+      }
       toast.success("Account created! Your application is under review.");
       setLocation(`/w/${slug}/onboard/thank-you`);
     },
@@ -173,6 +201,29 @@ export default function MemberOnboarding() {
             )}
           </div>
 
+          {/* NDA checkbox — only for MENTOR role when an active NDA exists */}
+          {isMentor && ndaDeclaration && (
+            <div className="flex items-start gap-2.5 pt-1">
+              <input
+                type="checkbox"
+                id="nda-accept"
+                checked={ndaAccepted}
+                onChange={(e) => setNdaAccepted(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer"
+              />
+              <label htmlFor="nda-accept" className="text-sm text-gray-700 cursor-pointer leading-snug">
+                I have read and agree to the{" "}
+                <button
+                  type="button"
+                  className="text-blue-600 hover:underline font-medium"
+                  onClick={() => setNdaModalOpen(true)}
+                >
+                  {ndaDeclaration.title}
+                </button>
+              </label>
+            </div>
+          )}
+
           <Button
             className="w-full"
             style={{ background: primaryColor }}
@@ -187,6 +238,21 @@ export default function MemberOnboarding() {
           Secured by FikraHub · If you did not expect this email, please disregard it.
         </p>
       </div>
+
+      {/* NDA content modal */}
+      {ndaDeclaration && (
+        <Dialog open={ndaModalOpen} onOpenChange={setNdaModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{ndaDeclaration.title}</DialogTitle>
+            </DialogHeader>
+            <RichTextViewer content={ndaDeclaration.content} className="text-sm" />
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={() => setNdaModalOpen(false)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

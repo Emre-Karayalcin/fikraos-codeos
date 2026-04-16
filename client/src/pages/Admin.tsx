@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Settings, Users, BarChart3, List, CalendarDays } from "lucide-react";
+import { AlertTriangle, Settings, Users, BarChart3, List, CalendarDays, FileText } from "lucide-react";
 import WorkspaceSettings from "@/components/admin/WorkspaceSettings";
 import ModuleManagement from "@/components/admin/ModuleManagement";
 import UserManagement from "@/components/admin/UserManagement";
@@ -18,6 +18,7 @@ import IdeasOverview from "@/components/admin/IdeasOverview";
 import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { ProgramProgressManager } from "@/components/admin/ProgramProgressManager";
+import { DeclarationsManager } from "@/components/admin/DeclarationsManager";
 
 export default function Admin() {
   const { slug } = useParams();
@@ -135,7 +136,7 @@ export default function Admin() {
 
           {/* Tabbed Interface */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-             <TabsList className="grid w-full grid-cols-5" data-testid="tabs-admin-navigation">
+             <TabsList className="grid w-full grid-cols-6" data-testid="tabs-admin-navigation">
               <TabsTrigger value="dashboard" className="flex items-center gap-2" data-testid="tab-dashboard">
                 <BarChart3 className="w-4 h-4" />
                 Dashboard
@@ -151,6 +152,10 @@ export default function Admin() {
               <TabsTrigger value="program" className="flex items-center gap-2">
                 <CalendarDays className="w-4 h-4" />
                 Program
+              </TabsTrigger>
+              <TabsTrigger value="declarations" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Declarations
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2" data-testid="tab-settings">
                 <Settings className="w-4 h-4" />
@@ -172,6 +177,10 @@ export default function Admin() {
 
             <TabsContent value="program" className="space-y-6">
               <ProgramProgressManager orgId={currentOrg?.id} />
+            </TabsContent>
+
+            <TabsContent value="declarations" className="space-y-6">
+              <DeclarationsManager orgId={currentOrg?.id} />
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">

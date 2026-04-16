@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { RichTextViewer } from "@/components/editor/RichTextViewer";
 import {
-  Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -377,6 +377,43 @@ export default function MentorDashboard() {
     retry: false,
   });
 
+  // Org ID for declaration checks
+  const { data: orgs } = useQuery<any[]>({
+    queryKey: ["/api/organizations"],
+    queryFn: async () => {
+      const res = await fetch("/api/organizations", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  const orgId = Array.isArray(orgs) ? orgs[0]?.id : undefined;
+
+  // Check for unaccepted MENTOR_NDA versions
+  const [ndaChecked, setNdaChecked] = useState(false);
+  const [ndaAgreed, setNdaAgreed] = useState(false);
+  const { data: pendingNda = [], refetch: refetchPendingNda } = useQuery<any[]>({
+    queryKey: ["/api/declarations/my-pending/nda", orgId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${orgId}/declarations/my-pending?type=MENTOR_NDA`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!orgId,
+  });
+
+  const acceptNdaMutation = useMutation({
+    mutationFn: async (declarationId: string) => {
+      const res = await fetch(`/api/workspaces/${orgId}/declarations/${declarationId}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => { setNdaChecked(false); setNdaAgreed(false); refetchPendingNda(); },
+  });
+
   const { data: bookings = [] } = useQuery<Booking[]>({
     queryKey: ["/api/mentor-profile/my-bookings"],
     queryFn: async () => {
@@ -567,6 +604,43 @@ export default function MentorDashboard() {
 
   return (
     <div className="h-screen bg-background text-foreground flex overflow-hidden">
+
+      {/* NDA Re-acceptance Gate — blocks the entire dashboard if there's a pending NDA */}
+      {pendingNda.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <div className="px-6 pt-6 pb-4 border-b">
+              <h2 className="text-lg font-bold">Updated Agreement — Acceptance Required</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Please review and accept the updated declaration to continue.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <h3 className="font-semibold mb-3">{pendingNda[0].title} <span className="text-xs text-muted-foreground font-normal">v{pendingNda[0].version}</span></h3>
+              <RichTextViewer content={pendingNda[0].content} className="text-sm" />
+            </div>
+            <div className="px-6 py-4 border-t space-y-3">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ndaAgreed}
+                  onChange={(e) => setNdaAgreed(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600"
+                />
+                <span className="text-sm">I have read and accept the terms above</span>
+              </label>
+              <Button
+                className="w-full"
+                disabled={!ndaAgreed || acceptNdaMutation.isPending}
+                onClick={() => acceptNdaMutation.mutate(pendingNda[0].id)}
+              >
+                {acceptNdaMutation.isPending ? "Saving…" : "Continue"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="hidden sm:block">
         <UnifiedSidebar />
       </div>
