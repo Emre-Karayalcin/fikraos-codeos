@@ -10,6 +10,7 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ArrowLeft, User, Calendar, Tag, MessageSquare, TrendingUp, Edit, Trash2, Sparkles, Clock, FileText, Info, RefreshCw, Loader2, ExternalLink, ChevronDown, ChevronRight, BookOpen, History, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AllAIOutputsView } from '@/components/idea/AllAIOutputsView';
+import { RichTextViewer } from '@/components/editor/RichTextViewer';
 import BusinessModel from '@/components/assets/BusinessModel';
 import LeanCanvas from '@/components/assets/LeanCanvas';
 import Personas from '@/components/assets/Personas';
@@ -377,6 +378,64 @@ export default function AdminIdeaDetail() {
     onError: () => toast.error('Failed to save PMO Evaluation'),
   });
 
+  // PMO COI gate — per-idea COI declaration check
+  const [coiAgreed, setCoiAgreed] = useState(false);
+  const [coiModalOpen, setCoiModalOpen] = useState(false);
+
+  const { data: activePmoCoi } = useQuery<any>({
+    queryKey: ['/api/declarations/active/pmo-coi', workspace?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspace!.id}/declarations/active?type=PMO_COI`, { credentials: 'include' });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!workspace?.id,
+  });
+
+  const { data: coiAccepted, refetch: refetchCoiAccepted } = useQuery<{ accepted: boolean }>({
+    queryKey: ['/api/declarations/has-accepted', workspace?.id, activePmoCoi?.id, ideaId],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/workspaces/${workspace!.id}/declarations/has-accepted?declarationId=${activePmoCoi!.id}&projectId=${ideaId}`,
+        { credentials: 'include' },
+      );
+      if (!res.ok) return { accepted: false };
+      return res.json();
+    },
+    enabled: !!workspace?.id && !!activePmoCoi?.id && !!ideaId,
+  });
+
+  const acceptCoiMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(
+        `/api/workspaces/${workspace!.id}/declarations/${activePmoCoi!.id}/accept`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ projectId: ideaId }),
+        },
+      );
+      if (!res.ok) throw new Error('Failed');
+    },
+    onSuccess: () => {
+      setCoiAgreed(false);
+      setCoiModalOpen(false);
+      refetchCoiAccepted();
+      setActiveTab('evaluation');
+    },
+    onError: () => toast.error('Failed to record COI declaration'),
+  });
+
+  const handleEvaluationTabClick = () => {
+    if (activePmoCoi && !coiAccepted?.accepted) {
+      setCoiModalOpen(true);
+    } else {
+      setActiveTab('evaluation');
+    }
+  };
+
   // Compute live PMO total score from current pmoScores
   const computePmoTotal = () => {
     const get = (k: string) => pmoScores[k] ?? 0;
@@ -406,6 +465,10 @@ export default function AdminIdeaDetail() {
 
   // Handle tab change
   const handleTabChange = (value: string) => {
+    if (value === 'evaluation' && activePmoCoi && !coiAccepted?.accepted) {
+      setCoiModalOpen(true);
+      return;
+    }
     setActiveTab(value);
   };
 
@@ -481,6 +544,52 @@ export default function AdminIdeaDetail() {
   return (
     <div className="flex h-screen bg-background">
       <AdminSidebar workspaceSlug={slug!} isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
+
+      {/* PMO COI Modal — per-idea, non-dismissable */}
+      {coiModalOpen && activePmoCoi && (
+        <Dialog open={true} onOpenChange={() => {}}>
+          <DialogContent
+            className="max-w-2xl max-h-[85vh] overflow-y-auto [&>button]:hidden"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>{activePmoCoi.title}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">Please review and declare your conflict of interest status before evaluating this idea.</p>
+            <div className="border rounded-lg p-4 bg-muted/30 max-h-72 overflow-y-auto">
+              <RichTextViewer content={activePmoCoi.content} className="text-sm" />
+            </div>
+            <div className="space-y-3 pt-2 border-t">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={coiAgreed}
+                  onChange={(e) => setCoiAgreed(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600"
+                />
+                <span className="text-sm">I declare that I have no conflict of interest with respect to this idea and agree to evaluate it impartially</span>
+              </label>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setCoiModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={!coiAgreed || acceptCoiMutation.isPending}
+                  onClick={() => acceptCoiMutation.mutate()}
+                >
+                  {acceptCoiMutation.isPending ? "Saving…" : "Confirm & Evaluate"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-6 space-y-6">
