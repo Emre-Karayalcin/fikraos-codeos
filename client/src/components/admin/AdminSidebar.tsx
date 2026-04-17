@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Kanban, Settings, Users, Building2,
   Palette, Target, ChevronLeft, ChevronRight,
   GraduationCap, ClipboardList, Mail, BarChart2, BookOpen, CalendarDays,
-  ClipboardCheck, MessageSquare, Video, Presentation, Map, HandCoins, Headphones,
+  ClipboardCheck, MessageSquare, Video, Presentation, Map, HandCoins, Headphones, FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -158,6 +158,11 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
           titleKey: 'Scoring Criteria',
           href: `/w/${workspaceSlug}/admin/scoring-criteria`,
           icon: BookOpen,
+        },
+        {
+          titleKey: 'Declarations',
+          href: `/w/${workspaceSlug}/admin?tab=declarations`,
+          icon: FileText,
         },
       ],
     },
