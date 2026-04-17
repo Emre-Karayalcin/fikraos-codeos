@@ -147,6 +147,38 @@ export default function Dashboard() {
     onSuccess: () => { setConsentAgreed(false); refetchConsent(); },
   });
 
+  // PMO COI gate — check for unaccepted PMO_COI declaration (ADMIN/OWNER only)
+  const [pmoCoiAgreed, setPmoCoiAgreed] = useState(false);
+  const isPmoOrOwnerRole = userRole?.role === 'ADMIN' || userRole?.role === 'OWNER';
+  const { data: pendingPmoCoi = [], refetch: refetchPmoCoi } = useQuery<any[]>({
+    queryKey: ["/api/declarations/my-pending/pmo-coi", currentOrg?.id],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/workspaces/${currentOrg!.id}/declarations/my-pending?type=PMO_COI`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentOrg?.id && !!user && (isPmoOrOwnerRole || userIsAdmin),
+  });
+
+  const acceptPmoCoiMutation = useMutation({
+    mutationFn: async (declarationId: string) => {
+      const res = await fetch(
+        `/api/workspaces/${currentOrg!.id}/declarations/${declarationId}/accept`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        },
+      );
+      if (!res.ok) throw new Error("Failed");
+    },
+    onSuccess: () => { setPmoCoiAgreed(false); refetchPmoCoi(); },
+  });
+
   const dismissPopup = () => {
     sessionStorage.setItem('onboarding_popup_shown', '1');
     setPopupDismissed(true);
@@ -335,6 +367,40 @@ export default function Dashboard() {
 
   return (
     <>
+    {/* PMO COI gate — non-dismissable, appears before everything else for ADMIN/OWNER */}
+    {pendingPmoCoi.length > 0 && (
+      <Dialog open={true} onOpenChange={() => {}}>
+        <DialogContent
+          className="max-w-2xl max-h-[85vh] overflow-y-auto [&>button]:hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>{pendingPmoCoi[0].title}</DialogTitle>
+          </DialogHeader>
+          <RichTextViewer content={pendingPmoCoi[0].content} className="text-sm" />
+          <div className="space-y-3 pt-4 border-t">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={pmoCoiAgreed}
+                onChange={(e) => setPmoCoiAgreed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600"
+              />
+              <span className="text-sm">I declare that I have no conflict of interest and agree to the terms above</span>
+            </label>
+            <Button
+              className="w-full"
+              disabled={!pmoCoiAgreed || acceptPmoCoiMutation.isPending}
+              onClick={() => acceptPmoCoiMutation.mutate(pendingPmoCoi[0].id)}
+            >
+              {acceptPmoCoiMutation.isPending ? "Saving…" : "Continue"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
+
     {/* Participant consent gate — non-dismissable, appears before everything else */}
     {pendingConsent.length > 0 && (
       <Dialog open={true} onOpenChange={() => {}}>
