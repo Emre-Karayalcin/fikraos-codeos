@@ -161,7 +161,7 @@ export function AdminSidebar({ workspaceSlug, isCollapsed, onToggle }: AdminSide
         },
         {
           titleKey: 'Declarations',
-          href: `/w/${workspaceSlug}/admin?tab=declarations`,
+          href: `/w/${workspaceSlug}/admin/declarations`,
           icon: FileText,
         },
       ],
