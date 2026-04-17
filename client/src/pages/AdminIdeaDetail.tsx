@@ -928,12 +928,12 @@ export default function AdminIdeaDetail() {
               </div>
             </TabsContent>
 
-            {/* Evaluation Tab — always shows AI screening, PMO scoring form shown when SHORTLISTED */}
+            {/* Evaluation Tab — PMO scoring form only */}
             <TabsContent value="evaluation" className="mt-6">
               <div className="space-y-8">
 
-              {/* ── AI Screening Evaluation — hidden when idea is SHORTLISTED (Step 3) ── */}
-              <div className={idea?.status === 'SHORTLISTED' ? 'hidden' : ''}>
+              {/* ── AI Screening Evaluation — hidden from Evaluation tab ── */}
+              <div className="hidden">
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
                   AI Screening Evaluation
@@ -1234,9 +1234,8 @@ export default function AdminIdeaDetail() {
               )}
               </div>{/* end AI Screening section */}
 
-              {/* ── PMO Evaluation (only when SHORTLISTED) ──────────────── */}
-              {idea?.status === 'SHORTLISTED' && (
-                <div>
+              {/* ── PMO Evaluation (always shown) ──────────────── */}
+              <div>
                   <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-amber-500" />
                     PMO Evaluation
@@ -1415,7 +1414,6 @@ export default function AdminIdeaDetail() {
                     </Card>
                   </div>
                 </div>
-              )}
 
               </div>{/* end space-y-8 wrapper */}
             </TabsContent>
