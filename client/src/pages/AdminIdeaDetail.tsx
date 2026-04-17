@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -88,6 +89,24 @@ export default function AdminIdeaDetail() {
   });
   const [activeTab, setActiveTab] = useState('overview');
   const queryClient = useQueryClient();
+
+  const { user } = useAuth();
+  const userIsAdmin = !!(user as any)?.isAdmin;
+
+  const { data: orgRole } = useQuery<{ role: string } | null>({
+    queryKey: ['/api/organizations', slug, 'my-role'],
+    queryFn: async () => {
+      const wsRes = await fetch(`/api/workspaces/${slug}`, { credentials: 'include' });
+      if (!wsRes.ok) return null;
+      const ws = await wsRes.json();
+      const res = await fetch(`/api/organizations/${ws.id}/admin/check-role`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!slug,
+  });
+
+  const isPmo = userIsAdmin || orgRole?.role === 'ADMIN' || orgRole?.role === 'OWNER';
 
   // PMO evaluation form state
   const [pmoScores, setPmoScores] = useState<Record<string, number | null>>({
@@ -932,8 +951,8 @@ export default function AdminIdeaDetail() {
             <TabsContent value="evaluation" className="mt-6">
               <div className="space-y-8">
 
-              {/* ── AI Screening Evaluation — hidden from Evaluation tab ── */}
-              <div className="hidden">
+              {/* ── AI Screening Evaluation — visible for non-PMO roles ── */}
+              <div className={isPmo ? 'hidden' : ''}>
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
                   AI Screening Evaluation
@@ -1234,7 +1253,8 @@ export default function AdminIdeaDetail() {
               )}
               </div>{/* end AI Screening section */}
 
-              {/* ── PMO Evaluation (always shown) ──────────────── */}
+              {/* ── PMO Evaluation (PMO/superadmin only) ──────────────── */}
+              {isPmo && (
               <div>
                   <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-amber-500" />
@@ -1414,6 +1434,7 @@ export default function AdminIdeaDetail() {
                     </Card>
                   </div>
                 </div>
+              )}
 
               </div>{/* end space-y-8 wrapper */}
             </TabsContent>
