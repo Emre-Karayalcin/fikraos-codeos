@@ -272,7 +272,7 @@ export function registerSuperAdminRoutes(app: Express) {
   // POST /api/super-admin/workspaces — create a new workspace
   app.post("/api/super-admin/workspaces", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
     try {
-      const { name, slug, primaryColor, challengesEnabled, expertsEnabled, radarEnabled, dashboardEnabled, aiBuilderEnabled, formSubmissionEnabled } = req.body;
+      const { name, slug, primaryColor, challengesEnabled, expertsEnabled, radarEnabled, dashboardEnabled, aiBuilderEnabled, formSubmissionEnabled, location } = req.body;
       if (!name || !slug) return res.status(400).json({ message: "name and slug are required" });
 
       const ownerId = (req as any).user.id;
@@ -286,6 +286,7 @@ export function registerSuperAdminRoutes(app: Express) {
         dashboardEnabled: dashboardEnabled ?? true,
         aiBuilderEnabled: aiBuilderEnabled ?? true,
         formSubmissionEnabled: formSubmissionEnabled ?? true,
+        location: location || null,
       }, ownerId);
 
       res.status(201).json(org);
@@ -300,7 +301,7 @@ export function registerSuperAdminRoutes(app: Express) {
   app.patch("/api/super-admin/workspaces/:id", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, slug, primaryColor, challengesEnabled, expertsEnabled, radarEnabled, dashboardEnabled, aiBuilderEnabled, formSubmissionEnabled } = req.body;
+      const { name, slug, primaryColor, challengesEnabled, expertsEnabled, radarEnabled, dashboardEnabled, aiBuilderEnabled, formSubmissionEnabled, location } = req.body;
 
       const updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
@@ -312,6 +313,7 @@ export function registerSuperAdminRoutes(app: Express) {
       if (dashboardEnabled !== undefined) updateData.dashboardEnabled = dashboardEnabled;
       if (aiBuilderEnabled !== undefined) updateData.aiBuilderEnabled = aiBuilderEnabled;
       if (formSubmissionEnabled !== undefined) updateData.formSubmissionEnabled = formSubmissionEnabled;
+      if (location !== undefined) updateData.location = location || null;
 
       const updated = await storage.updateOrganization(id, updateData);
       res.json(updated);

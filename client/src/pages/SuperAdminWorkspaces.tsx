@@ -50,6 +50,7 @@ interface Workspace {
   slug: string;
   logoUrl: string | null;
   primaryColor: string | null;
+  location: string | null;
   createdAt: string;
   challengesEnabled: boolean;
   expertsEnabled: boolean;
@@ -72,6 +73,7 @@ interface WorkspaceFormData {
   name: string;
   slug: string;
   primaryColor: string;
+  location: string;
   challengesEnabled: boolean;
   expertsEnabled: boolean;
   radarEnabled: boolean;
@@ -84,6 +86,7 @@ const DEFAULT_WS_FORM: WorkspaceFormData = {
   name: "",
   slug: "",
   primaryColor: "#4588f5",
+  location: "",
   challengesEnabled: true,
   expertsEnabled: true,
   radarEnabled: true,
@@ -103,6 +106,22 @@ const FEATURE_TOGGLES: { key: keyof WorkspaceFormData; label: string }[] = [
 
 interface PStep { titleEn: string; titleAr: string; }
 interface ProgData { orgId: string; currentStep: number; steps: PStep[]; }
+
+const REGIONS = [
+  "Riyadh",
+  "Jeddah",
+  "Mecca (Makkah)",
+  "Medina (Madinah)",
+  "Dammam",
+  "Taif",
+  "Tabuk",
+  "Al-Ahsa (Hofuf)",
+  "Buraydah",
+  "Khobar (Al-Khobar)",
+  "Abha",
+  "Jizan (Jazan)",
+  "Najran",
+];
 
 async function apiFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, { credentials: "include", ...options });
@@ -229,6 +248,9 @@ export default function SuperAdminWorkspaces() {
                           <TableCell>
                             <div className="font-medium">{w.name}</div>
                             <div className="text-xs text-muted-foreground">{w.slug}</div>
+                            {w.location && (
+                              <div className="text-xs text-muted-foreground">{w.location}</div>
+                            )}
                           </TableCell>
                           <TableCell>{w.memberCount}</TableCell>
                           <TableCell>{w.projectCount}</TableCell>
@@ -515,6 +537,7 @@ function WorkspaceModal({ mode, workspace, onClose, onSubmit, isPending }: Works
           name: workspace.name,
           slug: workspace.slug,
           primaryColor: workspace.primaryColor || "#4588f5",
+          location: workspace.location || "",
           challengesEnabled: workspace.challengesEnabled,
           expertsEnabled: workspace.expertsEnabled,
           radarEnabled: workspace.radarEnabled,
@@ -579,6 +602,20 @@ function WorkspaceModal({ mode, workspace, onClose, onSubmit, isPending }: Works
                 placeholder="#4588f5"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Location</Label>
+            <Select value={form.location} onValueChange={(v) => set("location", v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a region…" />
+              </SelectTrigger>
+              <SelectContent>
+                {REGIONS.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

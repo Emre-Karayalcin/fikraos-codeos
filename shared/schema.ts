@@ -151,6 +151,7 @@ export const organizations = pgTable("organizations", {
   expertsDescEn: varchar("experts_desc_en"),
   expertsDescAr: varchar("experts_desc_ar"),
   acceptanceCapacity: integer("acceptance_capacity").default(280).notNull(),
+  location: varchar("location", { length: 500 }),
   // Consultation feature config
   consultationEnabled: boolean("consultation_enabled").default(false),
   consultationMinCredits: integer("consultation_min_credits").default(10),
