@@ -69,6 +69,7 @@ import AdminEmailTemplates from "@/pages/AdminEmailTemplates";
 import AdminActivityInsights from "@/pages/AdminActivityInsights";
 import AdminScoringCriteria from "@/pages/AdminScoringCriteria";
 import AdminDeclarations from "@/pages/AdminDeclarations";
+import AdminDemoDay from "@/pages/AdminDemoDay";
 import AdminEvents from "@/pages/AdminEvents";
 import AdminAttendance from "@/pages/AdminAttendance";
 import AdminMentorFeedback from "@/pages/AdminMentorFeedback";
@@ -357,6 +358,12 @@ function Router() {
       <Route path="/w/:slug/admin/declarations" component={() => (
         <PageTransition>
           <AdminGuard><AdminDeclarations /></AdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/admin/demo-day" component={() => (
+        <PageTransition>
+          <AdminGuard><AdminDemoDay /></AdminGuard>
         </PageTransition>
       )} />
 

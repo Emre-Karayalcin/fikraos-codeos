@@ -242,14 +242,18 @@ function ideaGradient(title: string) {
   return CARD_GRADIENTS[Math.abs(hash) % CARD_GRADIENTS.length];
 }
 
-function IdeaCard({ idea, onClick }: { idea: JudgeIdea; onClick: () => void }) {
+function IdeaCard({ idea, onClick, disabled }: { idea: JudgeIdea; onClick: () => void; disabled?: boolean }) {
   const gradient = ideaGradient(idea.title);
   const initials = idea.ownerName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) || '?';
 
   return (
     <div
-      onClick={onClick}
-      className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
+      onClick={disabled ? undefined : onClick}
+      className={`rounded-2xl border border-border bg-card overflow-hidden shadow-sm transition-all ${
+        disabled
+          ? 'opacity-40 cursor-not-allowed select-none'
+          : 'hover:shadow-md cursor-pointer group'
+      }`}
     >
       {/* Colored header */}
       <div className={`bg-gradient-to-br ${gradient} px-4 pt-4 pb-6 relative`}>
@@ -277,20 +281,8 @@ function IdeaCard({ idea, onClick }: { idea: JudgeIdea; onClick: () => void }) {
           <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{idea.description}</p>
         )}
 
-        {/* Scores row */}
+        {/* Scores row — judge's own score only */}
         <div className="flex items-center gap-2 flex-wrap">
-          {idea.aiScore != null && (
-            <div className="flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs px-2 py-1 rounded-lg font-semibold">
-              <Brain className="w-3 h-3" />
-              AI: {idea.aiScore}
-            </div>
-          )}
-          {idea.pmoScore != null && (
-            <div className="flex items-center gap-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs px-2 py-1 rounded-lg font-semibold">
-              <ClipboardList className="w-3 h-3" />
-              PMO: {idea.pmoScore}
-            </div>
-          )}
           {idea.scored && idea.totalScore != null && (
             <div className="flex items-center gap-1 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-xs px-2 py-1 rounded-lg font-semibold">
               <Star className="w-3 h-3" />
@@ -380,9 +372,9 @@ function LeaderboardTab({ orgId }: { orgId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 pb-1">
-        <Sparkles className="w-4 h-4 text-blue-500" />
-        <h2 className="font-semibold text-sm">AI Screening Results</h2>
-        <span className="text-xs text-muted-foreground">click a row to expand AI review and PMO scores</span>
+        <Star className="w-4 h-4 text-yellow-500" />
+        <h2 className="font-semibold text-sm">Program Leaderboard</h2>
+        <span className="text-xs text-muted-foreground">click a row to expand details</span>
       </div>
 
       <div className="border border-border rounded-xl overflow-hidden">
@@ -393,8 +385,6 @@ function LeaderboardTab({ orgId }: { orgId: string }) {
               <TableHead className="w-10 text-center">Rank</TableHead>
               <TableHead>Idea</TableHead>
               <TableHead>Owner</TableHead>
-              <TableHead className="text-right">AI Score</TableHead>
-              <TableHead className="text-right">PMO Score</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -428,20 +418,6 @@ function LeaderboardTab({ orgId }: { orgId: string }) {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{row.ownerName}</TableCell>
-                  <TableCell className="text-right">
-                    {row.aiScore != null ? (
-                      <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs px-2 py-1 rounded-lg font-bold">
-                        <Brain className="w-3 h-3" />{row.aiScore}
-                      </span>
-                    ) : <span className="text-muted-foreground text-xs">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {row.pmoScore != null ? (
-                      <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs px-2 py-1 rounded-lg font-bold">
-                        <ClipboardList className="w-3 h-3" />{row.pmoScore}
-                      </span>
-                    ) : <span className="text-muted-foreground text-xs">—</span>}
-                  </TableCell>
                   <TableCell>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                       row.status === 'IN_INCUBATION'
@@ -455,7 +431,7 @@ function LeaderboardTab({ orgId }: { orgId: string }) {
 
                 {expandedRow === row.projectId && (
                   <TableRow key={`${row.projectId}-expand`}>
-                    <TableCell colSpan={7} className="p-0 bg-muted/20">
+                    <TableCell colSpan={5} className="p-0 bg-muted/20">
                       <div className="px-6 py-4 grid gap-4 sm:grid-cols-2">
                         {/* AI Review */}
                         <div className="space-y-2">
@@ -605,6 +581,20 @@ export default function JudgeDashboard() {
     enabled: !!orgId,
   });
 
+  // Poll for current presenter (Demo Day control)
+  const { data: presState } = useQuery<{ project: { id: string } | null }>({
+    queryKey: ["/api/presentation/current", orgId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${orgId}/presentation/current`, { credentials: "include" });
+      if (!res.ok) return { project: null };
+      return res.json();
+    },
+    enabled: !!orgId,
+    refetchInterval: 8000,
+  });
+
+  const currentPresentingId = presState?.project?.id ?? null;
+
   const scoredCount = ideas.filter((i) => i.scored).length;
 
   return (
@@ -660,7 +650,12 @@ export default function JudgeDashboard() {
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {ideas.map((idea) => (
-                  <IdeaCard key={idea.projectId} idea={idea} onClick={() => handleScoreClick(idea)} />
+                  <IdeaCard
+                    key={idea.projectId}
+                    idea={idea}
+                    onClick={() => handleScoreClick(idea)}
+                    disabled={currentPresentingId !== null && idea.projectId !== currentPresentingId}
+                  />
                 ))}
               </div>
             )

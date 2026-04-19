@@ -2034,7 +2034,76 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // ─── Client (read-only) routes ────────────────────────────────────────────────
+  // ─── Presentation Control (Demo Day) ─────────────────────────────────────────
+
+  // GET /api/workspaces/:orgId/presentation/current
+  app.get('/api/workspaces/:orgId/presentation/current', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
+      if (!org) return res.status(404).json({ error: 'Org not found' });
+
+      const currentProjectId = org.currentPresentingProjectId;
+      let project = null;
+      let allJudgesScored = false;
+      let judgeCount = 0;
+      let scoredCount = 0;
+
+      if (currentProjectId) {
+        const [proj] = await db.select().from(projects)
+          .innerJoin(users, eq(projects.createdById, users.id))
+          .where(eq(projects.id, currentProjectId))
+          .limit(1);
+        if (proj) {
+          project = {
+            id: proj.projects.id,
+            title: proj.projects.title,
+            ownerName: `${proj.users.firstName || ''} ${proj.users.lastName || ''}`.trim() || proj.users.username,
+          };
+        }
+
+        const [jCount] = await db.select({ c: count() }).from(organizationMembers)
+          .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, 'JUDGE')));
+        judgeCount = Number(jCount?.c ?? 0);
+
+        const [sCount] = await db.select({ c: count() }).from(judgeEvaluations)
+          .where(and(eq(judgeEvaluations.projectId, currentProjectId), eq(judgeEvaluations.orgId, orgId)));
+        scoredCount = Number(sCount?.c ?? 0);
+
+        allJudgesScored = judgeCount > 0 && scoredCount >= judgeCount;
+      }
+
+      res.json({ project, allJudgesScored, judgeCount, scoredCount });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch presentation state' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/admin/presentation/set
+  app.post('/api/workspaces/:orgId/admin/presentation/set', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const { projectId } = req.body;
+      if (!projectId) return res.status(400).json({ error: 'projectId required' });
+      if (!await requireOrgAdmin(req, orgId)) return res.status(403).json({ error: 'Admin access required' });
+      await db.update(organizations).set({ currentPresentingProjectId: projectId } as any).where(eq(organizations.id, orgId));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to set presenter' });
+    }
+  });
+
+  // POST /api/workspaces/:orgId/admin/presentation/clear
+  app.post('/api/workspaces/:orgId/admin/presentation/clear', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!await requireOrgAdmin(req, orgId)) return res.status(403).json({ error: 'Admin access required' });
+      await db.update(organizations).set({ currentPresentingProjectId: null } as any).where(eq(organizations.id, orgId));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to clear presenter' });
+    }
+  });
 
   // GET /api/workspaces/:orgId/client/dashboard-stats
   app.get('/api/workspaces/:orgId/client/dashboard-stats', isAuthenticated, async (req: any, res) => {

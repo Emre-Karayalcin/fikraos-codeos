@@ -156,6 +156,8 @@ export const organizations = pgTable("organizations", {
   consultationEnabled: boolean("consultation_enabled").default(false),
   consultationMinCredits: integer("consultation_min_credits").default(10),
   consultationMaxEligible: integer("consultation_max_eligible").default(3),
+  // Demo Day presenter control
+  currentPresentingProjectId: varchar("current_presenting_project_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
