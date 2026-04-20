@@ -24,7 +24,8 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, CalendarDays, ClipboardList, X, GraduationCap, FileText } from "lucide-react";
+import { Globe, Users, Lightbulb, Target, LayoutDashboard, Filter, CalendarDays, ClipboardList, X, GraduationCap, FileText, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SuperAdminSidebar } from "@/components/admin/SuperAdminSidebar";
 import { format, subDays, isAfter, parseISO } from "date-fns";
 
@@ -663,6 +664,35 @@ export default function SuperAdminDashboard() {
             </Card>
 
           </div>
+
+            {/* Exports */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Download className="w-4 h-4" />
+                  Data Exports
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    const params = filterOrgId !== "all" ? `?orgId=${filterOrgId}` : "";
+                    window.location.href = `/api/super-admin/judge-scores/export-csv${params}`;
+                  }}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Judge Scores
+                  {filterOrgId !== "all" && selectedWorkspace && (
+                    <span className="ml-1 text-muted-foreground">({selectedWorkspace.name})</span>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+        </div>
         </div>
       </div>
     </div>

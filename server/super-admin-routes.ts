@@ -4,8 +4,8 @@ import { isAuthenticated, comparePasswords, hashPassword } from "./auth";
 import { authRateLimiter } from "./middleware/security";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, eq, and, desc, inArray, count, isNull } from "drizzle-orm";
-import { organizations, organizationMembers, projects, challenges, assets, assetVersions, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, pitchDeckVersions, type ScoringConfig } from "../shared/schema";
+import { sql, eq, and, desc, inArray, count, isNull, avg } from "drizzle-orm";
+import { organizations, organizationMembers, projects, challenges, assets, assetVersions, chats, messages, users, events, memberApplications, platformEvents, scoringCriteriaConfig, pitchDeckVersions, judgeEvaluations, type ScoringConfig } from "../shared/schema";
 import { createEventSchema, updateEventSchema, validateRequest } from "../shared/validation-schemas";
 import { Resend } from "resend";
 import mustache from "mustache";
@@ -1748,6 +1748,62 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (e) {
       console.error("[super-admin] GET /pitch-decks/:deckId/versions error:", e);
       return res.status(500).json({ error: "Failed to fetch version history" });
+    }
+  });
+
+  // ── GET /api/super-admin/judge-scores/export-csv — all competitions, all judge scores
+  app.get("/api/super-admin/judge-scores/export-csv", isAuthenticated, isSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      // Optional ?orgId= filter
+      const filterOrgId = req.query.orgId as string | undefined;
+
+      const evalRows = await db.select({
+        orgId: judgeEvaluations.orgId,
+        orgName: organizations.name,
+        projectId: judgeEvaluations.projectId,
+        projectTitle: projects.title,
+        ownerFirstName: users.firstName,
+        ownerLastName: users.lastName,
+        ownerUsername: users.username,
+        judgeId: judgeEvaluations.judgeId,
+        judgeFirstName: sql<string>`judge_user.first_name`,
+        judgeLastName: sql<string>`judge_user.last_name`,
+        judgeEmail: sql<string>`judge_user.email`,
+        totalScore: judgeEvaluations.totalScore,
+        d1: judgeEvaluations.d1, d2: judgeEvaluations.d2, d3: judgeEvaluations.d3,
+        d4: judgeEvaluations.d4, d5: judgeEvaluations.d5,
+        p1: judgeEvaluations.p1, p2: judgeEvaluations.p2, p3: judgeEvaluations.p3, p4: judgeEvaluations.p4,
+        e1: judgeEvaluations.e1, e2: judgeEvaluations.e2, e3: judgeEvaluations.e3,
+      })
+      .from(judgeEvaluations)
+      .innerJoin(organizations, eq(judgeEvaluations.orgId, organizations.id))
+      .innerJoin(projects, eq(judgeEvaluations.projectId, projects.id))
+      .innerJoin(users, eq(projects.createdById, users.id))
+      .innerJoin(sql`users AS judge_user`, sql`judge_user.id = ${judgeEvaluations.judgeId}`)
+      .where(filterOrgId ? eq(judgeEvaluations.orgId, filterOrgId) : sql`1=1`)
+      .orderBy(organizations.name, projects.title);
+
+      const escape = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const headers = ['Competition', 'Idea Title', 'Owner', 'Judge', 'Total Score', 'Demo Deck Score', 'Pitching Score', 'Eval Score', 'D1','D2','D3','D4','D5','P1','P2','P3','P4','E1','E2','E3'];
+
+      const rows = evalRows.map(e => {
+        const n = (v: number | null) => v ?? 0;
+        const deckScore = Math.round((n(e.d1)/5)*8 + (n(e.d2)/5)*8 + (n(e.d3)/5)*8 + (n(e.d4)/5)*8 + (n(e.d5)/5)*8);
+        const pitchScore = Math.round((n(e.p1)/5)*8 + (n(e.p2)/5)*8 + (n(e.p3)/5)*8 + (n(e.p4)/5)*6);
+        const evalScore = Math.round((n(e.e1)/5)*10 + (n(e.e2)/5)*10 + (n(e.e3)/5)*10);
+        const ownerName = [e.ownerFirstName, e.ownerLastName].filter(Boolean).join(' ') || e.ownerUsername;
+        const judgeName = [e.judgeFirstName, e.judgeLastName].filter(Boolean).join(' ') || e.judgeEmail || e.judgeId;
+        return [e.orgName, e.projectTitle, ownerName, judgeName, e.totalScore ?? '', deckScore, pitchScore, evalScore, n(e.d1),n(e.d2),n(e.d3),n(e.d4),n(e.d5),n(e.p1),n(e.p2),n(e.p3),n(e.p4),n(e.e1),n(e.e2),n(e.e3)];
+      });
+
+      const csv = [headers, ...rows].map(row => row.map(escape).join(',')).join('\n');
+      const suffix = filterOrgId ? `-${filterOrgId}` : '-all';
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="judge-scores${suffix}.csv"`);
+      res.send(csv);
+    } catch (e) {
+      console.error("[super-admin] GET /judge-scores/export-csv error:", e);
+      return res.status(500).json({ error: "Failed to export" });
     }
   });
 }

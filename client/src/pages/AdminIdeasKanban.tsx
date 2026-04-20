@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Kanban, Plus, User, Trash2, GraduationCap, Trophy, ChevronDown, ChevronRight, Megaphone } from 'lucide-react';
+import { Kanban, Plus, User, Trash2, GraduationCap, Trophy, ChevronDown, ChevronRight, Megaphone, Download } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -773,15 +773,28 @@ export default function AdminIdeasKanban() {
                   <span className="text-sm text-muted-foreground">— top 3 qualify as Winners</span>
                 </div>
                 {judgeLeaderboardData.length > 0 && (
-                  <Button
-                    size="sm"
-                    className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
-                    onClick={() => setConfirmWinners(true)}
-                    disabled={publishWinners.isPending}
-                  >
-                    <Megaphone className="w-3.5 h-3.5" />
-                    Publish Top 3 as Winners
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => {
+                        window.location.href = `/api/workspaces/${workspace!.id}/admin/judge-leaderboard/export-csv`;
+                      }}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Export CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                      onClick={() => setConfirmWinners(true)}
+                      disabled={publishWinners.isPending}
+                    >
+                      <Megaphone className="w-3.5 h-3.5" />
+                      Publish Top 3 as Winners
+                    </Button>
+                  </div>
                 )}
               </div>
               {judgeLeaderboardData.length === 0 ? (

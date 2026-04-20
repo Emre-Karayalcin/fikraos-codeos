@@ -2034,6 +2034,93 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // GET /api/workspaces/:orgId/admin/judge-leaderboard/export-csv — CSV export of judge scores
+  app.get('/api/workspaces/:orgId/admin/judge-leaderboard/export-csv', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      if (!(await requireOrgAdmin(req, orgId))) return res.status(403).json({ error: 'Admin access required' });
+
+      // Reuse same queries as leaderboard
+      const aggregateRows = await db
+        .select({
+          projectId: projects.id,
+          title: projects.title,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+          ownerUsername: users.username,
+          totalCombined: drizzleSql<number>`coalesce(sum(${judgeEvaluations.totalScore}), 0)`,
+          avgScore: avg(judgeEvaluations.totalScore),
+          judgeCount: drizzleSql<number>`count(${judgeEvaluations.id})`,
+        })
+        .from(projects)
+        .innerJoin(users, eq(projects.createdById, users.id))
+        .leftJoin(judgeEvaluations, eq(judgeEvaluations.projectId, projects.id))
+        .where(and(eq(projects.orgId, orgId), eq(projects.status, 'IN_INCUBATION')))
+        .groupBy(projects.id, users.firstName, users.lastName, users.username)
+        .orderBy(drizzleSql`coalesce(sum(${judgeEvaluations.totalScore}), 0) desc`);
+
+      const evalRows = await db.select({
+        projectId: judgeEvaluations.projectId,
+        judgeId: judgeEvaluations.judgeId,
+        judgeFirstName: users.firstName,
+        judgeLastName: users.lastName,
+        judgeEmail: users.email,
+        totalScore: judgeEvaluations.totalScore,
+        d1: judgeEvaluations.d1, d2: judgeEvaluations.d2, d3: judgeEvaluations.d3,
+        d4: judgeEvaluations.d4, d5: judgeEvaluations.d5,
+        p1: judgeEvaluations.p1, p2: judgeEvaluations.p2, p3: judgeEvaluations.p3, p4: judgeEvaluations.p4,
+        e1: judgeEvaluations.e1, e2: judgeEvaluations.e2, e3: judgeEvaluations.e3,
+      })
+      .from(judgeEvaluations)
+      .innerJoin(users, eq(judgeEvaluations.judgeId, users.id))
+      .where(eq(judgeEvaluations.orgId, orgId));
+
+      const evalsByProject: Record<string, { judgeName: string; score: number; deckScore: number; pitchScore: number; evalScore: number }[]> = {};
+      for (const e of evalRows) {
+        if (!evalsByProject[e.projectId]) evalsByProject[e.projectId] = [];
+        const n = (v: number | null) => v ?? 0;
+        const deckScore = Math.round((n(e.d1)/5)*8 + (n(e.d2)/5)*8 + (n(e.d3)/5)*8 + (n(e.d4)/5)*8 + (n(e.d5)/5)*8);
+        const pitchScore = Math.round((n(e.p1)/5)*8 + (n(e.p2)/5)*8 + (n(e.p3)/5)*8 + (n(e.p4)/5)*6);
+        const evalScore = Math.round((n(e.e1)/5)*10 + (n(e.e2)/5)*10 + (n(e.e3)/5)*10);
+        evalsByProject[e.projectId].push({
+          judgeName: [e.judgeFirstName, e.judgeLastName].filter(Boolean).join(' ') || e.judgeEmail || e.judgeId,
+          score: e.totalScore ?? 0,
+          deckScore, pitchScore, evalScore,
+        });
+      }
+
+      // Collect all unique judge names for dynamic columns
+      const allJudgeNames = Array.from(new Set(evalRows.map(e =>
+        [e.judgeFirstName, e.judgeLastName].filter(Boolean).join(' ') || e.judgeEmail || e.judgeId
+      )));
+
+      // Build CSV
+      const escape = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+      const judgeHeaders = allJudgeNames.flatMap(j => [`${j} Score`, `${j} Demo Deck`, `${j} Pitching`, `${j} Eval`]);
+      const headers = ['Rank', 'Idea Title', 'Owner', 'Avg Score', 'Total Combined', 'Judge Count', ...judgeHeaders];
+
+      const rows = aggregateRows.map((r, i) => {
+        const ownerName = [r.ownerFirstName, r.ownerLastName].filter(Boolean).join(' ') || r.ownerUsername;
+        const judges = evalsByProject[r.projectId] ?? [];
+        const judgeMap: Record<string, typeof judges[0]> = {};
+        for (const j of judges) judgeMap[j.judgeName] = j;
+        const judgeCols = allJudgeNames.flatMap(jn => {
+          const j = judgeMap[jn];
+          return j ? [j.score, j.deckScore, j.pitchScore, j.evalScore] : ['', '', '', ''];
+        });
+        return [i + 1, r.title, ownerName, r.avgScore != null ? Math.round(Number(r.avgScore)) : '', Number(r.totalCombined), Number(r.judgeCount), ...judgeCols];
+      });
+
+      const csv = [headers, ...rows].map(row => row.map(escape).join(',')).join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="judge-scores-${orgId}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error('Error exporting judge scores CSV:', error);
+      res.status(500).json({ error: 'Failed to export' });
+    }
+  });
+
   // ─── Presentation Control (Demo Day) ─────────────────────────────────────────
 
   // GET /api/workspaces/:orgId/presentation/current
