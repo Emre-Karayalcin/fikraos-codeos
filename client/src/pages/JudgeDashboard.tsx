@@ -654,7 +654,7 @@ export default function JudgeDashboard() {
                     key={idea.projectId}
                     idea={idea}
                     onClick={() => handleScoreClick(idea)}
-                    disabled={currentPresentingId !== null && idea.projectId !== currentPresentingId}
+                    disabled={currentPresentingId === null || idea.projectId !== currentPresentingId}
                   />
                 ))}
               </div>
