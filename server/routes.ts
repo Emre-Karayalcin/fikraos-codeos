@@ -1795,7 +1795,7 @@ export function registerRoutes(app: Express): Server {
         .innerJoin(users, eq(projects.createdById, users.id))
         .leftJoin(ideaEvaluations, eq(ideaEvaluations.projectId, projects.id))
         .leftJoin(memberApplications, eq(memberApplications.userId, projects.createdById))
-        .where(and(eq(projects.orgId, orgId), inArray(projects.status, ['SHORTLISTED', 'IN_INCUBATION'])))
+        .where(and(eq(projects.orgId, orgId), inArray(projects.status, ['IN_INCUBATION'])))
         .orderBy(desc(memberApplications.aiScore));
 
       const toNum = (v: number | null | undefined) => v ?? 0;
