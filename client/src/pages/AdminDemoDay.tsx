@@ -41,18 +41,25 @@ export default function AdminDemoDay() {
   const orgId = workspace?.id;
 
   const { data: ideas = [] } = useQuery<Idea[]>({
-    queryKey: ['/api/workspaces', orgId, 'judge/ideas'],
+    queryKey: ['/api/ideas/management', orgId, 'IN_INCUBATION'],
     queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${orgId}/judge/ideas`, { credentials: 'include' });
+      const res = await fetch(`/api/ideas/management?orgId=${orgId}&pageSize=200`, { credentials: 'include' });
       if (!res.ok) return [];
       const data = await res.json();
-      return data.map((d: any) => ({
-        id: d.id,
-        title: d.title,
-        ownerName: `${d.ownerFirstName || ''} ${d.ownerLastName || ''}`.trim() || d.ownerUsername,
-        ownerUsername: d.ownerUsername,
-        status: d.status,
-      }));
+      const rows = data.data ?? data;
+      return rows
+        .filter((d: any) => (d.idea?.status ?? d.status) === 'IN_INCUBATION')
+        .map((d: any) => {
+          const idea = d.idea ?? d;
+          const owner = d.owner ?? {};
+          return {
+            id: idea.id,
+            title: idea.title,
+            ownerName: `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.username || '',
+            ownerUsername: owner.username || '',
+            status: idea.status,
+          };
+        });
     },
     enabled: !!orgId,
   });
@@ -104,8 +111,6 @@ export default function AdminDemoDay() {
   const allScored = presState?.allJudgesScored ?? false;
   const judgeCount = presState?.judgeCount ?? 0;
   const scoredCount = presState?.scoredCount ?? 0;
-
-  const inIncubation = ideas.filter(i => i.status === 'IN_INCUBATION');
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -176,13 +181,13 @@ export default function AdminDemoDay() {
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
             <Users className="w-4 h-4" />
-            Presenters ({inIncubation.length})
+            Presenters ({ideas.length})
           </h2>
-          {inIncubation.length === 0 && (
+          {ideas.length === 0 && (
             <p className="text-sm text-muted-foreground">No ideas in Demo Day stage (IN_INCUBATION).</p>
           )}
           <div className="space-y-2">
-            {inIncubation.map(idea => {
+            {ideas.map(idea => {
               const isCurrent = idea.id === currentId;
               return (
                 <Card key={idea.id} className={`transition-all ${isCurrent ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/20' : ''}`}>
