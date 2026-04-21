@@ -665,34 +665,33 @@ export default function SuperAdminDashboard() {
 
           </div>
 
-            {/* Exports */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Data Exports
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => {
-                    const params = filterOrgId !== "all" ? `?orgId=${filterOrgId}` : "";
-                    window.location.href = `/api/super-admin/judge-scores/export-csv${params}`;
-                  }}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Export Judge Scores
-                  {filterOrgId !== "all" && selectedWorkspace && (
-                    <span className="ml-1 text-muted-foreground">({selectedWorkspace.name})</span>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+          {/* Exports */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Data Exports
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => {
+                  const params = filterOrgId !== "all" ? `?orgId=${filterOrgId}` : "";
+                  window.location.href = `/api/super-admin/judge-scores/export-csv${params}`;
+                }}
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export Judge Scores
+                {filterOrgId !== "all" && selectedWorkspace && (
+                  <span className="ml-1 text-muted-foreground">({selectedWorkspace.name})</span>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
 
-        </div>
         </div>
       </div>
     </div>
