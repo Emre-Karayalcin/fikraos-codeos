@@ -1,13 +1,20 @@
-import React, { useRef, useCallback, useEffect, useMemo } from "react";
+import React, { useRef, useCallback, useEffect, useMemo, useState } from "react";
 import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, ArrowLeft, PlayCircle, BookOpen, CheckCircle2, Lock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  GraduationCap, ArrowLeft, PlayCircle, BookOpen, CheckCircle2, Lock,
+  FileText, Video, Link as LinkIcon, Presentation, ExternalLink, Map, ClipboardList,
+} from "lucide-react";
 import { useRoute, useLocation, useParams } from "wouter";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import toast from "react-hot-toast";
 
 // Per-video progress entry returned by the API
 interface CourseProgressEntry {
@@ -37,6 +44,34 @@ interface AcademyCourse {
   videos: AcademyVideo[];
 }
 
+interface ProgramModule {
+  id: string;
+  title: string;
+  description: string | null;
+  stageIndex: number;
+  order: number;
+  status: string;
+}
+
+interface ProgramResource {
+  id: string;
+  moduleId: string;
+  title: string;
+  type: string;
+  url: string;
+  description: string | null;
+  order: number;
+  hasAssignment: boolean;
+  assignmentDescription: string | null;
+}
+
+interface ResourceSubmission {
+  id: string;
+  submissionUrl: string;
+  fileName: string | null;
+  submittedAt: string;
+}
+
 function formatSeconds(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -49,12 +84,55 @@ function formatCourseDuration(videos: AcademyVideo[]): string {
   return `${mins} min`;
 }
 
+function resourceTypeIcon(type: string) {
+  switch (type) {
+    case "video": return <Video size={14} />;
+    case "pdf": return <FileText size={14} />;
+    case "slides": return <Presentation size={14} />;
+    case "doc": return <BookOpen size={14} />;
+    default: return <LinkIcon size={14} />;
+  }
+}
+
+function embedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // YouTube
+    if (u.hostname.includes("youtube.com")) {
+      const v = u.searchParams.get("v");
+      if (v) return `https://www.youtube.com/embed/${v}`;
+    }
+    if (u.hostname === "youtu.be") {
+      return `https://www.youtube.com/embed${u.pathname}`;
+    }
+    // Vimeo
+    if (u.hostname.includes("vimeo.com")) {
+      const id = u.pathname.replace("/", "");
+      if (id) return `https://player.vimeo.com/video/${id}`;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 // Academy Home - Shows list of courses
 function AcademyHome() {
   const [, setLocation] = useLocation();
   const { slug } = useParams<{ slug: string }>();
   const { workspaceSlug } = useWorkspace();
   const currentSlug = slug || workspaceSlug;
+
+  const { data: workspace } = useQuery<{ id: string }>({
+    queryKey: [`/api/workspaces/${currentSlug}`],
+    enabled: !!currentSlug,
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${currentSlug}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+  const orgId = workspace?.id ?? "";
 
   const { data: courses = [] } = useQuery<AcademyCourse[]>({
     queryKey: ["/api/academy/courses"],
@@ -64,6 +142,23 @@ function AcademyHome() {
       return res.json();
     },
   });
+
+  const { data: programModules = [] } = useQuery<ProgramModule[]>({
+    queryKey: [`/api/organizations/${orgId}/program/modules/published`],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${orgId}/program/modules/published`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const STAGE_LABELS = [
+    "Ideation & Business Foundations",
+    "Product Strategy & Validation",
+    "Product Design & Insights",
+    "Pitching & Presentation",
+  ];
 
   return (
     <div className="p-6 sm:p-8">
@@ -88,52 +183,99 @@ function AcademyHome() {
           </div>
         </div>
 
-        {/* Courses Grid - Aligned to left */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {courses.map((course) => {
-            const videoCount = course.videos?.length ?? 0;
-            const duration = formatCourseDuration(course.videos ?? []);
-            return (
-              <Card
-                key={course.id}
-                className="overflow-hidden border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all cursor-pointer group"
-                onClick={() => setLocation(`/w/${currentSlug}/academy/${course.slug}`)}
-              >
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-orange-500 to-orange-600">
-                  {course.thumbnailUrl ? (
-                    <img
-                      src={course.thumbnailUrl}
-                      alt={course.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <GraduationCap className="w-16 h-16 text-white/60" />
-                    </div>
-                  )}
-                  {/* START / CONTINUE overlay button */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="bg-white text-orange-600 px-6 py-2 rounded-md font-semibold text-sm">
-                      START COURSE
+        {/* Program Modules */}
+        {programModules.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Map className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">Program Roadmap</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {programModules.map((mod) => (
+                <Card
+                  key={mod.id}
+                  className="overflow-hidden border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all cursor-pointer group"
+                  onClick={() => setLocation(`/w/${currentSlug}/academy/module/${mod.id}`)}
+                >
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+                    <Map className="w-16 h-16 text-white/40" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="bg-white text-blue-600 px-6 py-2 rounded-md font-semibold text-sm">
+                        VIEW MODULE
+                      </div>
                     </div>
                   </div>
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-sm mb-2">
-                    {course.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mb-3 line-clamp-3">
-                    {course.description}
-                  </p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                    <span>{videoCount} lessons</span>
-                    <span>{duration}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  <CardContent className="p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                      Stage {mod.stageIndex} — {STAGE_LABELS[mod.stageIndex - 1]}
+                    </p>
+                    <h3 className="font-semibold text-sm mb-2">{mod.title}</h3>
+                    {mod.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">{mod.description}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Academy Courses Grid */}
+        {courses.length > 0 && (
+          <div>
+            {programModules.length > 0 && (
+              <div className="flex items-center gap-2 mb-4">
+                <GraduationCap className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">Courses</h2>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {courses.map((course) => {
+                const videoCount = course.videos?.length ?? 0;
+                const duration = formatCourseDuration(course.videos ?? []);
+                return (
+                  <Card
+                    key={course.id}
+                    className="overflow-hidden border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all cursor-pointer group"
+                    onClick={() => setLocation(`/w/${currentSlug}/academy/${course.slug}`)}
+                  >
+                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-orange-500 to-orange-600">
+                      {course.thumbnailUrl ? (
+                        <img
+                          src={course.thumbnailUrl}
+                          alt={course.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <GraduationCap className="w-16 h-16 text-white/60" />
+                        </div>
+                      )}
+                      {/* START / CONTINUE overlay button */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="bg-white text-orange-600 px-6 py-2 rounded-md font-semibold text-sm">
+                          START COURSE
+                        </div>
+                      </div>
+                    </div>
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-sm mb-2">
+                        {course.title}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mb-3 line-clamp-3">
+                        {course.description}
+                      </p>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                        <span>{videoCount} lessons</span>
+                        <span>{duration}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -548,8 +690,336 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
   );
 }
 
+// Program Module View - lists resources in a published module
+function ProgramModuleView({ moduleId }: { moduleId: string }) {
+  const [, setLocation] = useLocation();
+  const { slug } = useParams<{ slug: string }>();
+  const { workspaceSlug } = useWorkspace();
+  const currentSlug = slug || workspaceSlug;
+
+  const { data: workspace } = useQuery<{ id: string }>({
+    queryKey: [`/api/workspaces/${currentSlug}`],
+    enabled: !!currentSlug,
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${currentSlug}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+  const orgId = workspace?.id ?? "";
+
+  const { data: module } = useQuery<ProgramModule>({
+    queryKey: [`/api/organizations/${orgId}/program/modules/${moduleId}/info`],
+    enabled: !!orgId,
+    queryFn: async () => {
+      // Published modules list — find the one we need
+      const res = await fetch(`/api/organizations/${orgId}/program/modules/published`, { credentials: "include" });
+      if (!res.ok) return null;
+      const list: ProgramModule[] = await res.json();
+      return list.find((m) => m.id === moduleId) ?? null;
+    },
+  });
+
+  const { data: resources = [] } = useQuery<ProgramResource[]>({
+    queryKey: [`/api/organizations/${orgId}/program/modules/${moduleId}/resources/participant`],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${orgId}/program/modules/${moduleId}/resources/participant`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  return (
+    <>
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 sm:px-6 py-4">
+        <Button variant="ghost" size="sm" onClick={() => setLocation(`/w/${currentSlug}/academy`)} className="mb-3">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Training Modules
+        </Button>
+        <div className="flex items-center gap-3">
+          <Map className="w-6 h-6 text-primary" />
+          <div>
+            <h1 className="text-xl font-bold">{module?.title ?? "Loading..."}</h1>
+            <p className="text-sm text-muted-foreground">{resources.length} materials</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-6">
+        <div className="max-w-4xl mx-auto space-y-3">
+          {resources.length === 0 ? (
+            <p className="text-muted-foreground text-center py-12">No materials available yet.</p>
+          ) : (
+            resources.map((r) => (
+              <Card
+                key={r.id}
+                className="border border-border/50 hover:border-border hover:shadow-md transition-all cursor-pointer"
+                onClick={() => setLocation(`/w/${currentSlug}/academy/module/${moduleId}/${r.id}`)}
+              >
+                <div className="flex items-center gap-4 p-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    {resourceTypeIcon(r.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-sm">{r.title}</p>
+                      {r.hasAssignment && (
+                        <Badge className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-0">
+                          Assignment
+                        </Badge>
+                      )}
+                    </div>
+                    {r.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{r.description}</p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="capitalize text-xs shrink-0">{r.type}</Badge>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Program Resource View - shows a single resource with assignment section
+function ProgramResourceView({ moduleId, resourceId }: { moduleId: string; resourceId: string }) {
+  const [, setLocation] = useLocation();
+  const { slug } = useParams<{ slug: string }>();
+  const { workspaceSlug } = useWorkspace();
+  const currentSlug = slug || workspaceSlug;
+  const [submissionUrl, setSubmissionUrl] = useState("");
+
+  const { data: workspace } = useQuery<{ id: string }>({
+    queryKey: [`/api/workspaces/${currentSlug}`],
+    enabled: !!currentSlug,
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${currentSlug}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+  const orgId = workspace?.id ?? "";
+
+  const { data: resources = [] } = useQuery<ProgramResource[]>({
+    queryKey: [`/api/organizations/${orgId}/program/modules/${moduleId}/resources/participant`],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${orgId}/program/modules/${moduleId}/resources/participant`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const resource = resources.find((r) => r.id === resourceId);
+  const resourceIndex = resources.findIndex((r) => r.id === resourceId);
+  const prevResource = resourceIndex > 0 ? resources[resourceIndex - 1] : null;
+  const nextResource = resourceIndex < resources.length - 1 ? resources[resourceIndex + 1] : null;
+
+  const { data: mySubmission, refetch: refetchSubmission } = useQuery<ResourceSubmission | null>({
+    queryKey: [`/api/organizations/${orgId}/program/resources/${resourceId}/my-submission`],
+    enabled: !!orgId && !!resource?.hasAssignment,
+    queryFn: async () => {
+      const res = await fetch(`/api/organizations/${orgId}/program/resources/${resourceId}/my-submission`, { credentials: "include" });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/organizations/${orgId}/program/resources/${resourceId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ submissionUrl }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Failed" }));
+        throw new Error(err.message || "Failed to submit");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Assignment submitted!");
+      refetchSubmission();
+      setSubmissionUrl("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (!resource && resources.length > 0) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">Resource not found</p>
+        <Button variant="outline" onClick={() => setLocation(`/w/${currentSlug}/academy/module/${moduleId}`)} className="mt-4">
+          Back to Module
+        </Button>
+      </div>
+    );
+  }
+
+  if (!resource) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const embed = embedUrl(resource.url);
+
+  return (
+    <>
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 sm:px-6 py-4">
+        <Button variant="ghost" size="sm" onClick={() => setLocation(`/w/${currentSlug}/academy/module/${moduleId}`)} className="mb-3">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Module
+        </Button>
+        <div className="flex items-center gap-3">
+          <div className="text-primary">{resourceTypeIcon(resource.type)}</div>
+          <div>
+            <h1 className="text-xl font-bold">{resource.title}</h1>
+            <p className="text-sm text-muted-foreground">
+              Material {resourceIndex + 1} of {resources.length}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Content */}
+          {embed ? (
+            <div className="aspect-video w-full rounded-lg overflow-hidden bg-black">
+              <iframe
+                src={embed}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          ) : (
+            <Card className="border border-border">
+              <div className="p-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                  {resourceTypeIcon(resource.type)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold">{resource.title}</p>
+                  {resource.description && <p className="text-sm text-muted-foreground mt-0.5">{resource.description}</p>}
+                  <a href={resource.url} target="_blank" rel="noreferrer"
+                    className="text-primary text-sm underline mt-1 inline-flex items-center gap-1">
+                    Open resource <ExternalLink size={13} />
+                  </a>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Description */}
+          {resource.description && embed && (
+            <div>
+              <p className="text-muted-foreground text-sm">{resource.description}</p>
+            </div>
+          )}
+
+          {/* Assignment Section */}
+          {resource.hasAssignment && (
+            <Card className="border border-purple-200 dark:border-purple-800">
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <h3 className="font-semibold text-purple-900 dark:text-purple-100">Assignment</h3>
+                </div>
+                {resource.assignmentDescription && (
+                  <p className="text-sm text-muted-foreground">{resource.assignmentDescription}</p>
+                )}
+                {mySubmission ? (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-1">Submitted</p>
+                    <a href={mySubmission.submissionUrl} target="_blank" rel="noreferrer"
+                      className="text-sm text-primary underline break-all">
+                      {mySubmission.submissionUrl}
+                    </a>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(mySubmission.submittedAt).toLocaleString()}
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">Update your submission:</p>
+                      <div className="flex gap-2">
+                        <Input
+                          value={submissionUrl}
+                          onChange={(e) => setSubmissionUrl(e.target.value)}
+                          placeholder="https://..."
+                          className="flex-1"
+                        />
+                        <Button
+                          size="sm"
+                          disabled={!submissionUrl.trim() || submitMutation.isPending}
+                          onClick={() => submitMutation.mutate()}
+                        >
+                          {submitMutation.isPending ? "Updating..." : "Update"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="submission-url">Submission URL</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="submission-url"
+                        value={submissionUrl}
+                        onChange={(e) => setSubmissionUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="flex-1"
+                      />
+                      <Button
+                        disabled={!submissionUrl.trim() || submitMutation.isPending}
+                        onClick={() => submitMutation.mutate()}
+                      >
+                        {submitMutation.isPending ? "Submitting..." : "Submit"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between gap-4 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => prevResource && setLocation(`/w/${currentSlug}/academy/module/${moduleId}/${prevResource.id}`)}
+              disabled={!prevResource}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Previous
+            </Button>
+            <Button
+              onClick={() => nextResource && setLocation(`/w/${currentSlug}/academy/module/${moduleId}/${nextResource.id}`)}
+              disabled={!nextResource}
+            >
+              Next
+              <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // Main Academy Component with Routing
 export default function Academy() {
+  const [matchResource, paramsResource] = useRoute("/w/:slug/academy/module/:moduleId/:resourceId");
+  const [matchModule, paramsModule] = useRoute("/w/:slug/academy/module/:moduleId");
   const [matchCourse, paramsCourse] = useRoute("/w/:slug/academy/:courseSlug");
   const [matchVideo, paramsVideo] = useRoute("/w/:slug/academy/:courseSlug/:videoSlug");
 
@@ -562,7 +1032,18 @@ export default function Academy() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto pb-20 sm:pb-0">
-        {matchVideo && paramsVideo ? (
+        {matchResource && paramsResource ? (
+          <ProgramResourceView
+            key={`${paramsResource.moduleId}/${paramsResource.resourceId}`}
+            moduleId={paramsResource.moduleId}
+            resourceId={paramsResource.resourceId}
+          />
+        ) : matchModule && paramsModule ? (
+          <ProgramModuleView
+            key={paramsModule.moduleId}
+            moduleId={paramsModule.moduleId}
+          />
+        ) : matchVideo && paramsVideo ? (
           <VideoPlayer
             key={`${paramsVideo.courseSlug}/${paramsVideo.videoSlug}`}
             courseSlug={paramsVideo.courseSlug}

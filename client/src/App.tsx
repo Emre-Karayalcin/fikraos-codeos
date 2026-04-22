@@ -216,6 +216,18 @@ function Router() {
         </PageTransition>
       )} />
 
+      <Route path="/w/:slug/academy/module/:moduleId" component={() => (
+        <PageTransition>
+          <WorkspaceGuard><Academy /></WorkspaceGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/w/:slug/academy/module/:moduleId/:resourceId" component={() => (
+        <PageTransition>
+          <WorkspaceGuard><Academy /></WorkspaceGuard>
+        </PageTransition>
+      )} />
+
       <Route path="/w/:slug/academy/:courseSlug" component={() => (
         <PageTransition>
           <WorkspaceGuard><Academy /></WorkspaceGuard>

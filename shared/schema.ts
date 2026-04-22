@@ -1204,6 +1204,8 @@ export const moduleResources = pgTable("module_resources", {
   url: text("url").notNull(),
   description: text("description"),
   order: integer("order").notNull().default(0),
+  hasAssignment: boolean("has_assignment").notNull().default(false),
+  assignmentDescription: text("assignment_description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1237,6 +1239,20 @@ export const moduleConsultations = pgTable("module_consultations", {
 });
 
 export type ModuleConsultation = typeof moduleConsultations.$inferSelect;
+
+export const moduleResourceSubmissions = pgTable("module_resource_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resourceId: varchar("resource_id").notNull().references(() => moduleResources.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  submissionUrl: text("submission_url").notNull(),
+  fileName: text("file_name"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("mrs_unique").on(t.resourceId, t.userId),
+]);
+
+export type ModuleResourceSubmission = typeof moduleResourceSubmissions.$inferSelect;
 
 // ─── Consultation Feature ──────────────────────────────────────────────────
 

@@ -1,15 +1,17 @@
 import type { Express, Request, Response } from "express";
 import { isAuthenticated } from "./auth";
 import { db } from "./db";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, desc } from "drizzle-orm";
 import {
   programModules,
   moduleResources,
   moduleMentors,
   moduleConsultations,
+  moduleResourceSubmissions,
   mentorProfiles,
   users,
   organizationMembers,
+  organizations,
 } from "../shared/schema";
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
@@ -238,7 +240,7 @@ export function registerProgramRoutes(app: Express) {
         const { orgId, moduleId } = req.params;
         if (!(await requireOrgAdmin(req, res, orgId))) return;
 
-        const { title, type, url, description, order } = req.body;
+        const { title, type, url, description, order, hasAssignment, assignmentDescription } = req.body;
         const [resource] = await db
           .insert(moduleResources)
           .values({
@@ -248,6 +250,8 @@ export function registerProgramRoutes(app: Express) {
             url,
             description: description || null,
             order: order ?? 0,
+            hasAssignment: hasAssignment ?? false,
+            assignmentDescription: assignmentDescription || null,
           })
           .returning();
 
@@ -268,10 +272,10 @@ export function registerProgramRoutes(app: Express) {
         const { orgId, resourceId } = req.params;
         if (!(await requireOrgAdmin(req, res, orgId))) return;
 
-        const { title, type, url, description, order } = req.body;
+        const { title, type, url, description, order, hasAssignment, assignmentDescription } = req.body;
         const [updated] = await db
           .update(moduleResources)
-          .set({ title, type, url, description: description ?? null, order })
+          .set({ title, type, url, description: description ?? null, order, hasAssignment: hasAssignment ?? false, assignmentDescription: assignmentDescription ?? null })
           .where(eq(moduleResources.id, resourceId))
           .returning();
 
@@ -298,6 +302,131 @@ export function registerProgramRoutes(app: Express) {
       } catch (error) {
         console.error("Error deleting module resource:", error);
         res.status(500).json({ message: "Failed to delete resource" });
+      }
+    }
+  );
+
+  // ── Participant & Submission Endpoints ───────────────────────────────────
+
+  // GET /api/organizations/:orgId/program/modules/published — published modules for participants
+  app.get(
+    "/api/organizations/:orgId/program/modules/published",
+    isAuthenticated,
+    async (req: Request, res: Response) => {
+      try {
+        const { orgId } = req.params;
+        const rows = await db
+          .select()
+          .from(programModules)
+          .where(and(eq(programModules.orgId, orgId), eq(programModules.status, "published")))
+          .orderBy(asc(programModules.stageIndex), asc(programModules.order));
+        res.json(rows);
+      } catch (error) {
+        console.error("Error fetching published modules:", error);
+        res.status(500).json({ message: "Failed to fetch modules" });
+      }
+    }
+  );
+
+  // GET /api/organizations/:orgId/program/modules/:moduleId/resources/participant
+  app.get(
+    "/api/organizations/:orgId/program/modules/:moduleId/resources/participant",
+    isAuthenticated,
+    async (req: Request, res: Response) => {
+      try {
+        const { moduleId } = req.params;
+        const rows = await db
+          .select()
+          .from(moduleResources)
+          .where(eq(moduleResources.moduleId, moduleId))
+          .orderBy(asc(moduleResources.order));
+        res.json(rows);
+      } catch (error) {
+        console.error("Error fetching module resources:", error);
+        res.status(500).json({ message: "Failed to fetch resources" });
+      }
+    }
+  );
+
+  // POST /api/organizations/:orgId/program/resources/:resourceId/submit — upsert participant submission
+  app.post(
+    "/api/organizations/:orgId/program/resources/:resourceId/submit",
+    isAuthenticated,
+    async (req: Request, res: Response) => {
+      try {
+        const { orgId, resourceId } = req.params;
+        const userId = (req as any).user.id;
+        const { submissionUrl, fileName } = req.body;
+        if (!submissionUrl) return res.status(400).json({ message: "submissionUrl required" });
+
+        // Upsert: delete existing then insert (simple approach)
+        await db.delete(moduleResourceSubmissions)
+          .where(and(eq(moduleResourceSubmissions.resourceId, resourceId), eq(moduleResourceSubmissions.userId, userId)));
+
+        const [submission] = await db.insert(moduleResourceSubmissions)
+          .values({ resourceId, userId, orgId, submissionUrl, fileName: fileName || null })
+          .returning();
+
+        res.status(201).json(submission);
+      } catch (error) {
+        console.error("Error submitting assignment:", error);
+        res.status(500).json({ message: "Failed to submit assignment" });
+      }
+    }
+  );
+
+  // GET /api/organizations/:orgId/program/resources/:resourceId/my-submission
+  app.get(
+    "/api/organizations/:orgId/program/resources/:resourceId/my-submission",
+    isAuthenticated,
+    async (req: Request, res: Response) => {
+      try {
+        const { resourceId } = req.params;
+        const userId = (req as any).user.id;
+        const [submission] = await db
+          .select()
+          .from(moduleResourceSubmissions)
+          .where(and(eq(moduleResourceSubmissions.resourceId, resourceId), eq(moduleResourceSubmissions.userId, userId)))
+          .limit(1);
+        res.json(submission ?? null);
+      } catch (error) {
+        res.status(500).json({ message: "Failed to fetch submission" });
+      }
+    }
+  );
+
+  // GET /api/organizations/:orgId/program/resources/:resourceId/submissions — PMO views all
+  app.get(
+    "/api/organizations/:orgId/program/resources/:resourceId/submissions",
+    isAuthenticated,
+    async (req: Request, res: Response) => {
+      try {
+        const { orgId, resourceId } = req.params;
+        if (!(await requireOrgAdmin(req, res, orgId))) return;
+
+        const rows = await db
+          .select({
+            id: moduleResourceSubmissions.id,
+            submissionUrl: moduleResourceSubmissions.submissionUrl,
+            fileName: moduleResourceSubmissions.fileName,
+            submittedAt: moduleResourceSubmissions.submittedAt,
+            userFirstName: users.firstName,
+            userLastName: users.lastName,
+            userEmail: users.email,
+            username: users.username,
+          })
+          .from(moduleResourceSubmissions)
+          .innerJoin(users, eq(moduleResourceSubmissions.userId, users.id))
+          .where(eq(moduleResourceSubmissions.resourceId, resourceId))
+          .orderBy(desc(moduleResourceSubmissions.submittedAt));
+
+        res.json(rows.map(r => ({
+          ...r,
+          submitterName: [r.userFirstName, r.userLastName].filter(Boolean).join(' ') || r.username || r.userEmail,
+        })));
+      } catch (error) {
+        console.error("Error fetching submissions:", error);
+        res.status(500).json({ message: "Failed to fetch submissions" });
       }
     }
   );

@@ -26,6 +26,7 @@ import {
   Users, CalendarDays, Lock, Globe, Building, Blend,
   CheckCircle, Clock, Archive,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -58,6 +59,8 @@ interface ModuleResource {
   url: string;
   description: string | null;
   order: number;
+  hasAssignment: boolean;
+  assignmentDescription: string | null;
 }
 
 interface ModuleMentorRow {
@@ -219,7 +222,7 @@ function emptyModuleForm() {
 }
 
 function emptyResourceForm() {
-  return { title: "", type: "link", url: "", description: "", order: 0 };
+  return { title: "", type: "link", url: "", description: "", order: 0, hasAssignment: false, assignmentDescription: "" };
 }
 
 function emptyConsultationForm() {
@@ -390,6 +393,16 @@ function ModuleDetail({
   const [editResource, setEditResource] = useState<ModuleResource | null>(null);
   const [resourceForm, setResourceForm] = useState(emptyResourceForm());
   const [deleteResourceId, setDeleteResourceId] = useState<string | null>(null);
+  const [submissionsResourceId, setSubmissionsResourceId] = useState<string | null>(null);
+
+  const { data: resourceSubmissions = [], isFetching: submissionsFetching } = useQuery<{
+    id: string; submissionUrl: string; fileName: string | null; submittedAt: string;
+    userFirstName: string | null; userLastName: string | null; userEmail: string;
+  }[]>({
+    queryKey: [`/api/organizations/${orgId}/program/resources/${submissionsResourceId}/submissions`],
+    queryFn: () => apiFetch(`/api/organizations/${orgId}/program/resources/${submissionsResourceId}/submissions`),
+    enabled: !!submissionsResourceId && !!orgId,
+  });
 
   const saveResourceMutation = useMutation({
     mutationFn: (data: typeof resourceForm) => {
@@ -430,7 +443,7 @@ function ModuleDetail({
 
   function openEditResource(r: ModuleResource) {
     setEditResource(r);
-    setResourceForm({ title: r.title, type: r.type, url: r.url, description: r.description ?? "", order: r.order });
+    setResourceForm({ title: r.title, type: r.type, url: r.url, description: r.description ?? "", order: r.order, hasAssignment: r.hasAssignment, assignmentDescription: r.assignmentDescription ?? "" });
     setResourceDialog(true);
   }
 
@@ -637,7 +650,18 @@ function ModuleDetail({
                     {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
                   </div>
                   <Badge variant="outline" className="capitalize text-xs shrink-0">{r.type}</Badge>
+                  {r.hasAssignment && (
+                    <Badge className="text-xs shrink-0 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-0">
+                      Assignment
+                    </Badge>
+                  )}
                   <div className="flex gap-1 shrink-0">
+                    {r.hasAssignment && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="View submissions"
+                        onClick={() => setSubmissionsResourceId(r.id)}>
+                        <Users size={13} />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditResource(r)}>
                       <Pencil size={13} />
                     </Button>
@@ -687,6 +711,23 @@ function ModuleDetail({
                     onChange={(e) => setResourceForm((f) => ({ ...f, description: e.target.value }))}
                     rows={2} />
                 </div>
+                <div className="flex items-center gap-3 py-1">
+                  <Switch
+                    id="has-assignment"
+                    checked={resourceForm.hasAssignment}
+                    onCheckedChange={(v) => setResourceForm((f) => ({ ...f, hasAssignment: v }))}
+                  />
+                  <Label htmlFor="has-assignment" className="cursor-pointer">Has Assignment</Label>
+                </div>
+                {resourceForm.hasAssignment && (
+                  <div>
+                    <Label>Assignment Instructions</Label>
+                    <Textarea value={resourceForm.assignmentDescription}
+                      onChange={(e) => setResourceForm((f) => ({ ...f, assignmentDescription: e.target.value }))}
+                      rows={3}
+                      placeholder="Describe what participants should submit..." />
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setResourceDialog(false)}>Cancel</Button>
@@ -714,6 +755,50 @@ function ModuleDetail({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          {/* Submissions dialog */}
+          <Dialog open={!!submissionsResourceId} onOpenChange={(o) => !o && setSubmissionsResourceId(null)}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Assignment Submissions</DialogTitle>
+              </DialogHeader>
+              {submissionsFetching ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">Loading...</p>
+              ) : resourceSubmissions.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">No submissions yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground text-xs">
+                        <th className="text-left py-2 pr-4 font-medium">Name</th>
+                        <th className="text-left py-2 pr-4 font-medium">Email</th>
+                        <th className="text-left py-2 pr-4 font-medium">Submitted At</th>
+                        <th className="text-left py-2 font-medium">Link</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resourceSubmissions.map((s) => (
+                        <tr key={s.id} className="border-b border-border/50 hover:bg-muted/30">
+                          <td className="py-2 pr-4">
+                            {[s.userFirstName, s.userLastName].filter(Boolean).join(" ") || "—"}
+                          </td>
+                          <td className="py-2 pr-4 text-muted-foreground">{s.userEmail}</td>
+                          <td className="py-2 pr-4 text-muted-foreground">{fmtDateTime(s.submittedAt)}</td>
+                          <td className="py-2">
+                            <a href={s.submissionUrl} target="_blank" rel="noreferrer"
+                              className="text-primary underline text-xs truncate max-w-[200px] block">
+                              {s.fileName || s.submissionUrl}
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* ── MENTORS ── */}
