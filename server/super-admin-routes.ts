@@ -995,6 +995,7 @@ export function registerSuperAdminRoutes(app: Express) {
           aiScore: memberApplications.aiScore,
           userEmail: users.email,
           userFirstName: users.firstName,
+          userPassword: users.password,
           orgName: organizations.name,
           orgSlug: organizations.slug,
         })
@@ -1023,7 +1024,10 @@ export function registerSuperAdminRoutes(app: Express) {
       let failed = 0;
       for (const row of candidates) {
         const userName = row.userFirstName || row.userEmail || "there";
-        const loginUrl = `${hostUrl}/w/${row.orgSlug}`;
+        const hasPassword = row.userPassword && row.userPassword.length > 0;
+        const loginUrl = hasPassword
+          ? `${hostUrl}/w/${row.orgSlug}`
+          : `${hostUrl}/w/${row.orgSlug}/onboard?userId=${row.userId}&email=${encodeURIComponent(row.userEmail)}`;
         const html = loadTemplate("application-approved", { userName, orgName: row.orgName, loginUrl });
         if (!html) { failed++; continue; }
         try {
@@ -1033,6 +1037,21 @@ export function registerSuperAdminRoutes(app: Express) {
             subject: `🎉 You've been accepted to ${row.orgName}!`,
             html,
           });
+
+          // For new users without a password, also send the set-password email
+          if (!hasPassword) {
+            const setPasswordUrl = `${hostUrl}/w/${row.orgSlug}/onboard?userId=${row.userId}&email=${encodeURIComponent(row.userEmail)}`;
+            const pwHtml = loadTemplate("csv-onboarding", { orgName: row.orgName, firstName: userName, email: row.userEmail, ideaName: row.ideaName || "", setPasswordUrl });
+            if (pwHtml) {
+              await resend.emails.send({
+                from: process.env.EMAIL_FROM || "no-reply@fikrahub.com",
+                to: row.userEmail,
+                subject: `Welcome to ${row.orgName} — Set Your Password`,
+                html: pwHtml,
+              });
+            }
+          }
+
           await db.update(users).set({ status: "ACTIVE" }).where(eq(users.id, row.userId));
           await db.update(memberApplications)
             .set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() })

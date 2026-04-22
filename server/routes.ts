@@ -7635,6 +7635,16 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
         if (!html) { failed++; continue; }
         try {
           await resendClient.emails.send({ from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com', to: row.userEmail, subject: `🎉 You've been accepted to ${row.orgName}!`, html });
+
+          // For new users without a password, also send the set-password email
+          if (!hasPassword) {
+            const setPasswordUrl = `${hostUrl}/w/${row.orgSlug}/onboard?userId=${row.userId}&email=${encodeURIComponent(row.userEmail)}`;
+            const pwHtml = loadTpl('csv-onboarding', { orgName: row.orgName, firstName: row.userFirstName || row.userEmail || 'there', email: row.userEmail, ideaName: '', setPasswordUrl });
+            if (pwHtml) {
+              await resendClient.emails.send({ from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com', to: row.userEmail, subject: `Welcome to ${row.orgName} — Set Your Password`, html: pwHtml });
+            }
+          }
+
           await db.update(users).set({ status: 'ACTIVE' }).where(eq(users.id, row.userId));
           await db.update(memberApplications).set({ acceptanceEmailSentAt: new Date(), updatedAt: new Date() }).where(eq(memberApplications.id, row.id));
           sent++;
@@ -7865,23 +7875,9 @@ Respond ONLY with a valid JSON object containing the updated "${section}" field.
             // Trigger AI scoring
             screenApplicationAsync(appId, null, orgId).catch(console.error);
 
-            // Send onboarding email only for newly created users
-            if (isNewUser) {
-              const nameParts = fullName.split(' ');
-              const firstName = nameParts[0] || fullName;
-              const setPasswordUrl = `${APP_URL}/w/${org.slug}/onboard?userId=${targetUserId}&email=${encodeURIComponent(email)}`;
-              const html = loadTpl('csv-onboarding', { orgName: org.name, firstName, email, ideaName: row['idea_name'] || 'your idea', setPasswordUrl });
-              if (resendClient && html) {
-                resendClient.emails.send({
-                  from: process.env.EMAIL_FROM || 'no-reply@fikrahub.com',
-                  to: email,
-                  subject: `Welcome to ${org.name} — Set Your Password`,
-                  html,
-                }).catch(e => console.error('CSV onboarding email failed for', email, e));
-              } else {
-                console.log(`📧 [CSV import] Set-password link for ${email}: ${setPasswordUrl}`);
-              }
-            }
+            // NOTE: No email is sent at import time.
+            // The set-password email is sent together with the acceptance email
+            // so that rejected users never receive a password setup link.
 
             imported++;
           } catch (rowErr) {
