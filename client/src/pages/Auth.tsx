@@ -203,14 +203,14 @@ export default function Auth() {
               <>
               {(logo || darkLogo) ? (
                 <>
-                  <img 
+                  <img
                     src={darkLogo || logo}
-                    alt="Logo" 
+                    alt="Logo"
                     className="h-12 w-auto object-contain hidden dark:block"
                   />
-                  <img 
+                  <img
                     src={logo || darkLogo}
-                    alt="Logo" 
+                    alt="Logo"
                     className="h-12 w-auto object-contain block dark:hidden"
                   />
                 </>
@@ -226,6 +226,7 @@ export default function Auth() {
                   </div>
                 </>
               )}
+            </>
             )}
           </motion.div>
         </div>
