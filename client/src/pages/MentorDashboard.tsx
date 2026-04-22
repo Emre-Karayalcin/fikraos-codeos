@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { RichTextViewer } from "@/components/editor/RichTextViewer";
 import {
+  Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
