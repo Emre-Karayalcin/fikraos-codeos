@@ -645,37 +645,51 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
             <div className="space-y-2">
               {videos.map((v, index) => {
                 const prog = progressBySlug[v.slug];
+                const prevVid = index > 0 ? videos[index - 1] : null;
+                const prevProg = prevVid ? progressBySlug[prevVid.slug] : null;
+                const isLocked = index > 0 && !prevProg?.completed;
+                const isCurrent = v.id === video.id;
                 return (
                   <div
                     key={v.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                      v.id === video.id
+                    className={`p-3 rounded-lg border transition-all ${
+                      isCurrent
                         ? 'bg-primary/10 border-primary'
-                        : 'border-border/50 hover:border-border hover:bg-accent'
+                        : isLocked
+                        ? 'border-border/30 opacity-60 cursor-not-allowed'
+                        : 'border-border/50 hover:border-border hover:bg-accent cursor-pointer'
                     }`}
-                    onClick={() => setLocation(`/w/${currentSlug}/academy/${courseSlug}/${v.slug}`)}
+                    onClick={() => !isLocked && setLocation(`/w/${currentSlug}/academy/${courseSlug}/${v.slug}`)}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`flex-shrink-0 w-8 h-8 rounded flex items-center justify-center text-sm font-bold ${
-                        v.id === video.id ? 'bg-primary text-primary-foreground' : prog?.completed ? 'bg-green-500/10' : 'bg-muted'
+                        isCurrent ? 'bg-primary text-primary-foreground' : prog?.completed ? 'bg-green-500/10' : isLocked ? 'bg-muted' : 'bg-muted'
                       }`}>
-                        {prog?.completed && v.id !== video.id ? (
+                        {prog?.completed && !isCurrent ? (
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        ) : isLocked ? (
+                          <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                         ) : (
                           index + 1
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium truncate ${
-                          v.id === video.id ? 'text-primary' : prog?.completed ? 'text-muted-foreground' : 'text-foreground'
+                          isCurrent ? 'text-primary' : prog?.completed ? 'text-muted-foreground' : isLocked ? 'text-muted-foreground' : 'text-foreground'
                         }`}>
                           {v.title}
                         </p>
+                        {isLocked && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Complete previous video to unlock</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">{v.duration}</span>
-                        {prog?.completed && (
+                        {prog?.completed && !isCurrent && (
                           <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                        )}
+                        {isLocked && (
+                          <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                         )}
                       </div>
                     </div>
