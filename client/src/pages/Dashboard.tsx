@@ -19,6 +19,7 @@ import {
   FiStar,
   FiPhone,
 } from "react-icons/fi";
+import { CheckCircle2 } from "lucide-react";
 import { useBranding } from "@/contexts/BrandingContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -153,9 +154,26 @@ export default function Dashboard() {
     setPopupDismissed(true);
   };
 
+  // Active challenges — needed when user has no challengeId in their application
+  const { data: activeChallengesRaw = [] } = useQuery<{ challenge: { id: string; title: string; description?: string | null } }[]>({
+    queryKey: ['/api/workspaces', slug, 'active-challenges'],
+    queryFn: async () => {
+      if (!slug) return [];
+      const res = await fetch(`/api/workspaces/${slug}/active-challenges`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!slug && showPopup && !myApplication?.challengeId,
+    staleTime: 60_000,
+  });
+  const activeChallenges = activeChallengesRaw.map(r => r.challenge);
+  const [selectedChallengeForBuild, setSelectedChallengeForBuild] = useState<string>('');
+
   const buildMutation = useMutation({
     mutationFn: async () => {
       if (!currentOrg || !myApplication) throw new Error('Missing data');
+
+      const effectiveChallengeId = myApplication.challengeId || selectedChallengeForBuild || null;
 
       // Step 1: Create project
       const projectResp = await fetch('/api/projects', {
@@ -164,7 +182,7 @@ export default function Dashboard() {
         credentials: 'include',
         body: JSON.stringify({
           orgId: currentOrg.id,
-          challengeId: myApplication.challengeId || null,
+          challengeId: effectiveChallengeId,
           title: myApplication.ideaName || 'My Idea',
           description: `${myApplication.solutionDescription || ''}\n\nDifferentiator: ${myApplication.differentiator || ''}\n\nTarget User: ${myApplication.targetUser || ''}`,
           type: 'LAUNCH',
@@ -381,11 +399,46 @@ export default function Dashboard() {
             Based on your idea submission, our AI is ready to build your complete business model
             — including SWOT analysis, lean canvas, market research, and more.
           </p>
+
+          {/* Sector selector — shown when application has no challenge linked and org has active challenges */}
+          {!myApplication?.challengeId && activeChallenges.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Select a sector for your idea</p>
+              <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                {activeChallenges.map((c) => {
+                  const isSelected = selectedChallengeForBuild === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedChallengeForBuild(c.id)}
+                      className={`text-left rounded-lg border-2 px-3 py-2.5 transition-all text-sm ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/40 hover:bg-muted/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{c.title}</span>
+                        {isSelected && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                      </div>
+                      {c.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{c.description}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 pt-2">
             <Button
               className="flex-1"
               onClick={() => buildMutation.mutate()}
-              disabled={buildMutation.isPending}
+              disabled={
+                buildMutation.isPending ||
+                (!myApplication?.challengeId && activeChallenges.length > 0 && !selectedChallengeForBuild)
+              }
             >
               {buildMutation.isPending ? "Generating…" : "Get Started"}
             </Button>
@@ -393,6 +446,9 @@ export default function Dashboard() {
               Maybe Later
             </Button>
           </div>
+          {!myApplication?.challengeId && activeChallenges.length > 0 && !selectedChallengeForBuild && (
+            <p className="text-xs text-muted-foreground text-center">Please select a sector to continue</p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -303,6 +303,20 @@ export function UnifiedSidebar() {
   // Get current organization
   const currentOrg = Array.isArray(organizations) ? organizations[0] : undefined;
 
+  // Active challenges — used to enforce sector selection when creating ideas
+  const { data: activeChallengesRaw = [] } = useQuery<{ challenge: { id: string; title: string; description?: string | null } }[]>({
+    queryKey: ['/api/workspaces', currentWorkspaceSlug, 'active-challenges'],
+    queryFn: async () => {
+      if (!currentWorkspaceSlug) return [];
+      const res = await fetch(`/api/workspaces/${currentWorkspaceSlug}/active-challenges`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentWorkspaceSlug && !!isAuthenticated,
+    staleTime: 60_000,
+  });
+  const activeChallenges = activeChallengesRaw.map(r => r.challenge);
+
   // Check user role for admin access
   const { data: userRole } = useQuery({
     queryKey: ['/api/organizations', currentOrg?.id, 'admin', 'check-role'],
@@ -324,7 +338,7 @@ export function UnifiedSidebar() {
   const isClient = userRole?.role === 'CLIENT';
   const isConsultant = userRole?.role === 'CONSULTANT';
 
-  const createProjectAndChat = async (payload?: { title?: string; description?: string }) => {
+  const createProjectAndChat = async (payload?: { title?: string; description?: string; challengeId?: string }) => {
     if (!isAuthenticated) {
       setLocation("/auth");
       return;
@@ -340,7 +354,12 @@ export function UnifiedSidebar() {
     const projectResponse = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgId, title, description }),
+      body: JSON.stringify({
+        orgId,
+        title,
+        description,
+        ...(payload?.challengeId ? { challengeId: payload.challengeId } : {}),
+      }),
       credentials: "include"
     });
     if (!projectResponse.ok) throw new Error("Failed to create project");
@@ -368,7 +387,7 @@ export function UnifiedSidebar() {
     setIsNewChatOpen(true);
   };
 
-  const handleManualCreate = async (data: { ideaName: string; ideaDescription: string; country: string; uniqueness: string; }) => {
+  const handleManualCreate = async (data: { ideaName: string; ideaDescription: string; country: string; uniqueness: string; challengeId?: string }) => {
     try {
       const orgsResp = await fetch('/api/organizations', { credentials: 'include' });
       if (!orgsResp.ok) throw new Error('Failed to fetch organizations');
@@ -383,7 +402,8 @@ export function UnifiedSidebar() {
         body: JSON.stringify({
           orgId,
           title: data.ideaName || 'Untitled idea',
-          description: `${data.ideaDescription}\n\nCountry: ${data.country}\nUnique: ${data.uniqueness}`
+          description: `${data.ideaDescription}\n\nCountry: ${data.country}\nUnique: ${data.uniqueness}`,
+          ...(data.challengeId ? { challengeId: data.challengeId } : {}),
         }),
         credentials: 'include'
       });
@@ -598,10 +618,11 @@ export function UnifiedSidebar() {
       <NewChatModal
         open={isNewChatOpen}
         onOpenChange={setIsNewChatOpen}
-        onBuildWithAI={async () => {
+        challenges={activeChallenges}
+        onBuildWithAI={async (challengeId) => {
           setIsNewChatOpen(false);
           try {
-            await createProjectAndChat();
+            await createProjectAndChat(challengeId ? { challengeId } : undefined);
           } catch (e) {
             console.error('AI create failed', e);
             setLocation("/");

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import toast from 'react-hot-toast';
 
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -29,7 +30,8 @@ import {
   FileText,
   Upload,
   Link,
-  Eye
+  Eye,
+  Plus,
 } from 'lucide-react';
 import {
   Select,
@@ -242,6 +244,86 @@ export default function ChallengeDetail() {
 
   // State for submission preview dialog
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+
+  // Create Idea dialog
+  const [showCreateIdea, setShowCreateIdea] = useState(false);
+  const [createIdeaStep, setCreateIdeaStep] = useState(1);
+  const [newIdeaDescription, setNewIdeaDescription] = useState('');
+  const [newIdeaUniqueness, setNewIdeaUniqueness] = useState('');
+  const [newIdeaName, setNewIdeaName] = useState('');
+  const [creatingIdea, setCreatingIdea] = useState(false);
+
+  const handleCreateIdea = async () => {
+    if (!challenge) return;
+    setCreatingIdea(true);
+    try {
+      // Fetch org
+      const orgsResp = await fetch('/api/organizations', { credentials: 'include' });
+      if (!orgsResp.ok) throw new Error('Failed to fetch organization');
+      const orgs = await orgsResp.json();
+      const orgId = orgs[0]?.id;
+      if (!orgId) throw new Error('No organization found');
+
+      // Create project linked to this challenge
+      const projResp = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          orgId,
+          challengeId: challenge.id,
+          title: newIdeaName.trim() || 'My Idea',
+          description: newIdeaDescription.trim(),
+          type: 'LAUNCH',
+        }),
+      });
+      if (!projResp.ok) throw new Error('Failed to create idea');
+      const project = await projResp.json();
+
+      // Create chat
+      const chatResp = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId: project.id, title: 'Chat' }),
+      });
+      if (!chatResp.ok) throw new Error('Failed to create chat');
+      const chat = await chatResp.json();
+
+      // Seed AI
+      const initialMsg = `I have a new idea for the "${challenge.title}" sector.\n\nIdea: ${newIdeaName.trim()}\n\nDescription: ${newIdeaDescription.trim()}${newIdeaUniqueness.trim() ? `\n\nWhat makes it unique: ${newIdeaUniqueness.trim()}` : ''}`;
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ chatId: chat.id, content: initialMsg, role: 'user' }),
+      });
+      await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message: initialMsg, chatId: chat.id, language: 'en' }),
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['challenges'] });
+      toast.success('Idea created! Opening AI builder…');
+
+      setShowCreateIdea(false);
+      setCreateIdeaStep(1);
+      setNewIdeaDescription('');
+      setNewIdeaUniqueness('');
+      setNewIdeaName('');
+
+      const dest = workspaceSlug
+        ? `/w/${workspaceSlug}/chat/${chat.id}`
+        : `/chat/${chat.id}`;
+      setLocation(dest);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create idea');
+    } finally {
+      setCreatingIdea(false);
+    }
+  };
 
   const deleteChallengeMutation = useMutation({
     mutationFn: async (challengeId: string) => {
@@ -539,7 +621,78 @@ export default function ChallengeDetail() {
                         <Lightbulb className="w-5 h-5 text-primary" />
                         {projects.length === 1 ? projects[0].title : t('challenge.myIdeas', { count: projects.length })}
                       </h2>
+                      {challenge?.status === 'active' && (
+                        <Button size="sm" onClick={() => { setShowCreateIdea(true); setCreateIdeaStep(1); }} className="flex items-center gap-1.5">
+                          <Plus className="h-4 w-4" /> New Idea
+                        </Button>
+                      )}
                     </div>
+
+                    {/* Create Idea Dialog */}
+                    <Dialog open={showCreateIdea} onOpenChange={(o) => { if (!o) { setShowCreateIdea(false); setCreateIdeaStep(1); setNewIdeaDescription(''); setNewIdeaUniqueness(''); setNewIdeaName(''); } }}>
+                      <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Lightbulb className="h-5 w-5 text-primary" />
+                            Create Idea for "{challenge?.title}"
+                          </DialogTitle>
+                        </DialogHeader>
+
+                        {/* Step progress */}
+                        <div className="flex items-center gap-1.5 justify-center my-1">
+                          {[1, 2, 3].map((n) => (
+                            <span key={n} className={`h-2 rounded-full transition-all ${n === createIdeaStep ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30'}`} />
+                          ))}
+                        </div>
+
+                        {createIdeaStep === 1 && (
+                          <div className="space-y-3">
+                            <p className="text-sm font-medium">Describe your idea</p>
+                            <Textarea
+                              value={newIdeaDescription}
+                              onChange={(e) => setNewIdeaDescription(e.target.value)}
+                              placeholder="What problem does your idea solve? How does it work?"
+                              rows={4}
+                            />
+                            <div className="flex justify-end">
+                              <Button onClick={() => setCreateIdeaStep(2)} disabled={!newIdeaDescription.trim()}>Next</Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {createIdeaStep === 2 && (
+                          <div className="space-y-3">
+                            <p className="text-sm font-medium">What makes your idea unique?</p>
+                            <Input
+                              value={newIdeaUniqueness}
+                              onChange={(e) => setNewIdeaUniqueness(e.target.value)}
+                              placeholder="Your competitive advantage or differentiator…"
+                            />
+                            <div className="flex justify-between">
+                              <Button variant="ghost" onClick={() => setCreateIdeaStep(1)}>Back</Button>
+                              <Button onClick={() => setCreateIdeaStep(3)} disabled={!newIdeaUniqueness.trim()}>Next</Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {createIdeaStep === 3 && (
+                          <div className="space-y-3">
+                            <p className="text-sm font-medium">Give your idea a name</p>
+                            <Input
+                              value={newIdeaName}
+                              onChange={(e) => setNewIdeaName(e.target.value)}
+                              placeholder="Idea name…"
+                            />
+                            <div className="flex justify-between">
+                              <Button variant="ghost" onClick={() => setCreateIdeaStep(2)}>Back</Button>
+                              <Button onClick={handleCreateIdea} disabled={!newIdeaName.trim() || creatingIdea}>
+                                {creatingIdea ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Creating…</> : 'Create Idea'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
 
                     {/* Pitch Deck Edit Dialog */}
                     <Dialog open={!!editPitchDeckProject} onOpenChange={(open) => { if (!open) { setEditPitchDeckProject(null); setLocalPitchDeckUrl(''); setPitchDeckMode('select'); } }}>
@@ -693,9 +846,14 @@ export default function ChallengeDetail() {
                           {projects.length === 0 ? (
                             <TableRow>
                               <TableCell colSpan={4} className="text-center py-8">
-                                <div className="text-text-secondary">
-                                  <Lightbulb className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                <div className="text-text-secondary flex flex-col items-center gap-3">
+                                  <Lightbulb className="w-12 h-12 mx-auto opacity-50" />
                                   <p>{t('challenge.noIdeasYet')}</p>
+                                  {challenge?.status === 'active' && (
+                                    <Button size="sm" onClick={() => { setShowCreateIdea(true); setCreateIdeaStep(1); }}>
+                                      <Plus className="h-4 w-4 mr-1" /> Create your first idea
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>

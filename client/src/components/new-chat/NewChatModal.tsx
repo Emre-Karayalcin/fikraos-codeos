@@ -5,18 +5,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
+
+export interface ChallengeOption {
+  id: string;
+  title: string;
+  description?: string | null;
+}
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onBuildWithAI: () => void;
+  onBuildWithAI: (challengeId?: string) => void;
   onManualSubmit: (payload: {
     ideaName: string;
     ideaDescription: string;
     country: string;
     uniqueness: string;
+    challengeId?: string;
   }) => Promise<void>;
+  /** Active challenges for the org. If non-empty, sector selection is shown first. */
+  challenges?: ChallengeOption[];
+  /** Pre-selected challengeId (e.g., when opened from a challenge detail page). Skips sector step. */
+  preselectedChallengeId?: string;
 };
 
 const ALL_COUNTRIES: { code: string; name: string }[] = [
@@ -219,8 +230,22 @@ const ALL_COUNTRIES: { code: string; name: string }[] = [
   { code: "ZW", name: "Zimbabwe" }
 ];
 
-export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManualSubmit }: Props) {
+export default function NewChatModal({
+  open,
+  onOpenChange,
+  onBuildWithAI,
+  onManualSubmit,
+  challenges = [],
+  preselectedChallengeId,
+}: Props) {
   const { t } = useTranslation();
+
+  // Whether to show the sector selection screen first
+  const needsSectorStep = challenges.length > 0 && !preselectedChallengeId;
+
+  const [inSectorStep, setInSectorStep] = useState(needsSectorStep);
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string>(preselectedChallengeId ?? "");
+
   const [step, setStep] = useState<number>(0);
   const [ideaDescription, setIdeaDescription] = useState("");
   const [country, setCountry] = useState("SA");
@@ -229,6 +254,8 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
   const [submitting, setSubmitting] = useState(false);
 
   const reset = () => {
+    setInSectorStep(needsSectorStep);
+    setSelectedChallengeId(preselectedChallengeId ?? "");
     setStep(0);
     setIdeaDescription("");
     setCountry("SA");
@@ -242,11 +269,20 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
     onOpenChange(false);
   };
 
+  const confirmSector = () => {
+    if (!selectedChallengeId) return;
+    setInSectorStep(false);
+  };
+
   const startManual = () => setStep(1);
   const next = () => setStep((s) => Math.min(4, s + 1));
   const back = () => {
     if (step === 1) {
       setStep(0);
+      return;
+    }
+    if (step === 0 && needsSectorStep) {
+      setInSectorStep(true);
       return;
     }
     setStep((s) => Math.max(0, s - 1));
@@ -259,7 +295,8 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
         ideaName: ideaName.trim(),
         ideaDescription: ideaDescription.trim(),
         country,
-        uniqueness: uniqueness.trim()
+        uniqueness: uniqueness.trim(),
+        challengeId: selectedChallengeId || undefined,
       });
       close();
     } catch (e) {
@@ -271,21 +308,16 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
   const stepImage = (s: number) => {
     const base = "https://app.fikrahub.com/images/education";
     switch (s) {
-      case 1:
-        return `${base}/step-idea-1.png`;
-      case 2:
-        return `${base}/step-idea-2.png`;
-      case 3:
-        return `${base}/step-idea-3.png`;
-      case 4:
-        return `${base}/step-idea-4.png`;
-      default:
-        return `${base}/step-choose-1.png`;
+      case 1: return `${base}/step-idea-1.png`;
+      case 2: return `${base}/step-idea-2.png`;
+      case 3: return `${base}/step-idea-3.png`;
+      case 4: return `${base}/step-idea-4.png`;
+      default: return `${base}/step-choose-1.png`;
     }
   };
 
   const renderProgress = () => {
-    if (step === 0) return null;
+    if (inSectorStep || step === 0) return null;
     return (
       <div className="w-full flex items-center justify-center mb-4 relative">
         <div className="absolute left-4">
@@ -305,6 +337,8 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
     );
   };
 
+  const selectedChallenge = challenges.find(c => c.id === selectedChallengeId);
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="max-w-3xl w-full">
@@ -314,15 +348,75 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
 
         {renderProgress()}
 
-        {step === 0 && (
+        {/* ── Sector selection step ── */}
+        {inSectorStep && (
+          <div className="space-y-5">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold">Choose a Sector</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Select the sector your idea belongs to. Ideas must be created within a sector.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
+              {challenges.map((c) => {
+                const isSelected = selectedChallengeId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedChallengeId(c.id)}
+                    className={`text-left rounded-xl border-2 p-4 transition-all ${
+                      isSelected
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50 hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-medium text-sm">{c.title}</div>
+                      {isSelected && <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />}
+                    </div>
+                    {c.description && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.description}</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" onClick={close}>Cancel</Button>
+              <Button onClick={confirmSector} disabled={!selectedChallengeId}>
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Choose AI or Manual ── */}
+        {!inSectorStep && step === 0 && (
           <div className="space-y-6">
+            {selectedChallenge && (
+              <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-primary font-medium">Sector: {selectedChallenge.title}</span>
+                {needsSectorStep && (
+                  <button
+                    onClick={() => setInSectorStep(true)}
+                    className="ml-auto text-xs text-muted-foreground hover:text-foreground underline"
+                  >
+                    Change
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="text-center">
               <h3 className="text-xl font-semibold">{t('newChat.title') ?? 'Create conversation'}</h3>
               <p className="text-sm text-muted-foreground mt-2">{t('newChat.choose') ?? 'Choose how to build your conversation'}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-              <Button onClick={() => { onBuildWithAI(); onOpenChange(false); }} className="w-full py-4">
+              <Button onClick={() => { onBuildWithAI(selectedChallengeId || undefined); onOpenChange(false); }} className="w-full py-4">
                 {t('newChat.buildWithAI') ?? 'Build with AI'}
               </Button>
               <Button variant="outline" onClick={startManual} className="w-full py-4">
@@ -340,11 +434,11 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
           </div>
         )}
 
-        {step === 1 && (
+        {/* ── Manual steps 1–4 ── */}
+        {!inSectorStep && step === 1 && (
           <div className="space-y-6 text-center">
             <img src={stepImage(1)} alt="" className="mx-auto max-h-44 object-contain" />
             <h3 className="text-lg font-semibold">{t('manual.step1.title') ?? 'What is your idea? Explain it comprehensively.'}</h3>
-
             <div>
               <Textarea
                 value={ideaDescription}
@@ -354,7 +448,6 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
                 placeholder={t('manual.step1.placeholder') ?? ''}
               />
             </div>
-
             <div className="max-w-2xl mx-auto space-y-3">
               <Button onClick={next} className="w-full py-3" disabled={!ideaDescription.trim()}>
                 {t('common.next') ?? 'Next'}
@@ -363,11 +456,10 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
           </div>
         )}
 
-        {step === 2 && (
+        {!inSectorStep && step === 2 && (
           <div className="space-y-6 text-center">
             <img src={stepImage(2)} alt="" className="mx-auto max-h-44 object-contain" />
             <h3 className="text-lg font-semibold">{t('manual.step2.title') ?? 'Where are you launching your idea?'}</h3>
-
             <div className="max-w-2xl mx-auto">
               <select
                 value={country}
@@ -376,13 +468,10 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
                 aria-label={t('manual.step2.title') ?? 'Country'}
               >
                 {ALL_COUNTRIES.map((c) => (
-                  <option value={c.code} key={c.code}>
-                    {c.name}
-                  </option>
+                  <option value={c.code} key={c.code}>{c.name}</option>
                 ))}
               </select>
             </div>
-
             <div className="max-w-2xl mx-auto space-y-3">
               <Button onClick={next} className="w-full py-3">
                 {t('common.next') ?? 'Next'}
@@ -391,15 +480,13 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
           </div>
         )}
 
-        {step === 3 && (
+        {!inSectorStep && step === 3 && (
           <div className="space-y-6 text-center">
             <img src={stepImage(3)} alt="" className="mx-auto max-h-44 object-contain" />
             <h3 className="text-lg font-semibold">{t('manual.step3.title') ?? 'What makes your idea unique?'}</h3>
-
             <div className="max-w-2xl mx-auto">
               <Input value={uniqueness} onChange={(e) => setUniqueness(e.target.value)} placeholder={t('manual.step3.placeholder') ?? ''} />
             </div>
-
             <div className="max-w-2xl mx-auto space-y-3">
               <Button onClick={next} className="w-full py-3" disabled={!uniqueness.trim()}>
                 {t('common.next') ?? 'Next'}
@@ -408,15 +495,13 @@ export default function NewChatModal({ open, onOpenChange, onBuildWithAI, onManu
           </div>
         )}
 
-        {step === 4 && (
+        {!inSectorStep && step === 4 && (
           <div className="space-y-6 text-center">
             <img src={stepImage(4)} alt="" className="mx-auto max-h-44 object-contain" />
-            <h3 className="text-lg font-semibold">{t('manual.step5.title') ?? 'What’s your idea name?'}</h3>
-
+            <h3 className="text-lg font-semibold">{t('manual.step5.title') ?? "What's your idea name?"}</h3>
             <div className="max-w-2xl mx-auto">
               <Input value={ideaName} onChange={(e) => setIdeaName(e.target.value)} placeholder={t('manual.step4.placeholder') ?? ''} />
             </div>
-
             <div className="max-w-2xl mx-auto space-y-3">
               <Button onClick={handleManualFinish} className="w-full py-3" disabled={submitting || !ideaName.trim()}>
                 {submitting ? (t('common.saving') ?? 'Saving...') : (t('common.submit') ?? 'Submit')}
