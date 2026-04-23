@@ -21,10 +21,10 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from "@/components/ui/tabs";
 import {
-  Map, Plus, Pencil, Trash2, ChevronUp, ChevronDown,
+  Map, Plus, Pencil, Trash2, ChevronUp, ChevronDown, ChevronRight,
   FileText, Video, Link, BookOpen, Presentation,
   Users, CalendarDays, Lock, Globe, Building, Blend,
-  CheckCircle, Clock, Archive,
+  CheckCircle, Clock, Archive, Play,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
@@ -61,6 +61,22 @@ interface ModuleResource {
   order: number;
   hasAssignment: boolean;
   assignmentDescription: string | null;
+}
+
+interface AcademyVideo {
+  id: string;
+  title: string;
+  videoUrl: string;
+  durationSeconds: number | null;
+  displayOrder: number;
+  isPublished: boolean;
+}
+
+interface AcademyCourse {
+  id: string;
+  title: string;
+  isPublished: boolean;
+  videos: AcademyVideo[];
 }
 
 interface ModuleMentorRow {
@@ -394,6 +410,14 @@ function ModuleDetail({
   const [resourceForm, setResourceForm] = useState(emptyResourceForm());
   const [deleteResourceId, setDeleteResourceId] = useState<string | null>(null);
   const [submissionsResourceId, setSubmissionsResourceId] = useState<string | null>(null);
+  const [addMode, setAddMode] = useState<"training" | "manual">("training");
+  const [expandedCourseId, setExpandedCourseId] = useState<string | null>(null);
+
+  const { data: academyCourses = [] } = useQuery<AcademyCourse[]>({
+    queryKey: [`/api/workspaces/${orgId}/admin/academy/courses`],
+    queryFn: () => apiFetch(`/api/workspaces/${orgId}/admin/academy/courses`),
+    enabled: resourceDialog && !editResource,
+  });
 
   const { data: resourceSubmissions = [], isFetching: submissionsFetching } = useQuery<{
     id: string; submissionUrl: string; fileName: string | null; submittedAt: string;
@@ -438,6 +462,8 @@ function ModuleDetail({
   function openAddResource() {
     setEditResource(null);
     setResourceForm(emptyResourceForm());
+    setAddMode("training");
+    setExpandedCourseId(null);
     setResourceDialog(true);
   }
 
@@ -681,60 +707,134 @@ function ModuleDetail({
               <DialogHeader>
                 <DialogTitle>{editResource ? "Edit Resource" : "Add Resource"}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label>Title</Label>
-                  <Input value={resourceForm.title}
-                    onChange={(e) => setResourceForm((f) => ({ ...f, title: e.target.value }))} />
+
+              {/* New resource: two-tab picker */}
+              {!editResource && (
+                <div className="flex rounded-lg border border-border overflow-hidden mb-1">
+                  <button
+                    className={`flex-1 py-1.5 text-sm font-medium transition-colors ${addMode === "training" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
+                    onClick={() => setAddMode("training")}
+                  >
+                    From Training Modules
+                  </button>
+                  <button
+                    className={`flex-1 py-1.5 text-sm font-medium transition-colors ${addMode === "manual" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
+                    onClick={() => setAddMode("manual")}
+                  >
+                    Enter URL manually
+                  </button>
                 </div>
-                <div>
-                  <Label>Type</Label>
-                  <Select value={resourceForm.type}
-                    onValueChange={(v) => setResourceForm((f) => ({ ...f, type: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {RESOURCE_TYPES.map((rt) => (
-                        <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              )}
+
+              {/* Training Modules picker */}
+              {!editResource && addMode === "training" && (
+                <div className="max-h-72 overflow-y-auto space-y-1">
+                  {academyCourses.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No training modules found.</p>
+                  ) : (
+                    academyCourses.map((course) => (
+                      <div key={course.id}>
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-left text-sm font-medium transition-colors"
+                          onClick={() => setExpandedCourseId(expandedCourseId === course.id ? null : course.id)}
+                        >
+                          {expandedCourseId === course.id ? <ChevronDown size={14} className="shrink-0 text-muted-foreground" /> : <ChevronRight size={14} className="shrink-0 text-muted-foreground" />}
+                          <BookOpen size={14} className="shrink-0 text-muted-foreground" />
+                          <span className="flex-1 truncate">{course.title}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">{course.videos.length} video{course.videos.length !== 1 ? "s" : ""}</span>
+                        </button>
+                        {expandedCourseId === course.id && (
+                          <div className="ml-6 mb-1 space-y-0.5">
+                            {course.videos.length === 0 ? (
+                              <p className="text-xs text-muted-foreground px-3 py-1">No videos in this course.</p>
+                            ) : (
+                              course.videos.map((video) => (
+                                <button
+                                  key={video.id}
+                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-primary/10 hover:text-primary text-left text-sm transition-colors"
+                                  onClick={() => {
+                                    setResourceForm({ title: video.title, type: "video", url: video.videoUrl, description: "", order: 0, hasAssignment: false, assignmentDescription: "" });
+                                    setAddMode("manual");
+                                  }}
+                                >
+                                  <Play size={13} className="shrink-0 text-muted-foreground" />
+                                  <span className="flex-1 truncate">{video.title}</span>
+                                  {video.durationSeconds ? (
+                                    <span className="text-xs text-muted-foreground shrink-0">
+                                      {Math.floor(video.durationSeconds / 60)}m
+                                    </span>
+                                  ) : null}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
-                <div>
-                  <Label>URL</Label>
-                  <Input value={resourceForm.url}
-                    onChange={(e) => setResourceForm((f) => ({ ...f, url: e.target.value }))}
-                    placeholder="https://..." />
-                </div>
-                <div>
-                  <Label>Description (optional)</Label>
-                  <Textarea value={resourceForm.description}
-                    onChange={(e) => setResourceForm((f) => ({ ...f, description: e.target.value }))}
-                    rows={2} />
-                </div>
-                <div className="flex items-center gap-3 py-1">
-                  <Switch
-                    id="has-assignment"
-                    checked={resourceForm.hasAssignment}
-                    onCheckedChange={(v) => setResourceForm((f) => ({ ...f, hasAssignment: v }))}
-                  />
-                  <Label htmlFor="has-assignment" className="cursor-pointer">Has Assignment</Label>
-                </div>
-                {resourceForm.hasAssignment && (
+              )}
+
+              {/* Manual form (shown when editing OR when "Enter URL manually" tab is active) */}
+              {(editResource || addMode === "manual") && (
+                <div className="space-y-3">
                   <div>
-                    <Label>Assignment Instructions</Label>
-                    <Textarea value={resourceForm.assignmentDescription}
-                      onChange={(e) => setResourceForm((f) => ({ ...f, assignmentDescription: e.target.value }))}
-                      rows={3}
-                      placeholder="Describe what participants should submit..." />
+                    <Label>Title</Label>
+                    <Input value={resourceForm.title}
+                      onChange={(e) => setResourceForm((f) => ({ ...f, title: e.target.value }))} />
                   </div>
-                )}
-              </div>
+                  <div>
+                    <Label>Type</Label>
+                    <Select value={resourceForm.type}
+                      onValueChange={(v) => setResourceForm((f) => ({ ...f, type: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {RESOURCE_TYPES.map((rt) => (
+                          <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>URL</Label>
+                    <Input value={resourceForm.url}
+                      onChange={(e) => setResourceForm((f) => ({ ...f, url: e.target.value }))}
+                      placeholder="https://..." />
+                  </div>
+                  <div>
+                    <Label>Description (optional)</Label>
+                    <Textarea value={resourceForm.description}
+                      onChange={(e) => setResourceForm((f) => ({ ...f, description: e.target.value }))}
+                      rows={2} />
+                  </div>
+                  <div className="flex items-center gap-3 py-1">
+                    <Switch
+                      id="has-assignment"
+                      checked={resourceForm.hasAssignment}
+                      onCheckedChange={(v) => setResourceForm((f) => ({ ...f, hasAssignment: v }))}
+                    />
+                    <Label htmlFor="has-assignment" className="cursor-pointer">Has Assignment</Label>
+                  </div>
+                  {resourceForm.hasAssignment && (
+                    <div>
+                      <Label>Assignment Instructions</Label>
+                      <Textarea value={resourceForm.assignmentDescription}
+                        onChange={(e) => setResourceForm((f) => ({ ...f, assignmentDescription: e.target.value }))}
+                        rows={3}
+                        placeholder="Describe what participants should submit..." />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <DialogFooter>
                 <Button variant="outline" onClick={() => setResourceDialog(false)}>Cancel</Button>
-                <Button disabled={saveResourceMutation.isPending}
-                  onClick={() => saveResourceMutation.mutate(resourceForm)}>
-                  {saveResourceMutation.isPending ? "Saving..." : "Save"}
-                </Button>
+                {(editResource || addMode === "manual") && (
+                  <Button disabled={saveResourceMutation.isPending}
+                    onClick={() => saveResourceMutation.mutate(resourceForm)}>
+                    {saveResourceMutation.isPending ? "Saving..." : "Save"}
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
