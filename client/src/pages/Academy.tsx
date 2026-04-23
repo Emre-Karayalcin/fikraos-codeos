@@ -116,6 +116,18 @@ function embedUrl(url: string): string | null {
   return null;
 }
 
+/** Returns "iframe" for YouTube/Vimeo, "video" for direct MP4/video files, null otherwise */
+function detectVideoType(url: string): "iframe" | "video" | null {
+  if (!url) return null;
+  if (embedUrl(url)) return "iframe";
+  try {
+    const u = new URL(url);
+    const ext = u.pathname.split(".").pop()?.toLowerCase();
+    if (ext && ["mp4", "webm", "ogg", "mov", "m4v"].includes(ext)) return "video";
+  } catch { /* ignore */ }
+  return null;
+}
+
 // Academy Home - Shows list of courses
 function AcademyHome() {
   const [, setLocation] = useLocation();
@@ -601,17 +613,26 @@ function VideoPlayer({ courseSlug, videoSlug }: { courseSlug: string; videoSlug:
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Video Player */}
           <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-contain"
-              controls
-              autoPlay
-              preload="metadata"
-              src={video.videoUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onPause={handlePause}
-              onEnded={handleEnded}
-            />
+            {embedUrl(video.videoUrl) ? (
+              <iframe
+                src={embedUrl(video.videoUrl)!}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                className="w-full h-full object-contain"
+                controls
+                autoPlay
+                preload="metadata"
+                src={video.videoUrl}
+                onTimeUpdate={handleTimeUpdate}
+                onPause={handlePause}
+                onEnded={handleEnded}
+              />
+            )}
           </div>
 
           {/* Video Info */}
@@ -886,6 +907,7 @@ function ProgramResourceView({ moduleId, resourceId }: { moduleId: string; resou
   }
 
   const embed = embedUrl(resource.url);
+  const videoType = detectVideoType(resource.url);
 
   return (
     <>
@@ -917,6 +939,16 @@ function ProgramResourceView({ moduleId, resourceId }: { moduleId: string; resou
                 allowFullScreen
               />
             </div>
+          ) : videoType === "video" ? (
+            <div className="aspect-video w-full rounded-lg overflow-hidden bg-black">
+              <video
+                className="w-full h-full object-contain"
+                controls
+                autoPlay
+                preload="metadata"
+                src={resource.url}
+              />
+            </div>
           ) : (
             <Card className="border border-border">
               <div className="p-6 flex items-center gap-4">
@@ -936,7 +968,7 @@ function ProgramResourceView({ moduleId, resourceId }: { moduleId: string; resou
           )}
 
           {/* Description */}
-          {resource.description && embed && (
+          {resource.description && videoType && (
             <div>
               <p className="text-muted-foreground text-sm">{resource.description}</p>
             </div>
