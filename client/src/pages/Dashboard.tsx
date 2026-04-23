@@ -113,9 +113,23 @@ export default function Dashboard() {
     enabled: !!user && !isMentor && !userIsAdmin,
   });
 
+  // Don't show the popup if the user already has ideas
+  const { data: existingProjects = [] } = useQuery<{ id: string; createdById: string }[]>({
+    queryKey: ['/api/projects', currentOrg?.id, 'popup-check'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects?orgId=${currentOrg!.id}`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentOrg?.id && !!user && !isMentor && !userIsAdmin,
+    staleTime: 60_000,
+  });
+  const userAlreadyHasIdea = existingProjects.some((p: any) => p.createdById === user?.id);
+
   const showPopup =
     !popupDismissed &&
-    myApplication != null;
+    myApplication != null &&
+    !userAlreadyHasIdea;
 
   // Participant consent gate — check for unaccepted PARTICIPANT_CONSENT declaration
   const [consentAgreed, setConsentAgreed] = useState(false);
