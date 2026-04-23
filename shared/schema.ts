@@ -814,6 +814,9 @@ export const mentorBookings = pgTable("mentor_bookings", {
   participantEngagement: integer("participant_engagement"),
   areasCoached: jsonb("areas_coached").$type<string[]>(),
   mentorSurveyCompletedAt: timestamp("mentor_survey_completed_at"),
+  // Participant-uploaded PPTX supporting material
+  pptxFileUrl: varchar("pptx_file_url", { length: 2000 }),
+  pptxFileName: varchar("pptx_file_name", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

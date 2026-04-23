@@ -30,6 +30,9 @@ import {
   ChevronRight,
   Star,
   ExternalLink,
+  Paperclip,
+  Loader2,
+  X,
 } from "lucide-react";
 
 interface Availability {
@@ -117,6 +120,9 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [selectedIdeaId, setSelectedIdeaId] = useState<string>("");
   const [selectedPitchDeckId, setSelectedPitchDeckId] = useState<string>("");
+  const [pptxFileUrl, setPptxFileUrl] = useState<string>("");
+  const [pptxFileName, setPptxFileName] = useState<string>("");
+  const [pptxUploading, setPptxUploading] = useState(false);
 
   const { data: mentorDetail } = useQuery<MentorDetail>({
     queryKey: [`/api/mentors/${mentor.id}`],
@@ -149,6 +155,8 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
       setSelectedTime("");
       setSelectedIdeaId("");
       setSelectedPitchDeckId("");
+      setPptxFileUrl("");
+      setPptxFileName("");
     },
     onError: (err: any) => {
       toast({ title: "Booking failed", description: err.message || "Please try again.", variant: "destructive" });
@@ -214,6 +222,32 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
     return h * 60 + m;
   }
 
+  const handlePptxSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPptxUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/uploads/pptx", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Upload failed");
+      }
+      const data = await res.json();
+      setPptxFileUrl(data.url);
+      setPptxFileName(data.fileName || file.name);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPptxUploading(false);
+    }
+  };
+
   const handleBook = () => {
     if (!selectedDate || !selectedTime) {
       toast({ title: "Please select a date and time", variant: "destructive" });
@@ -226,6 +260,8 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
       bookedDate: selectedDate,
       bookedTime: selectedTime,
       durationMinutes: mentorDetail?.sessionDurationMinutes ?? 60,
+      pptxFileUrl: pptxFileUrl || undefined,
+      pptxFileName: pptxFileName || undefined,
     });
   };
 
@@ -475,6 +511,41 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
                   </Select>
                 );
               })()}
+            </div>
+
+            {/* PPTX upload (optional) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Upload Presentation (optional)
+              </label>
+              {pptxFileUrl ? (
+                <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm bg-muted/40">
+                  <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate flex-1">{pptxFileName}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setPptxFileUrl(""); setPptxFileName(""); }}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm cursor-pointer hover:bg-muted/40 transition-colors ${pptxUploading ? "opacity-50 pointer-events-none" : ""}`}>
+                  {pptxUploading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> Uploading…</>
+                  ) : (
+                    <><Paperclip className="h-4 w-4 text-muted-foreground" /> Attach PPTX / PPT file</>
+                  )}
+                  <input
+                    type="file"
+                    accept=".pptx,.ppt,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint"
+                    className="sr-only"
+                    onChange={handlePptxSelect}
+                    disabled={pptxUploading}
+                  />
+                </label>
+              )}
             </div>
 
             {/* Calendar */}

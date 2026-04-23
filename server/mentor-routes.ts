@@ -1,9 +1,11 @@
 import { Router } from "express";
+import multer from "multer";
 import { db } from "./db";
 import { mentorProfiles, mentorAvailability, mentorBookings, mentorSurveyQuestions, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords } from "../shared/schema";
 import { eq, and, isNotNull, inArray, sql, desc, avg, count } from "drizzle-orm";
 import { Resend } from "resend";
 import { generateIcs } from "./services/calendarService";
+import { uploadToGCS } from "./lib/gcsUpload";
 
 const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const EMAIL_FROM = process.env.EMAIL_FROM || "no-reply@fikrahub.com";
@@ -15,6 +17,42 @@ const CALENDLY_CLIENT_SECRET = process.env.CALENDLY_CLIENT_SECRET || null;
 const CALENDLY_REDIRECT_URI = process.env.CALENDLY_REDIRECT_URI || null;
 
 const router = Router();
+
+// Multer instance for PPTX uploads (memory storage → GCS)
+const pptxUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = [
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/vnd.ms-powerpoint",
+    ];
+    if (allowed.includes(file.mimetype) || file.originalname.toLowerCase().endsWith(".pptx") || file.originalname.toLowerCase().endsWith(".ppt")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PPTX/PPT files are allowed"));
+    }
+  },
+});
+
+// POST /api/uploads/pptx — upload PPTX to GCS, return URL
+router.post("/uploads/pptx", pptxUpload.single("file"), async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+    const result = await uploadToGCS({
+      file: req.file,
+      folder: "pptx",
+      organizationId: req.user.orgId || "shared",
+    });
+
+    res.json({ url: result.url, fileName: req.file.originalname });
+  } catch (error: any) {
+    console.error("PPTX upload error:", error);
+    res.status(500).json({ message: error.message || "Upload failed" });
+  }
+});
 
 // Convert "HH:MM" to total minutes
 function timeToMinutes(time: string): number {
@@ -269,7 +307,7 @@ router.post("/mentor-bookings", async (req: any, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    const { mentorProfileId, ideaId, pitchDeckId, bookedDate, bookedTime, durationMinutes, notes } = req.body;
+    const { mentorProfileId, ideaId, pitchDeckId, bookedDate, bookedTime, durationMinutes, notes, pptxFileUrl, pptxFileName } = req.body;
 
     const [mentorProfile] = await db
       .select({
@@ -388,6 +426,8 @@ router.post("/mentor-bookings", async (req: any, res) => {
         meetingProvider,
         meetingLink: initialMeetingLink,
         notes: notes || null,
+        pptxFileUrl: pptxFileUrl || null,
+        pptxFileName: pptxFileName || null,
         status: "PENDING",
       })
       .returning();
@@ -767,6 +807,8 @@ router.get("/mentor-profile/my-bookings", async (req: any, res) => {
         participantEngagement: mentorBookings.participantEngagement,
         areasCoached: mentorBookings.areasCoached,
         mentorSurveyCompletedAt: mentorBookings.mentorSurveyCompletedAt,
+        pptxFileUrl: mentorBookings.pptxFileUrl,
+        pptxFileName: mentorBookings.pptxFileName,
         createdAt: mentorBookings.createdAt,
       })
       .from(mentorBookings)

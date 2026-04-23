@@ -62,6 +62,8 @@ interface Booking {
   pitchDeckId?: string;
   pitchDeckDownloadUrl?: string;
   pitchDeckStatus?: string;
+  pptxFileUrl?: string;
+  pptxFileName?: string;
   bookedDate: string;
   bookedTime: string;
   durationMinutes: number;
@@ -359,6 +361,7 @@ export default function MentorDashboard() {
   const [showAllBookings, setShowAllBookings] = useState(false);
   const [viewingIdeaBooking, setViewingIdeaBooking] = useState<Booking | null>(null);
   const [viewingParticipantIdea, setViewingParticipantIdea] = useState<any | null>(null);
+  const [pptxPreviewBooking, setPptxPreviewBooking] = useState<Booking | null>(null);
   const [mentorFeedbackDrafts, setMentorFeedbackDrafts] = useState<Record<string, string>>({});
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [rescheduleTarget, setRescheduleTarget] = useState<Booking | null>(null);
@@ -565,6 +568,14 @@ export default function MentorDashboard() {
             >
               <FileText size={11} /> View Pitch Deck <ExternalLink size={10} />
             </a>
+          )}
+          {booking.pptxFileUrl && (
+            <button
+              onClick={() => setPptxPreviewBooking(booking)}
+              className="flex items-center gap-1 text-xs text-orange-600 hover:underline"
+            >
+              <FileText size={11} /> View Presentation
+            </button>
           )}
           {booking.meetingLink && (
             <a
@@ -1201,6 +1212,36 @@ export default function MentorDashboard() {
           onClose={() => setViewingParticipantIdea(null)}
         />
       )}
+
+      {/* PPTX Presentation Preview Dialog */}
+      <Dialog open={!!pptxPreviewBooking} onOpenChange={(o) => !o && setPptxPreviewBooking(null)}>
+        <DialogContent className="max-w-4xl w-full h-[80vh] flex flex-col p-0">
+          <DialogHeader className="px-4 pt-4 pb-2 border-b shrink-0">
+            <DialogTitle>
+              Presentation — {pptxPreviewBooking?.bookerFirstName} {pptxPreviewBooking?.bookerLastName}
+            </DialogTitle>
+            {pptxPreviewBooking?.pptxFileName && (
+              <p className="text-xs text-muted-foreground truncate">{pptxPreviewBooking.pptxFileName}</p>
+            )}
+          </DialogHeader>
+          {pptxPreviewBooking?.pptxFileUrl && (
+            <div className="flex-1 overflow-hidden flex flex-col gap-2 p-3">
+              <iframe
+                src={`https://docs.google.com/viewer?url=${encodeURIComponent(pptxPreviewBooking.pptxFileUrl)}&embedded=true`}
+                className="flex-1 w-full rounded border border-border"
+                title="Presentation preview"
+              />
+              <a
+                href={pptxPreviewBooking.pptxFileUrl}
+                download={pptxPreviewBooking.pptxFileName || "presentation.pptx"}
+                className="text-xs text-primary hover:underline self-end flex items-center gap-1"
+              >
+                <ExternalLink size={11} /> Download file
+              </a>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel booking confirmation dialog */}
       <Dialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
