@@ -624,6 +624,23 @@ export default function Challenges() {
      staleTime: 5 * 60 * 1000,
    });
 
+   // Derive the challenge the user is "locked into":
+   // 1. They have a project (idea) linked to a specific sector, OR
+   // 2. Their application has a challengeId assigned
+   const { data: userProjects = [] } = useQuery<{ id: string; challengeId?: string | null; createdById: string }[]>({
+     queryKey: ['/api/projects', user?.primaryOrgId, 'mine'],
+     queryFn: async () => {
+       const response = await fetch(`/api/projects?orgId=${user?.primaryOrgId}`, { credentials: 'include' });
+       if (!response.ok) return [];
+       return response.json();
+     },
+     enabled: !!user?.primaryOrgId && !isAdmin,
+     staleTime: 60_000,
+   });
+
+   const userIdeaChallengeId = userProjects.find(p => p.createdById === user?.id && p.challengeId)?.challengeId ?? null;
+   const effectiveUserChallengeId = userIdeaChallengeId ?? myApplication?.challengeId ?? null;
+
    return (
      <div className="h-screen w-full bg-background text-foreground overflow-hidden flex relative">
        <div className="hidden sm:block">
@@ -709,7 +726,7 @@ export default function Challenges() {
              {!isLoading && filteredChallenges.length > 0 && (
                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="challenges-grid">
                  {filteredChallenges.map(challenge => (
-                   <ChallengeCard key={challenge.id} challenge={challenge} workspaceSlug={currentWorkspaceSlug} isAdmin={isAdmin} userApplicationChallengeId={myApplication?.challengeId ?? null} />
+                   <ChallengeCard key={challenge.id} challenge={challenge} workspaceSlug={currentWorkspaceSlug} isAdmin={isAdmin} userApplicationChallengeId={effectiveUserChallengeId} />
                  ))}
                </div>
              )}
