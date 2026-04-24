@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    body{margin:0;background:#f6f8fb;font-family:Inter,system-ui,Arial,sans-serif;color:#111}
+    .wrap{max-width:640px;margin:28px auto;padding:24px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 6px 30px rgba(16,24,40,0.06);overflow:hidden}
+    .header{padding:28px 32px;background:linear-gradient(135deg,#f59e0b 0%,#ef4444 100%);color:#fff}
+    .header h1{margin:0;font-size:22px;font-weight:700}
+    .header p{margin:6px 0 0;font-size:14px;opacity:.85}
+    .body{padding:28px 32px;line-height:1.6;color:#0f172a}
+    .cta{display:inline-block;margin:8px 0;padding:12px 24px;background:#478af5;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
+    .footer{padding:18px 32px;background:#fbfdff;border-top:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap"><div class="card">
+    <div class="header">
+      <h1>📝 Feedback Reminder</h1>
+      <p>Your participant is waiting for improvement notes</p>
+    </div>
+    <div class="body">
+      <p>Hi {{ mentorName }},</p>
+      <p>Your session with <strong>{{ participantName }}</strong> on <strong>{{ sessionDate }}</strong> has been completed, but improvement feedback has not yet been submitted.</p>
+      <p>Participants can only see your notes after you submit them. Please take a moment to share your feedback — it helps them grow.</p>
+      <p style="text-align:center"><a class="cta" href="{{ dashboardUrl }}">Submit Feedback Now</a></p>
+      <p style="font-size:13px;color:#64748b;margin-top:24px">This is an automated reminder from CodeOS.</p>
+    </div>
+    <div class="footer">© 2025 CodeOS — All rights reserved</div>
+  </div></div>
+</body>
+</html>

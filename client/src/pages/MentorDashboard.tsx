@@ -72,6 +72,7 @@ interface Booking {
   notes?: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   mentorFeedback?: string | null;
+  mentorFeedbackUpdatedAt?: string | null;
   rating?: number | null;
   feedback?: string | null;
   sessionGoalMet?: boolean | null;
@@ -308,11 +309,16 @@ function MentorSurveyCard({
 
           {/* Written feedback */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Written feedback for participant <span className="font-normal">(optional)</span></p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Participant Improvement Notes <span className="text-destructive">*</span>
+            </p>
+            <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+              ℹ️ This feedback is participant-facing and immediately visible to them once submitted.
+            </div>
             <Textarea
               value={feedbackValue}
               onChange={(e) => onFeedbackChange(e.target.value)}
-              placeholder="Share actionable notes the participant will see in their dashboard..."
+              placeholder="Write improvement feedback for the participant — this will be shown directly to them after submission."
               rows={3}
             />
           </div>
@@ -323,9 +329,15 @@ function MentorSurveyCard({
                 Save Notes Only
               </Button>
             )}
-            <Button size="sm" disabled={isPending} onClick={() => onSubmit(engagement, areas)}>
-              {isPending ? "Saving…" : surveyDone ? "Update Survey" : "Submit Survey"}
-            </Button>
+            <div title={!feedbackValue.trim() ? "Add improvement feedback before submitting" : undefined}>
+              <Button
+                size="sm"
+                disabled={isPending || !feedbackValue.trim()}
+                onClick={() => onSubmit(engagement, areas)}
+              >
+                {isPending ? "Saving…" : surveyDone ? "Update Survey" : "Submit Survey"}
+              </Button>
+            </div>
           </div>
         </>
       )}
@@ -518,10 +530,12 @@ export default function MentorDashboard() {
 
   const showProfileBanner = !profile || !profile.bio;
 
+  const pendingFeedbackCount = completedBookings.filter((b) => !b.mentorFeedbackUpdatedAt).length;
+
   const tabs = [
     { key: "overview", label: "Overview" },
     { key: "calendar", label: "Calendar" },
-    { key: "feedback", label: "Feedback" },
+    { key: "feedback", label: pendingFeedbackCount > 0 ? `Feedback (${pendingFeedbackCount})` : "Feedback" },
     { key: "profile", label: "Profile" },
     { key: "participants", label: "Participants" },
   ] as const;
@@ -1141,40 +1155,57 @@ export default function MentorDashboard() {
 
               <div className="pt-4 border-t border-border space-y-4">
                 <div>
-                  <h3 className="font-semibold text-text-primary">Post-Session Survey & Feedback</h3>
+                  <h3 className="font-semibold text-text-primary">Post-Session Survey & Participant Improvement Notes</h3>
                   <p className="text-text-secondary text-sm mt-0.5">
-                    Rate participant engagement and share written feedback they can view in their dashboard.
+                    Rate participant engagement and share improvement feedback — participants see it immediately after submission.
                   </p>
                 </div>
 
-                {bookings.filter((b) => b.status === "COMPLETED").length === 0 ? (
+                {completedBookings.length === 0 ? (
                   <div className="bg-card border border-border rounded-xl p-4 text-sm text-text-secondary">
                     Completed sessions will appear here.
                   </div>
                 ) : (
-                  bookings.filter((b) => b.status === "COMPLETED").map((b) => {
+                  [...completedBookings]
+                    .sort((a, b) => {
+                      const aPending = !a.mentorFeedbackUpdatedAt ? 0 : 1;
+                      const bPending = !b.mentorFeedbackUpdatedAt ? 0 : 1;
+                      return aPending - bPending;
+                    })
+                    .map((b) => {
                     const feedbackValue = mentorFeedbackDrafts[b.id] ?? b.mentorFeedback ?? "";
                     const surveyDone = !!b.mentorSurveyCompletedAt;
+                    const feedbackPending = !b.mentorFeedbackUpdatedAt;
                     return (
-                      <MentorSurveyCard
-                        key={`mentor-survey-${b.id}`}
-                        booking={b}
-                        feedbackValue={feedbackValue}
-                        onFeedbackChange={(val) => setMentorFeedbackDrafts((prev) => ({ ...prev, [b.id]: val }))}
-                        surveyDone={surveyDone}
-                        onSubmit={(engagement, areas) =>
-                          mentorSurveyMutation.mutate({
-                            id: b.id,
-                            mentorFeedback: feedbackValue,
-                            participantEngagement: engagement,
-                            areasCoached: areas,
-                          })
-                        }
-                        isPending={mentorSurveyMutation.isPending}
-                        onSaveFeedbackOnly={() =>
-                          mentorFeedbackMutation.mutate({ id: b.id, mentorFeedback: feedbackValue })
-                        }
-                      />
+                      <div key={`mentor-survey-wrap-${b.id}`}>
+                        {feedbackPending && (
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                              Feedback Required
+                            </span>
+                            <span className="text-xs text-muted-foreground">{b.bookedDate}</span>
+                          </div>
+                        )}
+                        <MentorSurveyCard
+                          key={`mentor-survey-${b.id}`}
+                          booking={b}
+                          feedbackValue={feedbackValue}
+                          onFeedbackChange={(val) => setMentorFeedbackDrafts((prev) => ({ ...prev, [b.id]: val }))}
+                          surveyDone={surveyDone}
+                          onSubmit={(engagement, areas) =>
+                            mentorSurveyMutation.mutate({
+                              id: b.id,
+                              mentorFeedback: feedbackValue,
+                              participantEngagement: engagement,
+                              areasCoached: areas,
+                            })
+                          }
+                          isPending={mentorSurveyMutation.isPending}
+                          onSaveFeedbackOnly={() =>
+                            mentorFeedbackMutation.mutate({ id: b.id, mentorFeedback: feedbackValue })
+                          }
+                        />
+                      </div>
                     );
                   })
                 )}

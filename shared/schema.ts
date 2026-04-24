@@ -152,6 +152,8 @@ export const organizations = pgTable("organizations", {
   expertsDescAr: varchar("experts_desc_ar"),
   acceptanceCapacity: integer("acceptance_capacity").default(280).notNull(),
   location: varchar("location", { length: 500 }),
+  // Mentor feedback reminder config (hours after session until mentor gets reminder)
+  mentorFeedbackReminderHours: integer("mentor_feedback_reminder_hours").default(24),
   // Consultation feature config
   consultationEnabled: boolean("consultation_enabled").default(false),
   consultationMinCredits: integer("consultation_min_credits").default(10),
@@ -817,6 +819,8 @@ export const mentorBookings = pgTable("mentor_bookings", {
   // Participant-uploaded PPTX supporting material
   pptxFileUrl: varchar("pptx_file_url", { length: 2000 }),
   pptxFileName: varchar("pptx_file_name", { length: 500 }),
+  feedbackReminderSentAt: timestamp("feedback_reminder_sent_at"),
+  adminAlertSentAt: timestamp("admin_alert_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

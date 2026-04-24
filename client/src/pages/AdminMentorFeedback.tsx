@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { MessageSquare, Star, Pencil } from "lucide-react";
+import { MessageSquare, Star, Pencil, Clock } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -163,11 +163,15 @@ function EditSurveyDialog({
 }
 
 export default function AdminMentorFeedback() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { slug } = useParams<{ slug: string }>();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [filterMentorId, setFilterMentorId] = useState("all");
   const [filterMinRating, setFilterMinRating] = useState("all");
+  const [filterPending, setFilterPending] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
+  const [reminderHoursInput, setReminderHoursInput] = useState<number | "">(24);
 
   const { data: workspace } = useQuery<{ id: string }>({
     queryKey: [`/api/workspaces/${slug}`],
@@ -183,7 +187,7 @@ export default function AdminMentorFeedback() {
   if (filterMentorId && filterMentorId !== "all") params.set("mentorId", filterMentorId);
   if (filterMinRating && filterMinRating !== "all") params.set("minRating", filterMinRating);
 
-  const { data: feedback = [], isLoading } = useQuery<any[]>({
+  const { data: feedbackData, isLoading } = useQuery<{ records: any[]; feedbackPendingCount: number; reminderHours: number }>({
     queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`, filterMentorId, filterMinRating],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${orgId}/admin/mentor-feedback?${params}`, { credentials: "include" });
@@ -193,8 +197,34 @@ export default function AdminMentorFeedback() {
     enabled: !!orgId,
   });
 
+  const allRecords: any[] = feedbackData?.records ?? [];
+  const feedbackPendingCount = feedbackData?.feedbackPendingCount ?? 0;
+
+  // Sync reminder hours from server once loaded
+  useEffect(() => {
+    if (feedbackData?.reminderHours != null) {
+      setReminderHoursInput(feedbackData.reminderHours);
+    }
+  }, [feedbackData?.reminderHours]);
+
+  const reminderMutation = useMutation({
+    mutationFn: (hours: number) =>
+      apiRequest("PATCH", `/api/workspaces/${orgId}/admin/mentor-reminder-settings`, { mentorFeedbackReminderHours: hours }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`] });
+      toast({ title: "Reminder settings saved" });
+    },
+    onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+  });
+
+  const feedback = (() => {
+    let records = filterPending ? allRecords.filter((r) => !r.mentorFeedbackUpdatedAt) : allRecords;
+    if (filterPending) records = [...records].sort((a, b) => a.bookedDate.localeCompare(b.bookedDate));
+    return records;
+  })();
+
   // Collect unique mentor names from results
-  const mentors = Array.from(new Map(feedback.map(f => [f.mentorProfileId, f.mentorName])).entries());
+  const mentors = Array.from(new Map(allRecords.map(f => [f.mentorProfileId, f.mentorName])).entries());
 
   const avgRating = feedback.length > 0
     ? (feedback.reduce((sum, f) => sum + (f.rating || 0), 0) / feedback.length).toFixed(1)
@@ -213,12 +243,41 @@ export default function AdminMentorFeedback() {
             </div>
           </div>
 
+          {/* Reminder settings */}
+          <Card className="border-l-4 border-l-blue-400">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-blue-500" />
+                <p className="text-sm font-medium">Feedback Reminder Settings</p>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className="text-sm text-muted-foreground">Send reminder to mentor after</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={168}
+                  value={reminderHoursInput}
+                  onChange={(e) => setReminderHoursInput(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="w-20 h-8 text-sm"
+                />
+                <label className="text-sm text-muted-foreground">hours</label>
+                <Button
+                  size="sm"
+                  disabled={reminderMutation.isPending || !reminderHoursInput || Number(reminderHoursInput) < 1 || Number(reminderHoursInput) > 168}
+                  onClick={() => reminderMutation.mutate(Number(reminderHoursInput))}
+                >
+                  {reminderMutation.isPending ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className="border-l-4 border-l-yellow-500">
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">Total Reviews</p>
-                <p className="text-2xl font-bold mt-1">{feedback.length}</p>
+                <p className="text-2xl font-bold mt-1">{allRecords.length}</p>
               </CardContent>
             </Card>
             <Card className="border-l-4 border-l-yellow-500">
@@ -233,47 +292,71 @@ export default function AdminMentorFeedback() {
             <Card className="border-l-4 border-l-blue-500">
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">5-Star Reviews</p>
-                <p className="text-2xl font-bold mt-1">{feedback.filter(f => f.rating === 5).length}</p>
+                <p className="text-2xl font-bold mt-1">{allRecords.filter(f => f.rating === 5).length}</p>
+              </CardContent>
+            </Card>
+            <Card className={`border-l-4 ${feedbackPendingCount > 0 ? "border-l-orange-500" : "border-l-green-500"}`}>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Pending Feedback</p>
+                <p className={`text-2xl font-bold mt-1 ${feedbackPendingCount > 0 ? "text-orange-600" : "text-green-600"}`}>
+                  {feedbackPendingCount}
+                </p>
               </CardContent>
             </Card>
           </div>
 
           {/* Filters */}
-          <div className="flex gap-3 flex-wrap">
-            <Select value={filterMentorId} onValueChange={setFilterMentorId}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All mentors" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All mentors</SelectItem>
-                {mentors.map(([id, name]) => (
-                  <SelectItem key={id} value={id}>{name || id}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterMinRating} onValueChange={setFilterMinRating}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Min rating" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All ratings</SelectItem>
-                <SelectItem value="5">5 stars only</SelectItem>
-                <SelectItem value="4">4+ stars</SelectItem>
-                <SelectItem value="3">3+ stars</SelectItem>
-                <SelectItem value="2">2+ stars</SelectItem>
-              </SelectContent>
-            </Select>
-            {(filterMentorId !== "all" || filterMinRating !== "all") && (
-              <Button variant="outline" size="sm" onClick={() => { setFilterMentorId("all"); setFilterMinRating("all"); }}>
-                Clear
-              </Button>
-            )}
+          <div className="flex gap-3 flex-wrap items-center">
+            <button
+              onClick={() => setFilterPending(false)}
+              className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${!filterPending ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40"}`}
+            >
+              All Sessions
+            </button>
+            <button
+              onClick={() => setFilterPending(true)}
+              className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${filterPending ? "bg-orange-500 text-white border-orange-500" : "border-border text-muted-foreground hover:border-orange-400"}`}
+            >
+              Pending {feedbackPendingCount > 0 && <span className="ml-1 font-semibold">({feedbackPendingCount})</span>}
+            </button>
+            <div className="flex gap-3 flex-wrap ml-2">
+              <Select value={filterMentorId} onValueChange={setFilterMentorId}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="All mentors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All mentors</SelectItem>
+                  {mentors.map(([id, name]) => (
+                    <SelectItem key={id} value={id}>{name || id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterMinRating} onValueChange={setFilterMinRating}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Min rating" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All ratings</SelectItem>
+                  <SelectItem value="5">5 stars only</SelectItem>
+                  <SelectItem value="4">4+ stars</SelectItem>
+                  <SelectItem value="3">3+ stars</SelectItem>
+                  <SelectItem value="2">2+ stars</SelectItem>
+                </SelectContent>
+              </Select>
+              {(filterMentorId !== "all" || filterMinRating !== "all") && (
+                <Button variant="outline" size="sm" onClick={() => { setFilterMentorId("all"); setFilterMinRating("all"); }}>
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Table */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Feedback Records</CardTitle>
+              <CardTitle className="text-base">
+                {filterPending ? `Pending Feedback (${feedbackPendingCount})` : "Feedback Records"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {isLoading ? (

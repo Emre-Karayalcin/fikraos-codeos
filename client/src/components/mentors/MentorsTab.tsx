@@ -54,6 +54,7 @@ interface MyBooking {
   notes?: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   mentorFeedback?: string | null;
+  mentorFeedbackUpdatedAt?: string | null;
   rating?: number | null;
   feedback?: string | null;
   surveyResponses?: Record<string, string | number | boolean> | null;
@@ -252,13 +253,21 @@ function BookingDetailModal({
             )}
           </div>
 
-          {booking.mentorFeedback && (
-            <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                <MessageSquareText className="h-3.5 w-3.5" /> Mentor Feedback
-              </p>
-              <p className="text-sm text-foreground">{booking.mentorFeedback}</p>
-            </div>
+          {booking.status === "COMPLETED" && (
+            booking.mentorFeedbackUpdatedAt ? (
+              <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <MessageSquareText className="h-3.5 w-3.5" /> Improvement Notes from Your Mentor
+                </p>
+                <p className="text-sm text-foreground">{booking.mentorFeedback}</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-muted/10 p-3">
+                <p className="text-xs text-muted-foreground italic">
+                  Your mentor's improvement notes will appear here once submitted.
+                </p>
+              </div>
+            )
           )}
 
           {/* Reschedule form */}

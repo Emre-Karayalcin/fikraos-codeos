@@ -1,8 +1,8 @@
 import { Router } from "express";
 import multer from "multer";
 import { db } from "./db";
-import { mentorProfiles, mentorAvailability, mentorBookings, mentorSurveyQuestions, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords } from "../shared/schema";
-import { eq, and, isNotNull, inArray, sql, desc, avg, count } from "drizzle-orm";
+import { mentorProfiles, mentorAvailability, mentorBookings, mentorSurveyQuestions, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords, organizations } from "../shared/schema";
+import { eq, and, isNotNull, isNull, inArray, sql, desc, avg, count, lt } from "drizzle-orm";
 import { Resend } from "resend";
 import { generateIcs } from "./services/calendarService";
 import { uploadToGCS } from "./lib/gcsUpload";
@@ -593,6 +593,187 @@ async function autoCompleteExpiredBookings(userId?: string, mentorProfileId?: st
       .set({ status: "COMPLETED", updatedAt: new Date() })
       .where(inArray(mentorBookings.id, toComplete));
   }
+
+  // Fire-and-forget: send reminder/alert emails for sessions missing feedback
+  checkAndSendFeedbackReminders().catch((e) =>
+    console.error("checkAndSendFeedbackReminders error:", e)
+  );
+}
+
+async function checkAndSendFeedbackReminders() {
+  if (!resendClient) return;
+
+  const pending = await db
+    .select({
+      id: mentorBookings.id,
+      bookedDate: mentorBookings.bookedDate,
+      bookedTime: mentorBookings.bookedTime,
+      durationMinutes: mentorBookings.durationMinutes,
+      feedbackReminderSentAt: mentorBookings.feedbackReminderSentAt,
+      adminAlertSentAt: mentorBookings.adminAlertSentAt,
+      mentorProfileId: mentorBookings.mentorProfileId,
+      userId: mentorBookings.userId,
+      orgId: mentorProfiles.orgId,
+    })
+    .from(mentorBookings)
+    .innerJoin(mentorProfiles, eq(mentorBookings.mentorProfileId, mentorProfiles.id))
+    .where(
+      and(
+        eq(mentorBookings.status, "COMPLETED"),
+        isNull(mentorBookings.mentorFeedbackUpdatedAt),
+      )
+    );
+
+  if (pending.length === 0) return;
+
+  // Collect unique orgIds and fetch reminder hours
+  const orgIds = [...new Set(pending.map((b) => b.orgId))];
+  const orgsData = await db
+    .select({ id: organizations.id, mentorFeedbackReminderHours: organizations.mentorFeedbackReminderHours, name: organizations.name })
+    .from(organizations)
+    .where(inArray(organizations.id, orgIds));
+  const orgMap = new Map(orgsData.map((o) => [o.id, o]));
+
+  const now = new Date();
+
+  for (const b of pending) {
+    const org = orgMap.get(b.orgId);
+    if (!org) continue;
+    const reminderHours = org.mentorFeedbackReminderHours ?? 24;
+
+    const [h, m] = b.bookedTime.split(":").map(Number);
+    const sessionEnd = new Date(`${b.bookedDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`);
+    sessionEnd.setMinutes(sessionEnd.getMinutes() + (b.durationMinutes ?? 60));
+
+    const reminderThreshold = new Date(sessionEnd.getTime() + reminderHours * 3600_000);
+    const alertThreshold = new Date(reminderThreshold.getTime() + 24 * 3600_000);
+
+    // Send mentor reminder
+    if (now >= reminderThreshold && !b.feedbackReminderSentAt) {
+      const [mentorUser] = await db
+        .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+        .from(mentorProfiles)
+        .innerJoin(users, eq(mentorProfiles.userId, users.id))
+        .where(eq(mentorProfiles.id, b.mentorProfileId))
+        .limit(1);
+
+      const [participant] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, b.userId))
+        .limit(1);
+
+      if (mentorUser?.email) {
+        const mentorName = `${mentorUser.firstName || ""} ${mentorUser.lastName || ""}`.trim() || mentorUser.email;
+        const participantName = participant ? `${participant.firstName || ""} ${participant.lastName || ""}`.trim() : "your participant";
+        const dashboardUrl = `${process.env.APP_URL || "https://os.fikrahub.com"}/dashboard`;
+
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>
+          body{margin:0;background:#f6f8fb;font-family:Inter,system-ui,Arial,sans-serif;color:#111}
+          .wrap{max-width:640px;margin:28px auto;padding:24px}
+          .card{background:#fff;border-radius:12px;box-shadow:0 6px 30px rgba(16,24,40,0.06);overflow:hidden}
+          .header{padding:28px 32px;background:linear-gradient(135deg,#f59e0b 0%,#ef4444 100%);color:#fff}
+          .header h1{margin:0;font-size:22px;font-weight:700}
+          .header p{margin:6px 0 0;font-size:14px;opacity:.85}
+          .body{padding:28px 32px;line-height:1.6;color:#0f172a}
+          .cta{display:inline-block;margin:8px 0;padding:12px 24px;background:#478af5;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
+          .footer{padding:18px 32px;background:#fbfdff;border-top:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:13px}
+        </style></head><body>
+          <div class="wrap"><div class="card">
+            <div class="header"><h1>📝 Feedback Reminder</h1><p>Your participant is waiting for improvement notes</p></div>
+            <div class="body">
+              <p>Hi ${mentorName},</p>
+              <p>Your session with <strong>${participantName}</strong> on <strong>${b.bookedDate}</strong> has been completed, but improvement feedback has not yet been submitted.</p>
+              <p>Participants can only see your notes after you submit them. Please take a moment to share your feedback — it helps them grow.</p>
+              <p style="text-align:center"><a class="cta" href="${dashboardUrl}">Submit Feedback Now</a></p>
+              <p style="font-size:13px;color:#64748b;margin-top:24px">This is an automated reminder from CodeOS.</p>
+            </div>
+            <div class="footer">© 2025 CodeOS — All rights reserved</div>
+          </div></div>
+        </body></html>`;
+
+        await resendClient.emails.send({
+          from: EMAIL_FROM,
+          to: mentorUser.email,
+          subject: `Reminder: Submit feedback for ${participantName}`,
+          html,
+        });
+      }
+
+      await db.update(mentorBookings)
+        .set({ feedbackReminderSentAt: now, updatedAt: now })
+        .where(eq(mentorBookings.id, b.id));
+    }
+
+    // Send admin alert
+    if (now >= alertThreshold && !b.adminAlertSentAt) {
+      const [mentorUser] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(mentorProfiles)
+        .innerJoin(users, eq(mentorProfiles.userId, users.id))
+        .where(eq(mentorProfiles.id, b.mentorProfileId))
+        .limit(1);
+
+      const [participant] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, b.userId))
+        .limit(1);
+
+      const adminMembers = await db
+        .select({ userId: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(and(eq(organizationMembers.orgId, b.orgId), inArray(organizationMembers.role, ["ADMIN", "OWNER"])));
+
+      const adminEmails = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(inArray(users.id, adminMembers.map((a) => a.userId)));
+
+      const mentorName = mentorUser ? `${mentorUser.firstName || ""} ${mentorUser.lastName || ""}`.trim() : "Mentor";
+      const participantName = participant ? `${participant.firstName || ""} ${participant.lastName || ""}`.trim() : "Participant";
+      const adminUrl = `${process.env.APP_URL || "https://os.fikrahub.com"}/w/${b.orgId}/admin/mentor-feedback`;
+
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>
+        body{margin:0;background:#f6f8fb;font-family:Inter,system-ui,Arial,sans-serif;color:#111}
+        .wrap{max-width:640px;margin:28px auto;padding:24px}
+        .card{background:#fff;border-radius:12px;box-shadow:0 6px 30px rgba(16,24,40,0.06);overflow:hidden}
+        .header{padding:28px 32px;background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:#fff}
+        .header h1{margin:0;font-size:22px;font-weight:700}
+        .header p{margin:6px 0 0;font-size:14px;opacity:.85}
+        .body{padding:28px 32px;line-height:1.6;color:#0f172a}
+        .cta{display:inline-block;margin:8px 0;padding:12px 24px;background:#478af5;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
+        .footer{padding:18px 32px;background:#fbfdff;border-top:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:13px}
+      </style></head><body>
+        <div class="wrap"><div class="card">
+          <div class="header"><h1>🚨 Missing Mentor Feedback</h1><p>${org.name} — action may be required</p></div>
+          <div class="body">
+            <p>Hi,</p>
+            <p>Mentor <strong>${mentorName}</strong> has still not submitted improvement feedback for participant <strong>${participantName}</strong> after their session on <strong>${b.bookedDate}</strong>.</p>
+            <p>A reminder was already sent to the mentor. If this persists, you may want to follow up directly.</p>
+            <p style="text-align:center"><a class="cta" href="${adminUrl}">View Feedback Dashboard</a></p>
+            <p style="font-size:13px;color:#64748b;margin-top:24px">This is an automated alert from CodeOS.</p>
+          </div>
+          <div class="footer">© 2025 CodeOS — All rights reserved</div>
+        </div></div>
+      </body></html>`;
+
+      for (const { email } of adminEmails) {
+        if (email) {
+          await resendClient.emails.send({
+            from: EMAIL_FROM,
+            to: email,
+            subject: `Action needed: ${mentorName} hasn't submitted feedback for ${participantName}`,
+            html,
+          });
+        }
+      }
+
+      await db.update(mentorBookings)
+        .set({ adminAlertSentAt: now, updatedAt: now })
+        .where(eq(mentorBookings.id, b.id));
+    }
+  }
 }
 
 // GET /api/mentor-bookings/mine - Get user's bookings with mentor details
@@ -622,6 +803,7 @@ router.get("/mentor-bookings/mine", async (req: any, res) => {
         meetingLink: mentorBookings.meetingLink,
         notes: mentorBookings.notes,
         mentorFeedback: mentorBookings.mentorFeedback,
+        mentorFeedbackUpdatedAt: mentorBookings.mentorFeedbackUpdatedAt,
         status: mentorBookings.status,
         rating: mentorBookings.rating,
         feedback: mentorBookings.feedback,
@@ -1378,6 +1560,10 @@ router.patch("/mentor-bookings/:id/mentor-survey", async (req: any, res) => {
 
     const { mentorFeedback, participantEngagement, areasCoached } = req.body;
 
+    if (!mentorFeedback || typeof mentorFeedback !== "string" || !mentorFeedback.trim()) {
+      return res.status(400).json({ message: "Improvement feedback for participant is required." });
+    }
+
     if (participantEngagement !== undefined && (typeof participantEngagement !== "number" || participantEngagement < 1 || participantEngagement > 5)) {
       return res.status(400).json({ message: "participantEngagement must be 1–5" });
     }
@@ -1733,10 +1919,71 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
     if (minRating) result = result.filter(r => (r.rating || 0) >= parseInt(minRating));
     if (maxRating) result = result.filter(r => (r.rating || 0) <= parseInt(maxRating));
 
-    res.json(result);
+    // Count completed sessions missing feedback for PMO summary
+    const [pendingCountRow] = await db
+      .select({ count: count() })
+      .from(mentorBookings)
+      .where(
+        and(
+          inArray(mentorBookings.mentorProfileId, orgMentors.map((m) => m.id)),
+          eq(mentorBookings.status, "COMPLETED"),
+          isNull(mentorBookings.mentorFeedbackUpdatedAt),
+        )
+      );
+
+    const [orgSettings] = await db
+      .select({ mentorFeedbackReminderHours: organizations.mentorFeedbackReminderHours })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+
+    res.json({
+      records: result,
+      feedbackPendingCount: pendingCountRow?.count ?? 0,
+      reminderHours: orgSettings?.mentorFeedbackReminderHours ?? 24,
+    });
   } catch (error) {
     console.error("Error fetching mentor feedback:", error);
     res.status(500).json({ message: "Failed to fetch mentor feedback" });
+  }
+});
+
+// PATCH /api/workspaces/:orgId/admin/mentor-reminder-settings
+router.patch("/workspaces/:orgId/admin/mentor-reminder-settings", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { orgId } = req.params;
+    const { mentorFeedbackReminderHours } = req.body;
+
+    if (
+      typeof mentorFeedbackReminderHours !== "number" ||
+      mentorFeedbackReminderHours < 1 ||
+      mentorFeedbackReminderHours > 168
+    ) {
+      return res.status(400).json({ message: "mentorFeedbackReminderHours must be between 1 and 168" });
+    }
+
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, req.user.id)))
+      .limit(1);
+
+    if (!membership || !membership.role || !["ADMIN", "OWNER"].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const [updated] = await db
+      .update(organizations)
+      .set({ mentorFeedbackReminderHours, updatedAt: new Date() })
+      .where(eq(organizations.id, orgId))
+      .returning({ mentorFeedbackReminderHours: organizations.mentorFeedbackReminderHours });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating reminder settings:", error);
+    res.status(500).json({ message: "Failed to update reminder settings" });
   }
 });
 
