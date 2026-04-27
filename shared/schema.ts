@@ -154,6 +154,8 @@ export const organizations = pgTable("organizations", {
   location: varchar("location", { length: 500 }),
   // Mentor feedback reminder config (hours after session until mentor gets reminder)
   mentorFeedbackReminderHours: integer("mentor_feedback_reminder_hours").default(24),
+  // Session reminder config (hours BEFORE session to send reminder to participants)
+  sessionReminderHours: integer("session_reminder_hours").default(24),
   // Consultation feature config
   consultationEnabled: boolean("consultation_enabled").default(false),
   consultationMinCredits: integer("consultation_min_credits").default(10),
@@ -821,6 +823,7 @@ export const mentorBookings = pgTable("mentor_bookings", {
   pptxFileName: varchar("pptx_file_name", { length: 500 }),
   feedbackReminderSentAt: timestamp("feedback_reminder_sent_at"),
   adminAlertSentAt: timestamp("admin_alert_sent_at"),
+  sessionReminderSentAt: timestamp("session_reminder_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1242,6 +1245,7 @@ export const moduleConsultations = pgTable("module_consultations", {
   meetingLink: text("meeting_link"),
   notes: text("notes"),
   status: text("status").notNull().default("scheduled"), // scheduled | completed | cancelled
+  sessionReminderSentAt: timestamp("session_reminder_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1321,6 +1325,7 @@ export const consultationBookings = pgTable("consultation_bookings", {
   orgId:               varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   status:              consultationBookingStatusEnum("status").default("PENDING"),
   calendarInviteSent:  boolean("calendar_invite_sent").default(false),
+  sessionReminderSentAt: timestamp("session_reminder_sent_at"),
   bookedAt:            timestamp("booked_at").defaultNow(),
   cancelledAt:         timestamp("cancelled_at"),
 });

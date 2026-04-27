@@ -172,6 +172,7 @@ export default function AdminMentorFeedback() {
   const [filterPending, setFilterPending] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
   const [reminderHoursInput, setReminderHoursInput] = useState<number | "">(24);
+  const [sessionReminderHoursInput, setSessionReminderHoursInput] = useState<number | "">(24);
 
   const { data: workspace } = useQuery<{ id: string }>({
     queryKey: [`/api/workspaces/${slug}`],
@@ -187,7 +188,7 @@ export default function AdminMentorFeedback() {
   if (filterMentorId && filterMentorId !== "all") params.set("mentorId", filterMentorId);
   if (filterMinRating && filterMinRating !== "all") params.set("minRating", filterMinRating);
 
-  const { data: feedbackData, isLoading } = useQuery<{ records: any[]; feedbackPendingCount: number; reminderHours: number }>({
+  const { data: feedbackData, isLoading } = useQuery<{ records: any[]; feedbackPendingCount: number; reminderHours: number; sessionReminderHours: number }>({
     queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`, filterMentorId, filterMinRating],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${orgId}/admin/mentor-feedback?${params}`, { credentials: "include" });
@@ -205,14 +206,27 @@ export default function AdminMentorFeedback() {
     if (feedbackData?.reminderHours != null) {
       setReminderHoursInput(feedbackData.reminderHours);
     }
-  }, [feedbackData?.reminderHours]);
+    if (feedbackData?.sessionReminderHours != null) {
+      setSessionReminderHoursInput(feedbackData.sessionReminderHours);
+    }
+  }, [feedbackData?.reminderHours, feedbackData?.sessionReminderHours]);
 
   const reminderMutation = useMutation({
     mutationFn: (hours: number) =>
       apiRequest("PATCH", `/api/workspaces/${orgId}/admin/mentor-reminder-settings`, { mentorFeedbackReminderHours: hours }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`] });
-      toast({ title: "Reminder settings saved" });
+      toast({ title: "Feedback reminder settings saved" });
+    },
+    onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+  });
+
+  const sessionReminderMutation = useMutation({
+    mutationFn: (hours: number) =>
+      apiRequest("PATCH", `/api/workspaces/${orgId}/admin/session-reminder-settings`, { sessionReminderHours: hours }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`] });
+      toast({ title: "Session reminder settings saved" });
     },
     onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
   });
@@ -244,33 +258,67 @@ export default function AdminMentorFeedback() {
           </div>
 
           {/* Reminder settings */}
-          <Card className="border-l-4 border-l-blue-400">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="w-4 h-4 text-blue-500" />
-                <p className="text-sm font-medium">Feedback Reminder Settings</p>
-              </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <label className="text-sm text-muted-foreground">Send reminder to mentor after</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={168}
-                  value={reminderHoursInput}
-                  onChange={(e) => setReminderHoursInput(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-20 h-8 text-sm"
-                />
-                <label className="text-sm text-muted-foreground">hours</label>
-                <Button
-                  size="sm"
-                  disabled={reminderMutation.isPending || !reminderHoursInput || Number(reminderHoursInput) < 1 || Number(reminderHoursInput) > 168}
-                  onClick={() => reminderMutation.mutate(Number(reminderHoursInput))}
-                >
-                  {reminderMutation.isPending ? "Saving…" : "Save"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-l-4 border-l-blue-400">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4 text-blue-500" />
+                  <p className="text-sm font-medium">Session Reminder</p>
+                  <span className="text-xs text-muted-foreground ml-1">— applies to all booking types</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-sm text-muted-foreground">Send reminder</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={168}
+                    value={sessionReminderHoursInput}
+                    onChange={(e) => setSessionReminderHoursInput(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-20 h-8 text-sm"
+                  />
+                  <label className="text-sm text-muted-foreground">hours before session</label>
+                  <Button
+                    size="sm"
+                    disabled={sessionReminderMutation.isPending || !sessionReminderHoursInput || Number(sessionReminderHoursInput) < 1 || Number(sessionReminderHoursInput) > 168}
+                    onClick={() => sessionReminderMutation.mutate(Number(sessionReminderHoursInput))}
+                  >
+                    {sessionReminderMutation.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Covers: mentoring sessions, consultations, and program events.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-orange-400">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4 text-orange-500" />
+                  <p className="text-sm font-medium">Feedback Reminder</p>
+                  <span className="text-xs text-muted-foreground ml-1">— mentor only</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-sm text-muted-foreground">Remind mentor after</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={168}
+                    value={reminderHoursInput}
+                    onChange={(e) => setReminderHoursInput(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-20 h-8 text-sm"
+                  />
+                  <label className="text-sm text-muted-foreground">hours post-session</label>
+                  <Button
+                    size="sm"
+                    disabled={reminderMutation.isPending || !reminderHoursInput || Number(reminderHoursInput) < 1 || Number(reminderHoursInput) > 168}
+                    onClick={() => reminderMutation.mutate(Number(reminderHoursInput))}
+                  >
+                    {reminderMutation.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Reminds mentor to submit participant improvement notes.</p>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

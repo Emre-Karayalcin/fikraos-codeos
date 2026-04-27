@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { db } from "./db";
+import { checkAndSendSessionReminders } from "./sessionReminderService";
 import {
   consultationCredits,
   consultationSessions,
@@ -542,6 +543,11 @@ export function registerConsultationRoutes(app: Express) {
         )
       )
       .orderBy(consultationSessions.scheduledAt);
+
+    // Fire-and-forget: send pre-session reminders
+    checkAndSendSessionReminders().catch((e) =>
+      console.error("checkAndSendSessionReminders error:", e)
+    );
 
     res.json(sessions);
   });

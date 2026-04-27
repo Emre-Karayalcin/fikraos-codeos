@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Upcoming Session — FikraHub</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--bg:#f6f8fb;--card:#ffffff;--accent:#0891b2;--muted:#6b7280}
+    body{margin:0;background:var(--bg);font-family:Inter,system-ui,Arial,sans-serif;color:#111}
+    .wrap{max-width:680px;margin:28px auto;padding:24px}
+    .card{background:var(--card);border-radius:12px;box-shadow:0 6px 30px rgba(16,24,40,0.06);overflow:hidden}
+    .header{display:flex;gap:16px;align-items:center;padding:28px 32px;border-bottom:1px solid #f1f5f9;background:linear-gradient(135deg,#ecfeff,#f0fdfa)}
+    .logo{flex:0 0 64px;height:64px;border-radius:12px;background:#ffffff;display:flex;align-items:center;justify-content:center}
+    .logo img{height:auto;display:block}
+    .title{font-size:18px;font-weight:600;color:#0e7490}
+    .muted{color:var(--muted);font-size:14px;margin:4px 0 0}
+    .body{padding:28px 32px;line-height:1.6;color:#0f172a}
+    .greeting{margin:0 0 12px;font-size:16px}
+    table{width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;margin:20px 0}
+    table td{padding:10px 14px;font-size:14px}
+    table tr:nth-child(even){background:#f9fafb}
+    .label{color:#6b7280;font-weight:600;font-size:13px;white-space:nowrap;width:140px}
+    .cta{display:inline-block;margin:20px 0;padding:12px 24px;background:#0891b2;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px}
+    .small{font-size:13px;color:#64748b}
+    .footer{padding:20px 32px;background:#fbfdff;border-top:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:13px}
+    @media (prefers-color-scheme: dark) {
+      :root{--bg:#0f172a;--card:#1e293b;--muted:#94a3b8}
+      body{color:#f1f5f9}
+      .header{background:linear-gradient(135deg,#0c4a6e,#042f2e);border-bottom-color:#0e7490}
+      .body{color:#e2e8f0}
+      .footer{background:#1e293b;border-top-color:#334155;color:#94a3b8}
+      .logo{background:#1e293b}
+      .title{color:#67e8f9}
+      table{border-color:#334155}
+      table tr:nth-child(even){background:#1e293b}
+      table td{color:#e2e8f0}
+      .label{color:#94a3b8}
+    }
+    @media (max-width:520px){.wrap{padding:12px}.header,.body,.footer{padding:18px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <div class="logo">
+          <img src="https://codeos-dev.infinitepltesting.com/logo-code.jpeg" alt="FikraHub" width="48" height="48" style="border-radius:8px" />
+        </div>
+        <div>
+          <div class="title">🗓 Upcoming Program Session</div>
+          <div class="muted"><strong>{{orgName}}</strong></div>
+        </div>
+      </div>
+
+      <div class="body">
+        <p class="greeting">Hi {{userName}},</p>
+        <p>Don't miss your upcoming program session. Here are the details:</p>
+
+        <table>
+          <tr><td class="label">📋 Session</td><td>{{eventTitle}}</td></tr>
+          <tr><td class="label">📅 Date & Time</td><td>{{sessionDate}}</td></tr>
+          <tr><td class="label">⏱ Duration</td><td>{{durationMinutes}} minutes</td></tr>
+          {{#if location}}<tr><td class="label">📍 Location</td><td>{{location}}</td></tr>{{/if}}
+          {{#if meetingLink}}<tr><td class="label">🔗 Meeting Link</td><td><a href="{{meetingLink}}" style="color:#0891b2">Join Session</a></td></tr>{{/if}}
+        </table>
+
+        <p style="text-align:center">
+          <a class="cta" href="{{dashboardUrl}}">View Program Dashboard →</a>
+        </p>
+
+        <p class="small">
+          If the button doesn't work, visit:
+          <br/><a href="{{dashboardUrl}}" style="color:#0891b2;word-break:break-all">{{dashboardUrl}}</a>
+        </p>
+      </div>
+
+      <div class="footer">© 2025 FikraHub — All rights reserved</div>
+    </div>
+  </div>
+</body>
+</html>

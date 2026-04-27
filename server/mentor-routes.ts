@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { db } from "./db";
 import { mentorProfiles, mentorAvailability, mentorBookings, mentorSurveyQuestions, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords, organizations } from "../shared/schema";
+import { checkAndSendSessionReminders } from "./sessionReminderService";
 import { eq, and, isNotNull, isNull, inArray, sql, desc, avg, count, lt } from "drizzle-orm";
 import { Resend } from "resend";
 import { generateIcs } from "./services/calendarService";
@@ -597,6 +598,11 @@ async function autoCompleteExpiredBookings(userId?: string, mentorProfileId?: st
   // Fire-and-forget: send reminder/alert emails for sessions missing feedback
   checkAndSendFeedbackReminders().catch((e) =>
     console.error("checkAndSendFeedbackReminders error:", e)
+  );
+
+  // Fire-and-forget: send pre-session reminders for upcoming bookings
+  checkAndSendSessionReminders().catch((e) =>
+    console.error("checkAndSendSessionReminders error:", e)
   );
 }
 
@@ -1932,7 +1938,10 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
       );
 
     const [orgSettings] = await db
-      .select({ mentorFeedbackReminderHours: organizations.mentorFeedbackReminderHours })
+      .select({
+        mentorFeedbackReminderHours: organizations.mentorFeedbackReminderHours,
+        sessionReminderHours: organizations.sessionReminderHours,
+      })
       .from(organizations)
       .where(eq(organizations.id, orgId))
       .limit(1);
@@ -1941,6 +1950,7 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
       records: result,
       feedbackPendingCount: pendingCountRow?.count ?? 0,
       reminderHours: orgSettings?.mentorFeedbackReminderHours ?? 24,
+      sessionReminderHours: orgSettings?.sessionReminderHours ?? 24,
     });
   } catch (error) {
     console.error("Error fetching mentor feedback:", error);
@@ -1984,6 +1994,45 @@ router.patch("/workspaces/:orgId/admin/mentor-reminder-settings", async (req: an
   } catch (error) {
     console.error("Error updating reminder settings:", error);
     res.status(500).json({ message: "Failed to update reminder settings" });
+  }
+});
+
+// PATCH /api/workspaces/:orgId/admin/session-reminder-settings
+router.patch("/workspaces/:orgId/admin/session-reminder-settings", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const { orgId } = req.params;
+    const { sessionReminderHours } = req.body;
+
+    if (
+      typeof sessionReminderHours !== "number" ||
+      sessionReminderHours < 1 ||
+      sessionReminderHours > 168
+    ) {
+      return res.status(400).json({ message: "sessionReminderHours must be between 1 and 168" });
+    }
+
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, req.user.id)))
+      .limit(1);
+
+    if (!membership || !membership.role || !["ADMIN", "OWNER"].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const [updated] = await db
+      .update(organizations)
+      .set({ sessionReminderHours, updatedAt: new Date() })
+      .where(eq(organizations.id, orgId))
+      .returning({ sessionReminderHours: organizations.sessionReminderHours });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating session reminder settings:", error);
+    res.status(500).json({ message: "Failed to update session reminder settings" });
   }
 });
 
