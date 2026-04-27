@@ -2644,7 +2644,20 @@ export function registerRoutes(app: Express): Server {
         })
         .from(organizationMembers)
         .innerJoin(users, eq(organizationMembers.userId, users.id))
-        .where(eq(organizationMembers.orgId, orgId))
+        .leftJoin(memberApplications, and(
+          eq(memberApplications.userId, organizationMembers.userId),
+          eq(memberApplications.orgId, organizationMembers.orgId)
+        ))
+        .where(and(
+          eq(organizationMembers.orgId, orgId),
+          or(
+            not(eq(organizationMembers.role, 'MEMBER')),
+            and(
+              eq(memberApplications.status, 'APPROVED'),
+              isNotNull(memberApplications.acceptanceEmailSentAt)
+            )
+          )
+        ))
         .orderBy(desc((users as any).lastLoginAt));
 
       res.json(members);

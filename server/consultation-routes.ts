@@ -11,7 +11,7 @@ import {
   challenges,
   platformEvents,
 } from "../shared/schema";
-import { eq, and, desc, sql, inArray, ne } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, ne, isNotNull, or } from "drizzle-orm";
 import { isAuthenticated } from "./auth";
 import { z } from "zod";
 import { emailService } from "./services/emailService";
@@ -216,10 +216,21 @@ export function registerConsultationRoutes(app: Express) {
       })
       .from(organizationMembers)
       .innerJoin(users, eq(users.id, organizationMembers.userId))
+      .leftJoin(memberApplications, and(
+        eq(memberApplications.userId, organizationMembers.userId),
+        eq(memberApplications.orgId, organizationMembers.orgId)
+      ))
       .where(
         and(
           eq(organizationMembers.orgId, orgId),
-          inArray(organizationMembers.role, ["MEMBER", "MENTOR"])
+          inArray(organizationMembers.role, ["MEMBER", "MENTOR"]),
+          or(
+            ne(organizationMembers.role, 'MEMBER'),
+            and(
+              eq(memberApplications.status, 'APPROVED'),
+              isNotNull(memberApplications.acceptanceEmailSentAt)
+            )
+          )
         )
       )
       .orderBy(users.firstName);

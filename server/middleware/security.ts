@@ -58,7 +58,7 @@ export function setupSecurityMiddleware(app: Express) {
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 1000, // Increased from 100 to 1000 to support complex workflows and prevent false positives
-    message: 'Too many requests from this IP, please try again later.',
+    message: { error: 'Too many requests from this IP, please try again later.' },
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     skip: (req) => {
@@ -79,11 +79,11 @@ export function setupSecurityMiddleware(app: Express) {
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  message: 'Too many authentication attempts, please try again after 15 minutes.',
+  max: process.env.NODE_ENV === 'production' ? 5 : 100,
+  message: { error: 'Too many authentication attempts, please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: true, // Don't count successful requests
+  skipSuccessfulRequests: true,
 });
 
 /**
@@ -96,7 +96,7 @@ export const authRateLimiter = rateLimit({
 export const aiRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 50, // Limit each IP to 50 AI requests per hour
-  message: 'Too many AI requests, please try again later.',
+  message: { error: 'Too many AI requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
   // Use default key generator (req.ip) which handles IPv6 properly
@@ -108,7 +108,7 @@ export const aiRateLimiter = rateLimit({
 export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // Limit each IP to 3 requests per hour
-  message: 'Too many password reset attempts, please try again after an hour.',
+  message: { error: 'Too many password reset attempts, please try again after an hour.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -119,7 +119,7 @@ export const passwordResetLimiter = rateLimit({
 export const fileUploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10, // Limit each IP to 10 uploads per hour
-  message: 'Too many file uploads, please try again later.',
+  message: { error: 'Too many file uploads, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -130,7 +130,7 @@ export const fileUploadLimiter = rateLimit({
 export const orgCreationLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   max: 3, // Limit each IP to 3 org creations per day
-  message: 'Too many organization creation attempts, please try again tomorrow.',
+  message: { error: 'Too many organization creation attempts, please try again tomorrow.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -142,7 +142,7 @@ export const orgCreationLimiter = rateLimit({
 export const dataExportLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5, // Limit each IP to 5 exports per hour
-  message: 'Too many data export requests, please try again later.',
+  message: { error: 'Too many data export requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });

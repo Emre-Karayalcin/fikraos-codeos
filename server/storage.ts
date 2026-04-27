@@ -2,6 +2,7 @@ import {
   users,
   organizations,
   organizationMembers,
+  memberApplications,
   projects,
   chats,
   messages,
@@ -37,7 +38,7 @@ import {
   projectEvaluations,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, or, not, isNotNull } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -430,7 +431,20 @@ export class DatabaseStorage implements IStorage {
       })
       .from(organizationMembers)
       .innerJoin(users, eq(organizationMembers.userId, users.id))
-      .where(eq(organizationMembers.orgId, orgId));
+      .leftJoin(memberApplications, and(
+        eq(memberApplications.userId, organizationMembers.userId),
+        eq(memberApplications.orgId, organizationMembers.orgId)
+      ))
+      .where(and(
+        eq(organizationMembers.orgId, orgId),
+        or(
+          not(eq(organizationMembers.role, 'MEMBER')),
+          and(
+            eq(memberApplications.status, 'APPROVED'),
+            isNotNull(memberApplications.acceptanceEmailSentAt)
+          )
+        )
+      ));
 
     return result.map(row => ({
       user: row.user as Omit<User, 'password'>,
