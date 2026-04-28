@@ -711,8 +711,8 @@ async function checkAndSendFeedbackReminders() {
         .where(eq(mentorBookings.id, b.id));
     }
 
-    // Send admin alert
-    if (now >= alertThreshold && !b.adminAlertSentAt) {
+    // Send admin alert — only if a reminder was sent in a PREVIOUS call (not the same iteration)
+    if (now >= alertThreshold && !b.adminAlertSentAt && b.feedbackReminderSentAt) {
       const [mentorUser] = await db
         .select({ firstName: users.firstName, lastName: users.lastName })
         .from(mentorProfiles)
