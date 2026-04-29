@@ -228,6 +228,26 @@ export function registerConsultationRoutes(app: Express) {
     res.json(rows);
   });
 
+  // List consultant-role members for the session assignment dropdown
+  app.get("/api/workspaces/:orgId/admin/consultation/consultants", isAuthenticated, async (req, res) => {
+    const { orgId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+
+    const rows = await db
+      .select({
+        id:        users.id,
+        firstName: users.firstName,
+        lastName:  users.lastName,
+        email:     users.email,
+      })
+      .from(organizationMembers)
+      .innerJoin(users, eq(users.id, organizationMembers.userId))
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "CONSULTANT")))
+      .orderBy(users.firstName);
+
+    res.json(rows);
+  });
+
   // ── Participant: check own eligibility ────────────────────────────────────
   app.get("/api/workspaces/:orgId/consultation/eligibility", isAuthenticated, async (req, res) => {
     const { orgId } = req.params;

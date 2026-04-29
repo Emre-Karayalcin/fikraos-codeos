@@ -92,12 +92,23 @@ export default function AdminConsultation() {
   // ── Sessions state ────────────────────────────────────────────────────────
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [newSession, setNewSession] = useState({
-    title: "", scheduledAt: "", capacity: 3, externalMeetingLink: "", notes: "",
+    title: "", scheduledAt: "", capacity: 3, externalMeetingLink: "", notes: "", consultantUserId: "",
   });
 
   // ── Sessions query ────────────────────────────────────────────────────────
   const { data: sessions = [], refetch: refetchSessions } = useQuery<any[]>({
     queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions`],
+    enabled: !!orgId,
+  });
+
+  // ── Consultants query ─────────────────────────────────────────────────────
+  const { data: consultants = [] } = useQuery<any[]>({
+    queryKey: [`/api/workspaces/${orgId}/admin/consultation/consultants`],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/consultation/consultants`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
     enabled: !!orgId,
   });
 
@@ -178,6 +189,7 @@ export default function AdminConsultation() {
       if (newSession.scheduledAt) body.scheduledAt = new Date(newSession.scheduledAt).toISOString();
       if (newSession.externalMeetingLink) body.externalMeetingLink = newSession.externalMeetingLink;
       if (newSession.notes) body.notes = newSession.notes;
+      if (newSession.consultantUserId) body.consultantUserId = newSession.consultantUserId;
       const res = await fetch(`/api/workspaces/${orgId}/admin/consultation/sessions`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
         body: JSON.stringify(body),
@@ -187,10 +199,26 @@ export default function AdminConsultation() {
     },
     onSuccess: () => {
       toast.success("Session created");
-      setNewSession({ title: "", scheduledAt: "", capacity: 3, externalMeetingLink: "", notes: "" });
+      setNewSession({ title: "", scheduledAt: "", capacity: 3, externalMeetingLink: "", notes: "", consultantUserId: "" });
       queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions`] });
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const assignConsultantMutation = useMutation({
+    mutationFn: async ({ sessionId, consultantUserId }: { sessionId: string; consultantUserId: string | null }) => {
+      const res = await fetch(`/api/workspaces/${orgId}/admin/consultation/sessions/${sessionId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ consultantUserId: consultantUserId || null }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Consultant assigned");
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/consultation/sessions`] });
+    },
+    onError: () => toast.error("Failed to assign consultant"),
   });
 
   const updateSessionStatusMutation = useMutation({
@@ -484,6 +512,25 @@ export default function AdminConsultation() {
                         onChange={e => setNewSession(s => ({ ...s, capacity: Number(e.target.value) }))}
                       />
                     </div>
+                    <div className="space-y-1.5">
+                      <Label>Assign Consultant (optional)</Label>
+                      <Select
+                        value={newSession.consultantUserId || "__none__"}
+                        onValueChange={v => setNewSession(s => ({ ...s, consultantUserId: v === "__none__" ? "" : v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select consultant…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">No consultant assigned</SelectItem>
+                          {consultants.map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.firstName ? `${c.firstName} ${c.lastName ?? ""}`.trim() : c.username ?? c.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label>Meeting Link (optional)</Label>
                       <Input
@@ -538,6 +585,26 @@ export default function AdminConsultation() {
                                 {" · "}
                                 <Users className="w-3 h-3 inline" /> {s.filledSlots ?? s.activeBookings ?? 0}/{s.capacity} booked
                               </p>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-xs text-muted-foreground">Consultant:</span>
+                                <Select
+                                  value={s.consultantUserId ?? "__none__"}
+                                  onValueChange={v => assignConsultantMutation.mutate({ sessionId: s.id, consultantUserId: v === "__none__" ? null : v })}
+                                  disabled={assignConsultantMutation.isPending}
+                                >
+                                  <SelectTrigger className="h-6 text-xs w-44 py-0">
+                                    <SelectValue placeholder="Assign…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Unassigned</SelectItem>
+                                    {consultants.map((c: any) => (
+                                      <SelectItem key={c.id} value={c.id}>
+                                        {c.firstName ? `${c.firstName} ${c.lastName ?? ""}`.trim() : c.username ?? c.email}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {s.status === "ACTIVE" && (
