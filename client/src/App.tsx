@@ -65,6 +65,7 @@ import SuperAdminEmailTemplates from "@/pages/SuperAdminEmailTemplates";
 import SuperAdminScoringCriteria from "@/pages/SuperAdminScoringCriteria";
 import SuperAdminPitchDecks from "@/pages/SuperAdminPitchDecks";
 import SuperAdminDeclarations from "@/pages/SuperAdminDeclarations";
+import SuperAdminConsultationAnalytics from "@/pages/SuperAdminConsultationAnalytics";
 import AdminEmailTemplates from "@/pages/AdminEmailTemplates";
 import AdminActivityInsights from "@/pages/AdminActivityInsights";
 import AdminScoringCriteria from "@/pages/AdminScoringCriteria";
@@ -509,6 +510,12 @@ function Router() {
       <Route path="/admin/declarations" component={() => (
         <PageTransition>
           <SuperAdminGuard><SuperAdminDeclarations /></SuperAdminGuard>
+        </PageTransition>
+      )} />
+
+      <Route path="/admin/consultation-analytics" component={() => (
+        <PageTransition>
+          <SuperAdminGuard><SuperAdminConsultationAnalytics /></SuperAdminGuard>
         </PageTransition>
       )} />
 

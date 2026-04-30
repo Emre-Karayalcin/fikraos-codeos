@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useLocation, useParams } from "wouter";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
-  BarChart3, Users, Trophy, Lightbulb, TrendingUp, ArrowRight,
+  BarChart3, Users, Trophy, Lightbulb, TrendingUp, ArrowRight, HandCoins, CalendarCheck, AlertCircle, UserCheck,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -67,6 +67,16 @@ export default function ClientDashboard() {
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${orgId}/client/dashboard-stats`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!orgId,
+  });
+
+  const { data: consultationStats } = useQuery<any>({
+    queryKey: ["/api/client/consultation-analytics", orgId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${orgId}/client/consultation-analytics`, { credentials: "include" });
+      if (!res.ok) return null;
       return res.json();
     },
     enabled: !!orgId,
@@ -147,6 +157,35 @@ export default function ClientDashboard() {
               })}
             </div>
           </div>
+
+          {/* Consultation Analytics */}
+          {consultationStats && (
+            <div className="border border-border rounded-xl p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <HandCoins className="w-4 h-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Consultation</h2>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { label: "Sessions", value: consultationStats.totalSessions ?? 0, sub: `${consultationStats.completedSessions ?? 0} completed`, icon: CalendarCheck, color: "text-violet-600", bg: "bg-violet-500/10" },
+                  { label: "Credits Awarded", value: consultationStats.totalCreditsAwarded ?? 0, sub: `${consultationStats.uniqueParticipantsWithCredits ?? 0} participants`, icon: HandCoins, color: "text-amber-600", bg: "bg-amber-500/10" },
+                  { label: "No-Shows", value: consultationStats.noShows ?? 0, sub: "unconfirmed on completed", icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
+                  { label: "Utilisation", value: `${consultationStats.utilizationRate ?? 0}%`, sub: "participants with credits", icon: UserCheck, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+                ].map(card => (
+                  <div key={card.label} className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${card.bg} shrink-0`}>
+                      <card.icon className={`w-4 h-4 ${card.color}`} />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold leading-tight">{card.value}</p>
+                      <p className="text-xs font-medium">{card.label}</p>
+                      <p className="text-xs text-muted-foreground">{card.sub}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Top Ideas */}
           <div className="border border-border rounded-xl overflow-hidden">

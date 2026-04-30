@@ -12,7 +12,7 @@ import {
   challenges,
   platformEvents,
 } from "../shared/schema";
-import { eq, and, desc, sql, inArray, ne } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, ne, isNull, isNotNull } from "drizzle-orm";
 import { isAuthenticated } from "./auth";
 import { z } from "zod";
 import { emailService } from "./services/emailService";
@@ -660,6 +660,137 @@ export function registerConsultationRoutes(app: Express) {
     } as any).catch(console.error);
 
     res.status(201).json(booking);
+  });
+
+  // ── Analytics helpers ─────────────────────────────────────────────────────
+
+  async function buildConsultationAnalytics(orgIds: string[]) {
+    if (orgIds.length === 0) return [];
+    const orgFilter = orgIds.length === 1 ? eq(consultationSessions.orgId, orgIds[0]) : inArray(consultationSessions.orgId, orgIds);
+    const credOrgFilter = orgIds.length === 1 ? eq(consultationCredits.orgId, orgIds[0]) : inArray(consultationCredits.orgId, orgIds);
+    const bookOrgFilter = orgIds.length === 1 ? eq(consultationBookings.orgId, orgIds[0]) : inArray(consultationBookings.orgId, orgIds);
+
+    const [sessionsRaw, creditsRaw, bookingsRaw, orgsRaw] = await Promise.all([
+      db.select({
+        orgId:  consultationSessions.orgId,
+        status: consultationSessions.status,
+        count:  sql<number>`cast(count(*) as int)`,
+      }).from(consultationSessions).where(orgFilter).groupBy(consultationSessions.orgId, consultationSessions.status),
+
+      db.select({
+        orgId:       consultationCredits.orgId,
+        userId:      consultationCredits.userId,
+        totalCredits: sql<number>`cast(sum(${consultationCredits.credits}) as int)`,
+      }).from(consultationCredits).where(credOrgFilter).groupBy(consultationCredits.orgId, consultationCredits.userId),
+
+      db.select({
+        orgId:     consultationBookings.orgId,
+        status:    consultationBookings.status,
+        sessionId: consultationBookings.sessionId,
+        count:     sql<number>`cast(count(*) as int)`,
+      }).from(consultationBookings)
+        .innerJoin(consultationSessions, eq(consultationBookings.sessionId, consultationSessions.id))
+        .where(bookOrgFilter)
+        .groupBy(consultationBookings.orgId, consultationBookings.status, consultationBookings.sessionId, consultationSessions.status),
+
+      db.select({ id: organizations.id, name: organizations.name, consultationMaxEligible: organizations.consultationMaxEligible })
+        .from(organizations)
+        .where(orgIds.length === 1 ? eq(organizations.id, orgIds[0]) : inArray(organizations.id, orgIds)),
+    ]);
+
+    // no-shows = PENDING bookings where the session is COMPLETED
+    const noShowBookings = await db.select({
+      orgId: consultationBookings.orgId,
+      count: sql<number>`cast(count(*) as int)`,
+    })
+    .from(consultationBookings)
+    .innerJoin(consultationSessions, eq(consultationBookings.sessionId, consultationSessions.id))
+    .where(and(
+      orgIds.length === 1 ? eq(consultationBookings.orgId, orgIds[0]) : inArray(consultationBookings.orgId, orgIds),
+      eq(consultationBookings.status, "PENDING"),
+      eq(consultationSessions.status, "COMPLETED"),
+    ))
+    .groupBy(consultationBookings.orgId);
+
+    const noShowMap = new Map(noShowBookings.map(r => [r.orgId, r.count]));
+    const orgMap = new Map(orgsRaw.map(o => [o.id, o]));
+
+    return orgIds.map(orgId => {
+      const org = orgMap.get(orgId);
+      const sessRows = sessionsRaw.filter(r => r.orgId === orgId);
+      const credRows = creditsRaw.filter(r => r.orgId === orgId);
+      const bookRows = bookingsRaw.filter(r => r.orgId === orgId);
+
+      const totalSessions = sessRows.reduce((s, r) => s + r.count, 0);
+      const completedSessions = sessRows.find(r => r.status === "COMPLETED")?.count ?? 0;
+      const activeSessions = sessRows.find(r => r.status === "ACTIVE")?.count ?? 0;
+
+      const totalCreditsAwarded = credRows.reduce((s, r) => s + r.totalCredits, 0);
+      const uniqueParticipantsWithCredits = credRows.length;
+
+      const confirmedBookings = bookRows.filter(r => r.status === "CONFIRMED").reduce((s, r) => s + r.count, 0);
+      const cancelledBookings = bookRows.filter(r => r.status === "CANCELLED").reduce((s, r) => s + r.count, 0);
+      const pendingBookings   = bookRows.filter(r => r.status === "PENDING").reduce((s, r) => s + r.count, 0);
+      const noShows = noShowMap.get(orgId) ?? 0;
+      const totalActiveBookings = confirmedBookings + pendingBookings;
+
+      const maxEligible = org?.consultationMaxEligible ?? 3;
+      const uniqueBookers = new Set(bookRows.map(r => r.sessionId)).size; // proxy
+      const utilizationRate = maxEligible > 0
+        ? Math.min(100, Math.round((uniqueParticipantsWithCredits / maxEligible) * 100))
+        : 0;
+
+      return {
+        orgId,
+        orgName: org?.name ?? orgId,
+        totalSessions,
+        completedSessions,
+        activeSessions,
+        totalCreditsAwarded,
+        uniqueParticipantsWithCredits,
+        confirmedBookings,
+        cancelledBookings,
+        pendingBookings,
+        noShows,
+        totalActiveBookings,
+        utilizationRate,
+        completionRate: totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0,
+      };
+    });
+  }
+
+  // ── PMO: Consultation analytics ────────────────────────────────────────────
+  app.get("/api/workspaces/:orgId/admin/consultation/analytics", isAuthenticated, async (req, res) => {
+    const { orgId } = req.params;
+    if (!await requireOrgAdmin(req, res, orgId)) return;
+    const [data] = await buildConsultationAnalytics([orgId]);
+    res.json(data ?? {});
+  });
+
+  // ── Super Admin: Cross-competition consultation analytics ──────────────────
+  app.get("/api/admin/consultation/analytics", isAuthenticated, async (req: any, res) => {
+    const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS || "").split(",").map((e: string) => e.trim().toLowerCase()).filter(Boolean);
+    const isSuperAdmin = superAdminEmails.includes((req.user?.email || "").toLowerCase());
+    if (!isSuperAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+    const allOrgs = await db.select({ id: organizations.id }).from(organizations);
+    const data = await buildConsultationAnalytics(allOrgs.map(o => o.id));
+    res.json(data);
+  });
+
+  // ── Client: Read-only consultation analytics for their workspace ───────────
+  app.get("/api/workspaces/:orgId/client/consultation-analytics", isAuthenticated, async (req: any, res) => {
+    const { orgId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const [m] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    if (!m || !["CLIENT", "OWNER", "ADMIN"].includes(m.role)) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    const [data] = await buildConsultationAnalytics([orgId]);
+    res.json(data ?? {});
   });
 
   // ── CONSULTANT: My sessions + participant idea info ────────────────────────

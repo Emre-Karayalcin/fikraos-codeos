@@ -2,7 +2,7 @@ import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, ChevronLeft, ChevronRight, LogOut,
   Kanban, BarChart2, Building2, Users, Target,
-  CalendarDays, ClipboardList, Mail, BookOpen, Brain, Presentation, FileText,
+  CalendarDays, ClipboardList, Mail, BookOpen, Brain, Presentation, FileText, HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -47,9 +47,10 @@ const navSections = [
   {
     label: "Analytics & Config",
     items: [
-      { title: "Activity Insights", href: "/admin/activity-insights", icon: BarChart2 },
-      { title: "Scoring Criteria",  href: "/admin/scoring-criteria",  icon: BookOpen },
-      { title: "Declarations",      href: "/admin/declarations",       icon: FileText },
+      { title: "Activity Insights",        href: "/admin/activity-insights",       icon: BarChart2 },
+      { title: "Consultation Analytics",   href: "/admin/consultation-analytics",  icon: HandCoins },
+      { title: "Scoring Criteria",         href: "/admin/scoring-criteria",        icon: BookOpen },
+      { title: "Declarations",             href: "/admin/declarations",            icon: FileText },
     ],
   },
 ];

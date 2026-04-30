@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import toast from "react-hot-toast";
-import { HandCoins, Trophy, Settings2, Trash2, Medal, CalendarCheck, Plus, Users, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { HandCoins, Trophy, Settings2, Trash2, Medal, CalendarCheck, Plus, Users, CheckCircle, XCircle, ChevronDown, ChevronUp, BarChart3, TrendingUp, AlertCircle, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 
 export default function AdminConsultation() {
@@ -93,6 +93,12 @@ export default function AdminConsultation() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [newSession, setNewSession] = useState({
     title: "", scheduledAt: "", capacity: 3, externalMeetingLink: "", notes: "", consultantUserId: "",
+  });
+
+  // ── Analytics query ───────────────────────────────────────────────────────
+  const { data: analytics } = useQuery<any>({
+    queryKey: [`/api/workspaces/${orgId}/admin/consultation/analytics`],
+    enabled: !!orgId,
   });
 
   // ── Sessions query ────────────────────────────────────────────────────────
@@ -283,6 +289,7 @@ export default function AdminConsultation() {
               <TabsTrigger value="credits"><HandCoins className="w-4 h-4 mr-1.5" />Award Credits</TabsTrigger>
               <TabsTrigger value="rankings"><Trophy className="w-4 h-4 mr-1.5" />Rankings</TabsTrigger>
               <TabsTrigger value="sessions"><CalendarCheck className="w-4 h-4 mr-1.5" />Sessions</TabsTrigger>
+              <TabsTrigger value="analytics"><BarChart3 className="w-4 h-4 mr-1.5" />Analytics</TabsTrigger>
               <TabsTrigger value="settings"><Settings2 className="w-4 h-4 mr-1.5" />Settings</TabsTrigger>
             </TabsList>
 
@@ -705,6 +712,86 @@ export default function AdminConsultation() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* ── Analytics tab ─────────────────────────────────────────── */}
+            <TabsContent value="analytics" className="space-y-6 mt-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { label: "Total Sessions", value: analytics?.totalSessions ?? "—", sub: `${analytics?.completedSessions ?? 0} completed`, icon: CalendarCheck, color: "text-violet-600", bg: "bg-violet-500/10" },
+                  { label: "Credits Awarded", value: analytics?.totalCreditsAwarded ?? "—", sub: `${analytics?.uniqueParticipantsWithCredits ?? 0} participants`, icon: HandCoins, color: "text-amber-600", bg: "bg-amber-500/10" },
+                  { label: "No-Shows", value: analytics?.noShows ?? "—", sub: "unconfirmed on completed sessions", icon: AlertCircle, color: "text-red-600", bg: "bg-red-500/10" },
+                  { label: "Utilisation", value: analytics ? `${analytics.utilizationRate}%` : "—", sub: `${analytics?.uniqueParticipantsWithCredits ?? 0} of ${workspace?.consultationMaxEligible ?? "?"} eligible`, icon: UserCheck, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+                ].map(card => (
+                  <div key={card.label} className="border rounded-xl p-4 flex items-center gap-3">
+                    <div className={`p-2.5 rounded-lg ${card.bg} shrink-0`}>
+                      <card.icon className={`w-4 h-4 ${card.color}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xl font-bold leading-tight">{analytics === undefined ? "…" : card.value}</p>
+                      <p className="text-xs font-medium text-foreground">{card.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">{card.sub}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Session breakdown */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-violet-500" />Session Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {[
+                      { label: "Active", value: analytics?.activeSessions ?? 0, color: "bg-blue-500" },
+                      { label: "Completed", value: analytics?.completedSessions ?? 0, color: "bg-emerald-500" },
+                      { label: "Total", value: analytics?.totalSessions ?? 0, color: "bg-gray-300" },
+                    ].map(row => (
+                      <div key={row.label} className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground w-20 shrink-0">{row.label}</span>
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${row.color} rounded-full transition-all`}
+                            style={{ width: analytics?.totalSessions > 0 ? `${Math.round((row.value / analytics.totalSessions) * 100)}%` : "0%" }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold w-6 text-right">{row.value}</span>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground pt-1">Completion rate: <span className="font-semibold text-foreground">{analytics?.completionRate ?? 0}%</span></p>
+                  </CardContent>
+                </Card>
+
+                {/* Booking breakdown */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" />Booking Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {[
+                      { label: "Confirmed", value: analytics?.confirmedBookings ?? 0, color: "bg-emerald-500" },
+                      { label: "Pending", value: analytics?.pendingBookings ?? 0, color: "bg-amber-500" },
+                      { label: "Cancelled", value: analytics?.cancelledBookings ?? 0, color: "bg-red-400" },
+                      { label: "No-shows", value: analytics?.noShows ?? 0, color: "bg-rose-600" },
+                    ].map(row => {
+                      const total = (analytics?.confirmedBookings ?? 0) + (analytics?.pendingBookings ?? 0) + (analytics?.cancelledBookings ?? 0);
+                      return (
+                        <div key={row.label} className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground w-20 shrink-0">{row.label}</span>
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${row.color} rounded-full transition-all`}
+                              style={{ width: total > 0 ? `${Math.round((row.value / total) * 100)}%` : "0%" }}
+                            />
+                          </div>
+                          <span className="text-sm font-semibold w-6 text-right">{row.value}</span>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             {/* ── Settings tab ──────────────────────────────────────────── */}
