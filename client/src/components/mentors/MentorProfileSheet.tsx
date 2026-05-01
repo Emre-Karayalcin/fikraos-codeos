@@ -33,6 +33,7 @@ import {
   Paperclip,
   Loader2,
   X,
+  AlertCircle,
 } from "lucide-react";
 
 interface Availability {
@@ -141,6 +142,21 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
 
   const { data: pitchDecks = [] } = useQuery<PitchDeck[]>({
     queryKey: ["/api/my-pitch-decks"],
+    enabled: open,
+  });
+
+  const { data: weeklyUsage } = useQuery<{
+    sessions: number; minutes: number;
+    sessionLimit: number | null; hoursLimit: number | null;
+    weekStart: string; weekEnd: string;
+  }>({
+    queryKey: ["/api/mentor-bookings/weekly-usage", selectedDate],
+    queryFn: async () => {
+      const params = selectedDate ? `?date=${selectedDate}` : "";
+      const res = await fetch(`/api/mentor-bookings/weekly-usage${params}`, { credentials: "include" });
+      if (!res.ok) return null as any;
+      return res.json();
+    },
     enabled: open,
   });
 
@@ -633,10 +649,42 @@ export default function MentorProfileSheet({ mentor, open, onOpenChange }: Props
               </div>
             )}
 
+            {/* Weekly usage indicator */}
+            {weeklyUsage && (weeklyUsage.sessionLimit != null || weeklyUsage.hoursLimit != null) && (() => {
+              const sessionOver = weeklyUsage.sessionLimit != null && weeklyUsage.sessions >= weeklyUsage.sessionLimit;
+              const hoursUsed = weeklyUsage.minutes / 60;
+              const hoursOver = weeklyUsage.hoursLimit != null && hoursUsed >= weeklyUsage.hoursLimit;
+              const isOver = sessionOver || hoursOver;
+              return (
+                <div className={`rounded-lg px-3 py-2.5 text-xs space-y-1 ${isOver ? "bg-destructive/10 border border-destructive/30" : "bg-muted"}`}>
+                  <div className="flex items-center gap-1.5 font-medium">
+                    {isOver && <AlertCircle className="w-3.5 h-3.5 text-destructive" />}
+                    <span className={isOver ? "text-destructive" : "text-muted-foreground"}>
+                      {isOver ? "Weekly limit reached" : "This week's usage"}
+                    </span>
+                  </div>
+                  {weeklyUsage.sessionLimit != null && (
+                    <p className={sessionOver ? "text-destructive" : "text-muted-foreground"}>
+                      Sessions: {weeklyUsage.sessions} / {weeklyUsage.sessionLimit}
+                    </p>
+                  )}
+                  {weeklyUsage.hoursLimit != null && (
+                    <p className={hoursOver ? "text-destructive" : "text-muted-foreground"}>
+                      Hours: {hoursUsed.toFixed(1)} / {weeklyUsage.hoursLimit}h
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             <Button
               className="w-full"
               onClick={handleBook}
-              disabled={!selectedDate || !selectedTime || bookMutation.isPending}
+              disabled={
+                !selectedDate || !selectedTime || bookMutation.isPending ||
+                (weeklyUsage != null && weeklyUsage.sessionLimit != null && weeklyUsage.sessions >= weeklyUsage.sessionLimit) ||
+                (weeklyUsage != null && weeklyUsage.hoursLimit != null && weeklyUsage.minutes / 60 >= weeklyUsage.hoursLimit)
+              }
             >
               {bookMutation.isPending ? "Booking…" : "Book Session"}
             </Button>

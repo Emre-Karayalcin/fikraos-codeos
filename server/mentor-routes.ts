@@ -3,7 +3,7 @@ import multer from "multer";
 import { db } from "./db";
 import { mentorProfiles, mentorAvailability, mentorBookings, mentorSurveyQuestions, users, ideas, projects, organizationMembers, pitchDeckGenerations, attendanceRecords, organizations } from "../shared/schema";
 import { checkAndSendSessionReminders } from "./sessionReminderService";
-import { eq, and, isNotNull, isNull, inArray, sql, desc, avg, count, lt } from "drizzle-orm";
+import { eq, and, isNotNull, isNull, inArray, sql, desc, avg, count, lt, gte, lte } from "drizzle-orm";
 import { Resend } from "resend";
 import { generateIcs } from "./services/calendarService";
 import { uploadToGCS } from "./lib/gcsUpload";
@@ -72,6 +72,21 @@ function normalizeCalendlyUrl(raw?: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+// Returns ISO week bounds (Monday–Sunday) for a given YYYY-MM-DD date string
+function getWeekBounds(dateStr: string): { weekStart: string; weekEnd: string } {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  const dow = d.getUTCDay(); // 0=Sun … 6=Sat
+  const diffToMonday = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(d);
+  monday.setUTCDate(d.getUTCDate() + diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return {
+    weekStart: monday.toISOString().slice(0, 10),
+    weekEnd: sunday.toISOString().slice(0, 10),
+  };
 }
 
 function buildCalendlyPrefillLink(
@@ -411,6 +426,49 @@ router.post("/mentor-bookings", async (req: any, res) => {
       const existEnd = existStart + (existing.durationMinutes ?? 60);
       if (existStart < newEnd && existEnd > newStart) {
         return res.status(409).json({ message: "This time slot overlaps with an existing booking" });
+      }
+    }
+
+    // ── 3. Weekly booking limits ──────────────────────────────────────────────
+    const userOrgId = await getUserOrgId(req.user.id);
+    if (userOrgId) {
+      const [orgLimits] = await db
+        .select({
+          mentorWeeklySessionLimit: organizations.mentorWeeklySessionLimit,
+          mentorWeeklyHoursLimit: organizations.mentorWeeklyHoursLimit,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, userOrgId))
+        .limit(1);
+
+      if (orgLimits && (orgLimits.mentorWeeklySessionLimit != null || orgLimits.mentorWeeklyHoursLimit != null)) {
+        const { weekStart, weekEnd } = getWeekBounds(bookedDate);
+        const weekBookings = await db
+          .select({ durationMinutes: mentorBookings.durationMinutes })
+          .from(mentorBookings)
+          .where(and(
+            eq(mentorBookings.userId, req.user.id),
+            gte(mentorBookings.bookedDate, weekStart),
+            lte(mentorBookings.bookedDate, weekEnd),
+            inArray(mentorBookings.status, ["PENDING", "CONFIRMED"]),
+          ));
+
+        if (orgLimits.mentorWeeklySessionLimit != null && weekBookings.length >= orgLimits.mentorWeeklySessionLimit) {
+          return res.status(429).json({
+            message: `You have reached your weekly session limit of ${orgLimits.mentorWeeklySessionLimit} session${orgLimits.mentorWeeklySessionLimit === 1 ? "" : "s"}.`,
+          });
+        }
+
+        if (orgLimits.mentorWeeklyHoursLimit != null) {
+          const usedMinutes = weekBookings.reduce((sum, b) => sum + (b.durationMinutes ?? 60), 0);
+          const newTotalMinutes = usedMinutes + (sessionDuration);
+          if (newTotalMinutes > orgLimits.mentorWeeklyHoursLimit * 60) {
+            const usedHours = (usedMinutes / 60).toFixed(1);
+            return res.status(429).json({
+              message: `This session would exceed your weekly limit of ${orgLimits.mentorWeeklyHoursLimit} hour${orgLimits.mentorWeeklyHoursLimit === 1 ? "" : "s"} (${usedHours}h used this week).`,
+            });
+          }
+        }
       }
     }
 
@@ -1941,6 +1999,8 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
       .select({
         mentorFeedbackReminderHours: organizations.mentorFeedbackReminderHours,
         sessionReminderHours: organizations.sessionReminderHours,
+        mentorWeeklySessionLimit: organizations.mentorWeeklySessionLimit,
+        mentorWeeklyHoursLimit: organizations.mentorWeeklyHoursLimit,
       })
       .from(organizations)
       .where(eq(organizations.id, orgId))
@@ -1951,6 +2011,8 @@ router.get("/workspaces/:orgId/admin/mentor-feedback", async (req: any, res) => 
       feedbackPendingCount: pendingCountRow?.count ?? 0,
       reminderHours: orgSettings?.mentorFeedbackReminderHours ?? 24,
       sessionReminderHours: orgSettings?.sessionReminderHours ?? 24,
+      weeklySessionLimit: orgSettings?.mentorWeeklySessionLimit ?? null,
+      weeklyHoursLimit: orgSettings?.mentorWeeklyHoursLimit ?? null,
     });
   } catch (error) {
     console.error("Error fetching mentor feedback:", error);
@@ -2033,6 +2095,98 @@ router.patch("/workspaces/:orgId/admin/session-reminder-settings", async (req: a
   } catch (error) {
     console.error("Error updating session reminder settings:", error);
     res.status(500).json({ message: "Failed to update session reminder settings" });
+  }
+});
+
+// PATCH /api/workspaces/:orgId/admin/mentor-booking-limits
+router.patch("/workspaces/:orgId/admin/mentor-booking-limits", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const { orgId } = req.params;
+    const { mentorWeeklySessionLimit, mentorWeeklyHoursLimit } = req.body;
+
+    const [membership] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, req.user.id)))
+      .limit(1);
+
+    if (!membership || !membership.role || !["ADMIN", "OWNER"].includes(membership.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // Accept null (remove limit) or a positive integer
+    const sessionLimit = mentorWeeklySessionLimit === null ? null :
+      (typeof mentorWeeklySessionLimit === "number" && mentorWeeklySessionLimit >= 1) ? mentorWeeklySessionLimit : undefined;
+    const hoursLimit = mentorWeeklyHoursLimit === null ? null :
+      (typeof mentorWeeklyHoursLimit === "number" && mentorWeeklyHoursLimit >= 1) ? mentorWeeklyHoursLimit : undefined;
+
+    if (sessionLimit === undefined && hoursLimit === undefined) {
+      return res.status(400).json({ message: "Provide mentorWeeklySessionLimit and/or mentorWeeklyHoursLimit (positive integer or null)" });
+    }
+
+    const updatePayload: Record<string, any> = { updatedAt: new Date() };
+    if (sessionLimit !== undefined) updatePayload.mentorWeeklySessionLimit = sessionLimit;
+    if (hoursLimit !== undefined) updatePayload.mentorWeeklyHoursLimit = hoursLimit;
+
+    const [updated] = await db
+      .update(organizations)
+      .set(updatePayload)
+      .where(eq(organizations.id, orgId))
+      .returning({
+        mentorWeeklySessionLimit: organizations.mentorWeeklySessionLimit,
+        mentorWeeklyHoursLimit: organizations.mentorWeeklyHoursLimit,
+      });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating booking limits:", error);
+    res.status(500).json({ message: "Failed to update booking limits" });
+  }
+});
+
+// GET /api/mentor-bookings/weekly-usage — participant's usage for a given week
+router.get("/mentor-bookings/weekly-usage", async (req: any, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const dateStr = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const { weekStart, weekEnd } = getWeekBounds(dateStr);
+
+    const orgId = await getUserOrgId(req.user.id);
+    if (!orgId) return res.json({ sessions: 0, minutes: 0, sessionLimit: null, hoursLimit: null, weekStart, weekEnd });
+
+    const [orgLimits] = await db
+      .select({
+        mentorWeeklySessionLimit: organizations.mentorWeeklySessionLimit,
+        mentorWeeklyHoursLimit: organizations.mentorWeeklyHoursLimit,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+
+    const weekBookings = await db
+      .select({ durationMinutes: mentorBookings.durationMinutes })
+      .from(mentorBookings)
+      .where(and(
+        eq(mentorBookings.userId, req.user.id),
+        gte(mentorBookings.bookedDate, weekStart),
+        lte(mentorBookings.bookedDate, weekEnd),
+        inArray(mentorBookings.status, ["PENDING", "CONFIRMED"]),
+      ));
+
+    const totalMinutes = weekBookings.reduce((s, b) => s + (b.durationMinutes ?? 60), 0);
+
+    res.json({
+      sessions: weekBookings.length,
+      minutes: totalMinutes,
+      sessionLimit: orgLimits?.mentorWeeklySessionLimit ?? null,
+      hoursLimit: orgLimits?.mentorWeeklyHoursLimit ?? null,
+      weekStart,
+      weekEnd,
+    });
+  } catch (error) {
+    console.error("Error fetching weekly usage:", error);
+    res.status(500).json({ message: "Failed to fetch weekly usage" });
   }
 });
 

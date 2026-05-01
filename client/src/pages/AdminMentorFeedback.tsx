@@ -14,7 +14,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { MessageSquare, Star, Pencil, Clock } from "lucide-react";
+import { MessageSquare, Star, Pencil, Clock, CalendarDays } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -173,6 +173,8 @@ export default function AdminMentorFeedback() {
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
   const [reminderHoursInput, setReminderHoursInput] = useState<number | "">(24);
   const [sessionReminderHoursInput, setSessionReminderHoursInput] = useState<number | "">(24);
+  const [weeklySessionLimitInput, setWeeklySessionLimitInput] = useState<number | ""  | null>(null);
+  const [weeklyHoursLimitInput, setWeeklyHoursLimitInput] = useState<number | "" | null>(null);
 
   const { data: workspace } = useQuery<{ id: string }>({
     queryKey: [`/api/workspaces/${slug}`],
@@ -188,7 +190,7 @@ export default function AdminMentorFeedback() {
   if (filterMentorId && filterMentorId !== "all") params.set("mentorId", filterMentorId);
   if (filterMinRating && filterMinRating !== "all") params.set("minRating", filterMinRating);
 
-  const { data: feedbackData, isLoading } = useQuery<{ records: any[]; feedbackPendingCount: number; reminderHours: number; sessionReminderHours: number }>({
+  const { data: feedbackData, isLoading } = useQuery<{ records: any[]; feedbackPendingCount: number; reminderHours: number; sessionReminderHours: number; weeklySessionLimit: number | null; weeklyHoursLimit: number | null }>({
     queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`, filterMentorId, filterMinRating],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${orgId}/admin/mentor-feedback?${params}`, { credentials: "include" });
@@ -201,15 +203,13 @@ export default function AdminMentorFeedback() {
   const allRecords: any[] = feedbackData?.records ?? [];
   const feedbackPendingCount = feedbackData?.feedbackPendingCount ?? 0;
 
-  // Sync reminder hours from server once loaded
+  // Sync settings from server once loaded
   useEffect(() => {
-    if (feedbackData?.reminderHours != null) {
-      setReminderHoursInput(feedbackData.reminderHours);
-    }
-    if (feedbackData?.sessionReminderHours != null) {
-      setSessionReminderHoursInput(feedbackData.sessionReminderHours);
-    }
-  }, [feedbackData?.reminderHours, feedbackData?.sessionReminderHours]);
+    if (feedbackData?.reminderHours != null) setReminderHoursInput(feedbackData.reminderHours);
+    if (feedbackData?.sessionReminderHours != null) setSessionReminderHoursInput(feedbackData.sessionReminderHours);
+    if (feedbackData?.weeklySessionLimit !== undefined) setWeeklySessionLimitInput(feedbackData.weeklySessionLimit ?? "");
+    if (feedbackData?.weeklyHoursLimit !== undefined) setWeeklyHoursLimitInput(feedbackData.weeklyHoursLimit ?? "");
+  }, [feedbackData?.reminderHours, feedbackData?.sessionReminderHours, feedbackData?.weeklySessionLimit, feedbackData?.weeklyHoursLimit]);
 
   const reminderMutation = useMutation({
     mutationFn: (hours: number) =>
@@ -229,6 +229,16 @@ export default function AdminMentorFeedback() {
       toast({ title: "Session reminder settings saved" });
     },
     onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+  });
+
+  const bookingLimitsMutation = useMutation({
+    mutationFn: (payload: { mentorWeeklySessionLimit: number | null; mentorWeeklyHoursLimit: number | null }) =>
+      apiRequest("PATCH", `/api/workspaces/${orgId}/admin/mentor-booking-limits`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/workspaces/${orgId}/admin/mentor-feedback`] });
+      toast({ title: "Booking limits saved" });
+    },
+    onError: () => toast({ title: "Failed to save booking limits", variant: "destructive" }),
   });
 
   const feedback = (() => {
@@ -257,7 +267,7 @@ export default function AdminMentorFeedback() {
             </div>
           </div>
 
-          {/* Reminder settings */}
+          {/* Settings */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="border-l-4 border-l-blue-400">
               <CardContent className="p-4">
@@ -316,6 +326,74 @@ export default function AdminMentorFeedback() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">Reminds mentor to submit participant improvement notes.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-violet-400">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CalendarDays className="w-4 h-4 text-violet-500" />
+                  <p className="text-sm font-medium">Weekly Session Limit</p>
+                  <span className="text-xs text-muted-foreground ml-1">— per participant</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-sm text-muted-foreground">Max</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={99}
+                    placeholder="∞"
+                    value={weeklySessionLimitInput ?? ""}
+                    onChange={e => setWeeklySessionLimitInput(e.target.value === "" ? null : Number(e.target.value))}
+                    className="w-20 h-8 text-sm"
+                  />
+                  <label className="text-sm text-muted-foreground">sessions / week</label>
+                  <Button
+                    size="sm"
+                    disabled={bookingLimitsMutation.isPending}
+                    onClick={() => bookingLimitsMutation.mutate({
+                      mentorWeeklySessionLimit: weeklySessionLimitInput ? Number(weeklySessionLimitInput) : null,
+                      mentorWeeklyHoursLimit: weeklyHoursLimitInput ? Number(weeklyHoursLimitInput) : null,
+                    })}
+                  >
+                    {bookingLimitsMutation.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Leave blank for unlimited. Enforced at booking time.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-teal-400">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4 text-teal-500" />
+                  <p className="text-sm font-medium">Weekly Hours Limit</p>
+                  <span className="text-xs text-muted-foreground ml-1">— per participant</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-sm text-muted-foreground">Max</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={168}
+                    placeholder="∞"
+                    value={weeklyHoursLimitInput ?? ""}
+                    onChange={e => setWeeklyHoursLimitInput(e.target.value === "" ? null : Number(e.target.value))}
+                    className="w-20 h-8 text-sm"
+                  />
+                  <label className="text-sm text-muted-foreground">hours / week</label>
+                  <Button
+                    size="sm"
+                    disabled={bookingLimitsMutation.isPending}
+                    onClick={() => bookingLimitsMutation.mutate({
+                      mentorWeeklySessionLimit: weeklySessionLimitInput ? Number(weeklySessionLimitInput) : null,
+                      mentorWeeklyHoursLimit: weeklyHoursLimitInput ? Number(weeklyHoursLimitInput) : null,
+                    })}
+                  >
+                    {bookingLimitsMutation.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Leave blank for unlimited. Both limits are checked independently.</p>
               </CardContent>
             </Card>
           </div>

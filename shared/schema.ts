@@ -156,6 +156,9 @@ export const organizations = pgTable("organizations", {
   mentorFeedbackReminderHours: integer("mentor_feedback_reminder_hours").default(24),
   // Session reminder config (hours BEFORE session to send reminder to participants)
   sessionReminderHours: integer("session_reminder_hours").default(24),
+  // Participant weekly mentorship booking limits (null = unlimited)
+  mentorWeeklySessionLimit: integer("mentor_weekly_session_limit"),
+  mentorWeeklyHoursLimit: integer("mentor_weekly_hours_limit"),
   // Consultation feature config
   consultationEnabled: boolean("consultation_enabled").default(false),
   consultationMinCredits: integer("consultation_min_credits").default(10),
